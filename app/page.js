@@ -489,3 +489,4 @@ export default function Home() {
             <PanelContent
               cafes={cafes} filtered={filtered}
             
+
