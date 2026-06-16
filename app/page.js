@@ -11,7 +11,7 @@ export default function Home() {
       background: '#FFF8F0'
     }}>
       <h1 style={{color: '#6B4226', fontSize: 28}}>
-        🏙️ TwinLand
+        🏙️ TwinLand 
       </h1>
       <p style={{color: '#A08C8C', marginTop: 10}}>
         کشف کافه‌های تهران
