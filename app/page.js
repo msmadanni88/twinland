@@ -1,4 +1,3 @@
-الان همه متن رو پاک کن و این کد رو جاش بذار:
 
 ```js
 'use client'
@@ -68,5 +67,3 @@ export default function Home() {
   )
 }
 ```
-
-بعد **Commit changes** بزن ✅
