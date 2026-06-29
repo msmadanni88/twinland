@@ -383,4 +383,360 @@ export default function TwinLand() {
       {/* FILTER BAR */}
       <div style={{height:38,flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'0 12px',overflowX:'auto',scrollbarWidth:'none',background:'rgba(255,255,255,.80)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
         {ZONES.map(z=>(
-          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:
+          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'4px 13px',fontSize:11,fontWeight:zone===z.key?700:400,color:zone===z.key?'white':C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
+        ))}
+        <div style={{width:1,height:18,background:C.border,flexShrink:0,margin:'0 2px'}}/>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 جستجو..."
+          style={{background:search?C.accentL:'transparent',border:'1.5px solid '+(search?C.accent:'transparent'),borderRadius:99,padding:'3px 12px',fontSize:11,fontFamily:'inherit',color:C.text,width:110,flexShrink:0,transition:'all .2s'}}/>
+      </div>
+
+      {/* BODY */}
+      <div style={{flex:1,position:'relative',overflow:'hidden'}}>
+
+        {/* MAP */}
+        <div style={{position:'absolute',inset:0,zIndex:1}}>
+          <div ref={mapRef} style={{position:'absolute',inset:0}}/>
+
+          {mapMode==='dark'&&<div style={{position:'absolute',inset:0,pointerEvents:'none',background:'rgba(4,8,28,.72)',zIndex:2}}/>}
+
+          {/* LOADING SKELETON */}
+          {mapLoading&&(
+            <div style={{position:'absolute',inset:0,zIndex:5,background:'#E8E4DC',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
+              <div style={{position:'absolute',inset:0,overflow:'hidden'}}>
+                {/* شبیه‌سازی tile‌های نقشه */}
+                {Array.from({length:20}).map((_,i)=>(
+                  <div key={i} style={{position:'absolute',width:256,height:256,left:(i%5)*256,top:Math.floor(i/5)*256,background:'#DDD9D0',border:'1px solid #C8C4BB',overflow:'hidden'}}>
+                    <div style={{position:'absolute',inset:0,background:'linear-gradient(90deg,transparent 0%,rgba(255,255,255,.4) 50%,transparent 100%)',animation:'shimmer 1.8s infinite',animationDelay:(i*0.1)+'s'}}/>
+                  </div>
+                ))}
+              </div>
+              <div style={{zIndex:2,background:'rgba(255,255,255,.9)',backdropFilter:'blur(12px)',borderRadius:20,padding:'20px 28px',display:'flex',flexDirection:'column',alignItems:'center',gap:12,boxShadow:'0 8px 32px rgba(0,0,0,.12)'}}>
+                <div style={{fontSize:40}}>🗺️</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.text}}>در حال بارگذاری نقشه...</div>
+                <div style={{width:160,height:6,background:C.border,borderRadius:99,overflow:'hidden'}}>
+                  <div style={{height:'100%',background:'linear-gradient(90deg,'+C.accent+',#FF9500)',borderRadius:99,animation:'shimmer 1.4s ease infinite'}}/>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* live pill */}
+          <div style={{position:'absolute',top:10,right:(isDesktop&&panelOpen)?PANEL_W+14:10,zIndex:10,transition:'right .35s ease',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'5px 13px',display:'flex',gap:8,alignItems:'center',fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
+            <span style={{color:C.text,fontWeight:700}}>☕ {filtered.length}</span>
+            <span style={{color:C.border}}>|</span>
+            <span><span style={{color:C.green,fontSize:8}}>●</span> {totalLive}</span>
+            {checkedIn.size>0&&<><span style={{color:C.border}}>|</span><span style={{color:C.green,fontWeight:700}}>✓ {checkedIn.size}</span></>}
+          </div>
+
+          {streak>=2&&<div style={{position:'absolute',top:10,left:10,zIndex:10,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
+
+          {/* nav controls */}
+          <div style={{position:'absolute',bottom:14,left:12,zIndex:10,display:'flex',flexDirection:'column',gap:5}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,32px)',gap:3}}>
+              {[{e:1},{l:'↑',fn:()=>panMap(0,-80)},{e:1},{l:'←',fn:()=>panMap(80,0)},{l:'⌖',fn:()=>{const c=CITIES[city];mapInst.current?.flyTo([c.lat,c.lng],c.zoom)}},{l:'→',fn:()=>panMap(-80,0)},{e:1},{l:'↓',fn:()=>panMap(0,80)},{e:1}].map((b,i)=>
+                b.e?<div key={i}/>:<button key={i} onClick={b.fn} style={{background:C.glass,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',border:'1px solid '+C.border,borderRadius:9,width:32,height:32,fontSize:b.l==='⌖'?10:15,color:C.text,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 6px rgba(0,0,0,.08)'}}>{b.l}</button>
+              )}
+            </div>
+            <div style={{display:'flex',gap:3}}>
+              {[['＋',()=>mapInst.current?.zoomIn()],['－',()=>mapInst.current?.zoomOut()]].map(([l,fn])=>(
+                <button key={l} onClick={fn} style={{background:C.glass,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',border:'1px solid '+C.border,borderRadius:9,width:32,height:32,fontSize:18,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 6px rgba(0,0,0,.08)'}}>{l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* GLASS PANEL */}
+        {panelOpen&&(
+          <>
+            {panelIsOverlay&&(
+              <div onClick={()=>setPanelOpen(false)} style={{position:'absolute',inset:0,zIndex:19,background:'rgba(0,0,0,.25)',backdropFilter:'blur(2px)',WebkitBackdropFilter:'blur(2px)'}}/>
+            )}
+            <div style={{position:'absolute',top:0,right:0,bottom:0,width:PANEL_W,zIndex:20,background:'rgba(255,255,255,.82)',backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderLeft:'1px solid rgba(255,255,255,.5)',boxShadow:'-4px 0 32px rgba(0,0,0,.12)',display:'flex',flexDirection:'column',animation:panelIsOverlay?'slideUp .3s ease':'fadeIn .2s ease'}}>
+              {/* tabs */}
+              <div style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid rgba(0,0,0,.07)'}}>
+                {[{key:'dashboard',icon:'📊',label:'داشبورد'},{key:'missions',icon:'📋',label:'ماموریت‌ها'}].map(t=>(
+                  <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flex:1,background:panelTab===t.key?C.accent:'rgba(0,0,0,.05)',border:'none',borderRadius:10,padding:'8px 4px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?'white':C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
+                    <span>{t.icon}</span>{t.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{flex:1,overflowY:'auto',scrollbarWidth:'none'}}>
+                {panelTab==='dashboard'
+                  ?<DashboardTab cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP}/>
+                  :<MissionsTab checkedIn={checkedIn} showToast={showToast}/>
+                }
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* BOTTOM NAV */}
+      <div style={{height:BH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'stretch'}}>
+        {NAV.map(item=>{
+          const active=tab===item.key
+          return <button key={item.key} onClick={()=>{setTab(item.key);if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key!=='map')showToast('📣 '+item.label+' به زودی!')}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:active?C.accent:C.sub,fontSize:isMobile?9:10,position:'relative',fontFamily:'inherit',fontWeight:active?700:400}}>
+            <span style={{fontSize:isMobile?20:22}}>{item.icon}</span>
+            {item.label}
+            {active&&<div style={{position:'absolute',bottom:0,left:'20%',right:'20%',height:2.5,background:C.accent,borderRadius:'2px 2px 0 0'}}/>}
+          </button>
+        })}
+      </div>
+
+      {selCafe&&<CafePopup cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
+      {showXP&&<XPPanel xp={xp} levelInfo={levelInfo} streak={streak} onClose={()=>setShowXP(false)}/>}
+
+      {showMenu&&(
+        <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:TH+8,right:14,left:14,background:'rgba(255,255,255,.97)',backdropFilter:'blur(24px)',borderRadius:18,border:'1px solid '+C.border,overflow:'hidden',boxShadow:'0 8px 40px rgba(0,0,0,.15)',animation:'fadeIn .2s ease'}}>
+            {[{key:'map',icon:'🗺',label:'نقشه'},{key:'missions',icon:'📋',label:'ماموریت‌ها'},{key:'clans',icon:'🛡',label:'کلن‌ها'},{key:'rank',icon:'🏆',label:'رتبه‌بندی'},{key:'xp',icon:'⭐',label:'سیستم XP'},{key:'settings',icon:'⚙️',label:'تنظیمات'}].map((item,i,arr)=>(
+              <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}setTab(item.key);if(item.key!=='map')showToast('📣 '+item.label+' به زودی!')}} style={{width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none'}}>
+                <span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>{item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showCity&&(
+        <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowCity(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:540,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease',maxHeight:'75dvh',overflowY:'auto'}}>
+            <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 18px'}}/>
+            <div style={{fontSize:17,fontWeight:800,color:C.text,textAlign:'center',marginBottom:16}}>🏙️ انتخاب شهر</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+              {Object.entries(CITIES).map(([k,v])=>(
+                <button key={k} onClick={()=>{setCity(k);setShowCity(false);showToast('✈️ '+v.name)}} style={{background:city===k?C.accent:C.chip,border:'none',borderRadius:12,padding:'12px 6px',fontSize:12,fontWeight:city===k?800:500,color:city===k?'white':C.text,fontFamily:'inherit'}}>{v.name}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMode&&(
+        <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowMode(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
+            <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 18px'}}/>
+            <div style={{fontSize:17,fontWeight:800,color:C.text,textAlign:'center',marginBottom:16}}>🎨 استایل نقشه</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {MAP_MODES.map(m=>(
+                <button key={m.key} onClick={()=>{setMapMode(m.key);setShowMode(false);showToast(m.label+' فعال شد')}} style={{background:mapMode===m.key?C.accent:C.chip,border:mapMode===m.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'16px',fontSize:14,fontWeight:mapMode===m.key?800:500,color:mapMode===m.key?'white':C.text,fontFamily:'inherit'}}>{m.label}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {xpAnim&&<div className="xp-float" style={{position:'fixed',top:'30%',left:'50%',transform:'translateX(-50%)',zIndex:9999,pointerEvents:'none',fontSize:28,fontWeight:900,color:C.accent,textShadow:'0 2px 12px rgba(0,0,0,.2)'}}>+{xpAnim.amount} XP ⭐</div>}
+
+      {toast&&<div style={{position:'fixed',bottom:BH+14,left:'50%',transform:'translateX(-50%)',zIndex:4000,background:toast.type==='xp'?C.accent:toast.type==='level'?C.gold:toast.type==='warn'?'#FF9500':C.text,color:'white',borderRadius:99,padding:'10px 22px',fontSize:13,fontWeight:600,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,.2)',animation:'fadeUp .2s ease'}}>{toast.msg}</div>}
+    </div>
+  )
+}
+
+// ── DASHBOARD TAB ─────────────────────────────────────────────────────────────
+function DashboardTab({cafes,filtered,live,totalLive,showToast,setSearch,checkedIn,xp,levelInfo,streak,setShowXP}) {
+  return <div>
+    <div style={{margin:'14px 12px 0',background:'linear-gradient(135deg,'+levelInfo.current.color+'22,'+levelInfo.current.color+'08)',border:'1.5px solid '+levelInfo.current.color+'33',borderRadius:18,padding:'14px',cursor:'pointer'}} onClick={()=>setShowXP(true)}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <span style={{fontSize:36}}>{levelInfo.current.icon}</span>
+        <div style={{flex:1}}>
+          <div style={{fontSize:11,color:C.sub}}>لول {levelInfo.current.level} — {levelInfo.current.name}</div>
+          <div style={{fontSize:22,fontWeight:900,color:levelInfo.current.color}}>{xp} XP</div>
+        </div>
+        {streak>=2&&<div style={{textAlign:'center',background:'rgba(255,107,53,.12)',borderRadius:12,padding:'8px 10px'}}>
+          <div style={{fontSize:20}}>🔥</div>
+          <div style={{fontSize:16,fontWeight:900,color:C.accent}}>{streak}</div>
+          <div style={{fontSize:9,color:C.sub}}>روز</div>
+        </div>}
+      </div>
+      {levelInfo.next&&<div style={{marginTop:10}}>
+        <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+          <span style={{fontSize:10,color:C.sub}}>تا {levelInfo.next.icon} {levelInfo.next.name}</span>
+          <span style={{fontSize:10,fontWeight:700,color:levelInfo.current.color}}>{levelInfo.next.minXP-xp} XP مانده</span>
+        </div>
+        <div style={{height:8,background:'rgba(0,0,0,.08)',borderRadius:99,overflow:'hidden'}}>
+          <div style={{height:'100%',width:levelInfo.progress+'%',background:'linear-gradient(90deg,'+levelInfo.current.color+','+C.accent+')',borderRadius:99,transition:'width .6s'}}/>
+        </div>
+      </div>}
+    </div>
+    <div style={{padding:'12px 12px 0'}}>
+      <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>آمار زنده</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+        {[{icon:'☕',val:cafes.length,lbl:'کافه'},{icon:'👥',val:totalLive,lbl:'آنلاین'},{icon:'⭐',val:cafes.filter((c)=>c.is_top).length,lbl:'برتر'},{icon:'✅',val:checkedIn.size,lbl:'رفتم'}].map((item)=>(
+          <div key={item.lbl} style={{background:'rgba(0,0,0,.04)',borderRadius:12,padding:'10px'}}>
+            <div style={{fontSize:16}}>{item.icon}</div>
+            <div style={{fontSize:18,fontWeight:800,color:C.text,marginTop:2}}>{item.val}</div>
+            <div style={{fontSize:9,color:C.sub,marginTop:1}}>{item.lbl}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)',marginTop:12}}>
+      <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>فیلتر سریع</div>
+      {QUICK_FILTERS.map(f=>(
+        <button key={f.tag} onClick={()=>{setSearch(f.tag);showToast('🔍 '+f.tag)}} style={{width:'100%',display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',padding:'8px 4px',borderRadius:8,color:C.text,fontSize:13,fontFamily:'inherit',fontWeight:500}}>
+          <span style={{fontSize:17,width:24,textAlign:'center'}}>{f.icon}</span>{f.tag}
+        </button>
+      ))}
+    </div>
+    <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)'}}>
+      <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>رویداد فعال</div>
+      <div style={{background:'#FFF9F0',border:'1px solid #FFE0B2',borderRadius:14,padding:'12px'}}>
+        <div style={{fontSize:22,marginBottom:5}}>⚔️</div>
+        <div style={{fontSize:13,fontWeight:800,color:C.text}}>شمشیر گریفیندور</div>
+        <div style={{fontSize:11,color:C.sub,marginTop:3,lineHeight:1.5}}>کافه‌های غرب تهران • امروز</div>
+        <div style={{fontSize:11,color:C.accent,fontWeight:700,marginTop:4}}>+{XP_CONFIG.event_bonus} XP بونوس</div>
+        <button onClick={()=>showToast('🎮 ورود به رویداد...')} style={{marginTop:10,width:'100%',background:C.accent,border:'none',borderRadius:10,padding:'8px',fontSize:12,color:'white',fontWeight:700,fontFamily:'inherit'}}>شرکت در رویداد</button>
+      </div>
+    </div>
+    <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)',paddingBottom:24}}>
+      <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>برترین‌ها</div>
+      {[{r:'🥇',n:'کاشف_دانی',x:1240},{r:'🥈',n:'قهوه‌باز',x:980},{r:'🥉',n:'تهران‌گرد',x:840}].map(p=>(
+        <div key={p.n} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid rgba(0,0,0,.05)'}}>
+          <span style={{fontSize:18}}>{p.r}</span>
+          <div style={{flex:1}}><div style={{fontSize:12,color:C.text,fontWeight:700}}>{p.n}</div></div>
+          <div style={{fontSize:12,color:C.accent,fontWeight:800}}>{p.x} XP</div>
+        </div>
+      ))}
+    </div>
+  </div>
+}
+
+// ── MISSIONS TAB ──────────────────────────────────────────────────────────────
+function MissionsTab({checkedIn,showToast}) {
+  const TYPE_LABELS = {daily:'روزانه',weekly:'هفتگی',streak:'استریک',social:'اجتماعی',event:'رویداد'}
+  const TYPE_COLORS = {daily:C.blue,weekly:C.purple,streak:C.accent,social:C.green,event:'#FF9500'}
+
+  return <div style={{padding:'12px 12px 32px'}}>
+    <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>ماموریت‌های فعال</div>
+    <div style={{fontSize:11,color:C.sub,marginBottom:14}}>ماموریت‌ها رو انجام بده و XP بگیر</div>
+    {['daily','streak','weekly','social','event'].map(type=>{
+      const items=MISSIONS.filter(m=>m.type===type); if(!items.length) return null
+      return <div key={type} style={{marginBottom:18}}>
+        <div style={{display:'inline-flex',alignItems:'center',gap:5,background:TYPE_COLORS[type]+'18',border:'1px solid '+TYPE_COLORS[type]+'44',borderRadius:99,padding:'3px 10px',fontSize:10,fontWeight:700,color:TYPE_COLORS[type],marginBottom:8}}>{TYPE_LABELS[type]}</div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {items.map(m=>{
+            const pct=Math.round((m.done/m.total)*100); const isDone=m.done>=m.total
+            return <div key={m.id} style={{background:isDone?C.green+'12':'rgba(255,255,255,.7)',border:'1px solid '+(isDone?C.green+'44':'rgba(0,0,0,.08)'),borderRadius:14,padding:'12px',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}}>
+              <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+                <div style={{width:40,height:40,borderRadius:12,flexShrink:0,background:isDone?C.green+'20':TYPE_COLORS[type]+'15',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{isDone?'✅':m.icon}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text}}>{m.title}</div>
+                    <div style={{fontSize:11,fontWeight:800,color:C.accent,flexShrink:0}}>+{m.xp} XP</div>
+                  </div>
+                  <div style={{fontSize:11,color:C.sub,marginTop:2,lineHeight:1.4}}>{m.desc}</div>
+                  <div style={{marginTop:8}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                      <span style={{fontSize:10,color:isDone?C.green:C.sub,fontWeight:isDone?700:400}}>{isDone?'تکمیل شد! ✓':`${m.done} از ${m.total}`}</span>
+                      <span style={{fontSize:10,color:C.sub}}>{pct}%</span>
+                    </div>
+                    <div style={{height:5,background:'rgba(0,0,0,.08)',borderRadius:99,overflow:'hidden'}}>
+                      <div className="mission-bar" style={{height:'100%',width:pct+'%',background:isDone?'linear-gradient(90deg,'+C.green+',#5AC96C)':'linear-gradient(90deg,'+TYPE_COLORS[type]+','+TYPE_COLORS[type]+'aa)',borderRadius:99}}/>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {isDone&&<button onClick={()=>showToast('🎁 +'+m.xp+' XP دریافت شد!','xp')} style={{marginTop:10,width:'100%',background:'linear-gradient(90deg,'+C.green+',#5AC96C)',border:'none',borderRadius:10,padding:'8px',fontSize:12,color:'white',fontWeight:700,fontFamily:'inherit',boxShadow:'0 3px 12px '+C.green+'44'}}>🎁 دریافت جایزه</button>}
+            </div>
+          })}
+        </div>
+      </div>
+    })}
+  </div>
+}
+
+// ── CAFE POPUP ────────────────────────────────────────────────────────────────
+function CafePopup({cafe,live,favs,setFavs,checkedIn,onClose,onCheckin,showToast}) {
+  const color=getColor(cafe.name); const isChecked=checkedIn.has(cafe.id); const isFav=favs.has(cafe.id)
+  const xpAmount=cafe.is_top?XP_CONFIG.checkin_top:XP_CONFIG.checkin
+  return <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)'}} onClick={onClose}>
+    <div onClick={(e)=>e.stopPropagation()} style={{position:'absolute',bottom:0,left:0,right:0,maxHeight:'88dvh',overflowY:'auto',background:C.card,borderRadius:'24px 24px 0 0',border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
+      <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'14px auto'}}/>
+      <div style={{padding:'0 18px 16px',display:'flex',alignItems:'center',gap:14,borderBottom:'1px solid '+C.border}}>
+        <div style={{width:60,height:60,borderRadius:18,background:color+'18',border:'2.5px solid '+(isChecked?C.green:color)+'66',display:'flex',alignItems:'center',justifyContent:'center',fontSize:30,flexShrink:0}}>{isChecked?'✅':'☕'}</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:19,fontWeight:800,color:C.text}}>{cafe.name}</div>
+          <div style={{fontSize:12,color:C.accent,marginTop:3}}>📍 {cafe.description}</div>
+          <div style={{color:'#FF9500',fontSize:14,marginTop:3}}>{cafe.is_top?'★★★★★':'★★★☆☆'}</div>
+        </div>
+        <div style={{textAlign:'center',flexShrink:0}}>
+          <div style={{fontSize:26,fontWeight:900,color:C.green}}>{live[cafe.id]||0}</div>
+          <div style={{fontSize:9,color:C.sub,marginTop:1}}>الان اینجا</div>
+        </div>
+      </div>
+      <div style={{padding:'16px 18px'}}>
+        {cafe.tags?.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:14}}>{cafe.tags.map((t)=><span key={t} style={{background:C.chip,borderRadius:99,fontSize:11,color:C.text,padding:'3px 11px',fontWeight:500}}>{t}</span>)}</div>}
+        {cafe.is_top&&<div style={{background:'#FFF9F0',border:'1px solid #FFE0B2',borderRadius:14,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,marginBottom:14}}><span style={{fontSize:24}}>⚔️</span><div><div style={{fontSize:12,fontWeight:700,color:'#E65100'}}>آیتم فعال: شمشیر گریفیندور</div><div style={{fontSize:11,color:C.sub,marginTop:2}}>با سفارش ۱۰۰,۰۰۰ تومان شانس دریافت داری</div></div></div>}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14}}>
+          {[['☕',isChecked?'رفتی!':'+'+xpAmount+' XP','چک‌این'],['⏰','۸ص–۱۰ش','ساعات'],['🏅',cafe.is_top?'طلایی':'نقره','رتبه']].map(([icon,val,lbl])=>(
+            <div key={lbl} style={{background:C.chip,borderRadius:12,padding:'10px 6px',textAlign:'center'}}>
+              <div style={{fontSize:18}}>{icon}</div>
+              <div style={{fontSize:13,fontWeight:700,color:lbl==='چک‌این'&&isChecked?C.green:C.text,marginTop:4}}>{val}</div>
+              <div style={{fontSize:9,color:C.sub,marginTop:2}}>{lbl}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:7,marginBottom:14}}>
+          {[{icon:'❤️',lbl:'علاقه',active:isFav,fn:()=>{const n=new Set(favs);isFav?n.delete(cafe.id):n.add(cafe.id);setFavs(n);showToast(isFav?'حذف شد':'❤️ ذخیره شد')}},{icon:'📤',lbl:'اشتراک',active:false,fn:()=>showToast('🔗 کپی شد!')},{icon:'🗺',lbl:'مسیر',active:false,fn:()=>window.open('https://www.google.com/maps?q='+cafe.lat+','+cafe.lng,'_blank')},{icon:'💬',lbl:'نظر',active:false,fn:()=>showToast('💬 به زودی!')}].map((item)=>(
+            <button key={item.lbl} onClick={item.fn} style={{background:item.active?C.accent+'18':C.chip,border:'1.5px solid '+(item.active?C.accent:'transparent'),borderRadius:12,padding:'9px 4px',color:C.text,fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+              <span style={{fontSize:20}}>{item.icon}</span>
+              <span style={{fontSize:9,color:item.active?C.accent:C.sub,fontWeight:item.active?700:400}}>{item.lbl}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={onCheckin} disabled={isChecked} style={{width:'100%',background:isChecked?C.green:C.accent,color:'white',border:'none',borderRadius:14,padding:15,fontSize:15,fontWeight:700,fontFamily:'inherit',boxShadow:'0 4px 18px '+(isChecked?C.green:C.accent)+'44',opacity:isChecked?.85:1,transition:'all .3s'}}>
+          {isChecked?'✅ چک‌این شد!':'📍 چک‌این — +'+xpAmount+' XP'}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+// ── XP PANEL ──────────────────────────────────────────────────────────────────
+function XPPanel({xp,levelInfo,streak,onClose}) {
+  const {current,next,progress}=levelInfo
+  return <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.5)',backdropFilter:'blur(12px)'}} onClick={onClose}>
+    <div onClick={(e)=>e.stopPropagation()} style={{position:'absolute',bottom:0,left:0,right:0,maxHeight:'85dvh',overflowY:'auto',background:C.card,borderRadius:'24px 24px 0 0',border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease',padding:'0 0 40px'}}>
+      <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'14px auto 20px'}}/>
+      <div style={{margin:'0 18px',background:'linear-gradient(135deg,'+current.color+'22,'+current.color+'08)',border:'1.5px solid '+current.color+'33',borderRadius:20,padding:'20px',marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:14}}>
+          <div style={{fontSize:52}}>{current.icon}</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,color:C.sub}}>لول {current.level}</div>
+            <div style={{fontSize:22,fontWeight:900,color:C.text}}>{current.name}</div>
+            <div style={{fontSize:26,fontWeight:900,color:current.color}}>{xp.toLocaleString()} XP</div>
+          </div>
+          {streak>=2&&<div style={{textAlign:'center',background:'rgba(255,107,53,.12)',borderRadius:14,padding:'10px 12px'}}><div style={{fontSize:24}}>🔥</div><div style={{fontSize:18,fontWeight:900,color:C.accent}}>{streak}</div><div style={{fontSize:9,color:C.sub}}>روز</div></div>}
+        </div>
+        {next&&<div style={{marginTop:16}}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><span style={{fontSize:11,color:C.sub}}>تا {next.icon} {next.name}</span><span style={{fontSize:11,fontWeight:700,color:current.color}}>{next.minXP-xp} XP مانده</span></div>
+          <div style={{height:10,background:C.border,borderRadius:99,overflow:'hidden'}}><div style={{height:'100%',width:progress+'%',background:'linear-gradient(90deg,'+current.color+','+C.accent+')',borderRadius:99,transition:'width .8s'}}/></div>
+        </div>}
+      </div>
+      <div style={{padding:'0 18px',marginBottom:18}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.sub,marginBottom:12,letterSpacing:.5}}>روش‌های کسب XP</div>
+        {[{icon:'📍',label:'چک‌این عادی',xp:XP_CONFIG.checkin,note:'هر کافه'},{icon:'⭐',label:'کافه برتر',xp:XP_CONFIG.checkin_top,note:'کافه‌های طلایی'},{icon:'🌟',label:'اول روز',xp:XP_CONFIG.checkin_first,note:'بونوس روزانه'},{icon:'🔥',label:'استریک',xp:XP_CONFIG.streak_bonus,note:'۳+ روز پشت هم'},{icon:'⚔️',label:'رویداد',xp:XP_CONFIG.event_bonus,note:'رویدادهای ویژه'}].map(item=>(
+          <div key={item.label} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:'1px solid '+C.border}}>
+            <span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>
+            <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>{item.label}</div><div style={{fontSize:11,color:C.sub}}>{item.note}</div></div>
+            <div style={{fontSize:14,fontWeight:800,color:C.accent}}>+{item.xp}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{padding:'0 18px'}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.sub,marginBottom:12,letterSpacing:.5}}>تمام لول‌ها</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+          {LEVELS.map(l=>{const isCurrent=l.level===current.level;const isPast=xp>=l.minXP;return(
+            <div key={l.level} style={{background:isCurrent?l.color+'18':isPast?C.chip:C.bg,border:'1.5px solid '+(isCurrent?l.color+'66':C.border),borderRadius:14,padding:'12px',opacity:isPast?1:.5}}>
+              <div style={{fontSize:24}}>{l.icon}</div>
+              <div style={{fontSize:12,fontWeight:700,color:isCurrent?l.color:C.text,marginTop:4}}>{l.name}</div>
+              <div style={{fontSize:10,color:C.sub,marginTop:2}}>{l.minXP.toLocaleString()} XP</div>
+              {isCurrent&&<div style={{fontSize:9,color:l.color,fontWeight:700,marginTop:4}}>← الان اینجایی</div>}
+            </div>
+          )})}
+        </div>
+      </div>
+    </div>
+  </div>
+}
