@@ -373,7 +373,7 @@ export default function TwinLand() {
           {panelOpen?'✕':'📊'}{!isMobile&&<span>{panelOpen?'بستن':'پنل'}</span>}
         </button>
         <button onClick={()=>setShowMode(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.accent,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
-          {MAP_MODES.find(m=>m.key===mapMode)!.label.split(' ')[0]}
+          {MAP_MODES.find(m=>m.key===mapMode).label.split(' ')[0]}
         </button>
         <button onClick={()=>setShowCity(true)} style={{background:C.accent,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:'white',fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
           {CITIES[city].name} ▾
@@ -383,4 +383,4 @@ export default function TwinLand() {
       {/* FILTER BAR */}
       <div style={{height:38,flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'0 12px',overflowX:'auto',scrollbarWidth:'none',background:'rgba(255,255,255,.80)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
         {ZONES.map(z=>(
-          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent
+          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:
