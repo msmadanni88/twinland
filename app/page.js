@@ -196,7 +196,7 @@ export default function TwinLand() {
     const timer=setTimeout(()=>{
       if(!mounted||!mapRef.current) return
 
-      const loadLeaflet=(cb:()=>void)=>{
+      const loadLeaflet=(cb)=>{
         if(window.L){ cb(); return }
         const css=document.createElement('link'); css.rel='stylesheet'
         css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
@@ -383,4 +383,4 @@ export default function TwinLand() {
       {/* FILTER BAR */}
       <div style={{height:38,flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'0 12px',overflowX:'auto',scrollbarWidth:'none',background:'rgba(255,255,255,.80)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
         {ZONES.map(z=>(
-          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.
+          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent
