@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
 const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
 
-const CITIES: Record<string, {name:string,lat:number,lng:number,zoom:number}> = {
+const CITIES = {
   tehran:  { name:'تهران',  lat:35.7219, lng:51.3979, zoom:12 },
   mashhad: { name:'مشهد',   lat:36.2972, lng:59.6067, zoom:12 },
   isfahan: { name:'اصفهان', lat:32.6539, lng:51.6660, zoom:12 },
@@ -28,8 +28,8 @@ const LEVELS = [
   { level:6, name:'افسانه‌ای', minXP:2000, icon:'👑', color:'#FFD700' },
 ]
 
-function getLevelInfo(xp:number) {
-  let current = LEVELS[0], next: typeof LEVELS[0]|null = LEVELS[1]
+function getLevelInfo(xp) {
+  let current = LEVELS[0], next = LEVELS[1]
   for (let i=0;i<LEVELS.length;i++) {
     if (xp>=LEVELS[i].minXP) { current=LEVELS[i]; next=LEVELS[i+1]||null }
   }
@@ -87,7 +87,7 @@ const QUICK_FILTERS = [
 ]
 
 const CAFE_COLORS = ['#FF6B35','#E84393','#7C3AED','#0EA5E9','#10B981','#F59E0B','#EF4444','#8B5CF6']
-function getColor(name:string) {
+function getColor(name) {
   let h=0; for (let i=0;i<name.length;i++) h=name.charCodeAt(i)+((h<<5)-h)
   return CAFE_COLORS[Math.abs(h)%CAFE_COLORS.length]
 }
@@ -106,16 +106,16 @@ const MOCK_CAFES = [
 const BP = { mobile:640, tablet:1024 }
 
 export default function TwinLand() {
-  const mapRef   = useRef<HTMLDivElement>(null)
-  const mapInst  = useRef<any>(null)
-  const mksRef   = useRef<Record<string,any>>({})
+  const mapRef   = useRef(null)
+  const mapInst  = useRef(null)
+  const mksRef   = useRef({})
 
-  const [cafes,      setCafes]      = useState<any[]>([])
+  const [cafes,      setCafes]      = useState([])
   const [city,       setCity]       = useState('tehran')
   const [mapMode,    setMapMode]    = useState('normal')
   const [zone,       setZone]       = useState('all')
   const [search,     setSearch]     = useState('')
-  const [selCafe,    setSelCafe]    = useState<any>(null)
+  const [selCafe,    setSelCafe]    = useState(null)
   const [tab,        setTab]        = useState('map')
   const [panelOpen,  setPanelOpen]  = useState(false)
   const [panelTab,   setPanelTab]   = useState('dashboard')
@@ -123,43 +123,61 @@ export default function TwinLand() {
   const [showCity,   setShowCity]   = useState(false)
   const [showMode,   setShowMode]   = useState(false)
   const [showXP,     setShowXP]     = useState(false)
-  const [toast,      setToast]      = useState<{msg:string,type:string}|null>(null)
+  const [toast,      setToast]      = useState(null)
   const [mapReady,   setMapReady]   = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
-  const [live,       setLive]       = useState<Record<string,number>>({})
-  const [checkedIn,  setCheckedIn]  = useState<Set<string>>(new Set())
-  const [favs,       setFavs]       = useState<Set<string>>(new Set())
+  const [live,       setLive]       = useState({})
+  const [checkedIn,  setCheckedIn]  = useState(new Set())
+  const [favs,       setFavs]       = useState(new Set())
   const [xp,         setXp]         = useState(340)
   const [streak,     setStreak]     = useState(3)
-  const [xpAnim,     setXpAnim]     = useState<{amount:number}|null>(null)
+  const [xpAnim,     setXpAnim]     = useState(null)
   const [vw,         setVw]         = useState(800)
 
-  useEffect(()=>{ setVw(window.innerWidth); const fn=()=>setVw(window.innerWidth); window.addEventListener('resize',fn); return ()=>window.removeEventListener('resize',fn) },[])
+  useEffect(()=>{
+    const check=()=>setVw(window.innerWidth)
+    check()
+    window.addEventListener('resize',check)
+    return ()=>window.removeEventListener('resize',check)
+  },[])
 
   const isMobile  = vw < BP.mobile
   const isDesktop = vw >= BP.tablet
   const levelInfo = getLevelInfo(xp)
 
-  useEffect(()=>{ if(isDesktop) setPanelOpen(true) },[isDesktop])
+  // فقط روی دسکتاپ واقعی (با ماوس) پنل auto-open بشه
+  useEffect(()=>{
+    if(typeof window==='undefined') return
+    const hasMouse = window.matchMedia('(pointer:fine)').matches
+    if(isDesktop && hasMouse) setPanelOpen(true)
+  },[isDesktop])
 
-  const showToast = useCallback((msg:string,type='info')=>{
+  const showToast = useCallback((msg,type='info')=>{
     setToast({msg,type}); setTimeout(()=>setToast(null),2800)
   },[])
 
-  const gainXP = useCallback((amount:number)=>{
+  const gainXP = useCallback((amount)=>{
     setXp(prev=>prev+amount); setXpAnim({amount}); setTimeout(()=>setXpAnim(null),1800)
   },[])
 
   useEffect(()=>{
     fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true',{
       headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
-    }).then(r=>r.json()).then(d=>{ setCafes(Array.isArray(d)&&d.length?d:MOCK_CAFES) })
-    .catch(()=>setCafes(MOCK_CAFES))
+    }).then(r=>r.json()).then(d=>{
+      const list = (Array.isArray(d)&&d.length) ? d : MOCK_CAFES
+      setCafes(list)
+    }).catch(()=>setCafes(MOCK_CAFES))
+  },[])
+
+  // اگه بعد از ۲ ثانیه هنوز کافه‌ای نیومد، mock رو بذار
+  useEffect(()=>{
+    const t=setTimeout(()=>{ setCafes(prev=>prev.length?prev:MOCK_CAFES) },2000)
+    return ()=>clearTimeout(t)
   },[])
 
   useEffect(()=>{
     if(!cafes.length) return
-    const update=()=>{ const c:Record<string,number>={}; cafes.forEach(cafe=>{c[cafe.id]=Math.floor(Math.random()*12)}); setLive(c) }
+    const update=()=>{ const c={}; cafes.forEach(cafe=>{c[cafe.id]=Math.floor(Math.random()*12)}); setLive(c) }
     update(); const t=setInterval(update,4000); return ()=>clearInterval(t)
   },[cafes])
 
@@ -179,7 +197,7 @@ export default function TwinLand() {
       if(!mounted||!mapRef.current) return
 
       const loadLeaflet=(cb:()=>void)=>{
-        if((window as any).L){ cb(); return }
+        if(window.L){ cb(); return }
         const css=document.createElement('link'); css.rel='stylesheet'
         css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
         document.head.appendChild(css)
@@ -197,7 +215,7 @@ export default function TwinLand() {
       loadLeaflet(()=>{
         if(!mounted||!mapRef.current||mapInst.current) return
         try {
-          const L=(window as any).L
+          const L=window.L
           const c=CITIES.tehran
           const m=L.map(mapRef.current,{
             center:[c.lat,c.lng],zoom:c.zoom,
@@ -206,10 +224,17 @@ export default function TwinLand() {
 
           // ── TILE از proxy خودمون ──
           // اگه روی localhost هستی از CDN مستقیم میاد، روی Vercel از proxy
-          const mainLayer = L.tileLayer(
-            'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-            { maxZoom:19, subdomains:'abcd' }
-          )
+          const isLocal = typeof window!=='undefined' && (window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1')
+
+          const tileUrl = isLocal
+            ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+            : '/api/tiles/{z}/{x}/{y}.png'
+
+          const tileOpts = isLocal
+            ? { maxZoom:19, subdomains:'abc' }
+            : { maxZoom:19 }
+
+          const mainLayer = L.tileLayer(tileUrl, tileOpts)
           let tileLoaded=false
 
           mainLayer.on('tileload',()=>{
@@ -240,7 +265,7 @@ export default function TwinLand() {
   },[])
 
   useEffect(()=>{
-    const pane=document.querySelector('.leaflet-tile-pane') as HTMLElement|null
+    const pane=document.querySelector('.leaflet-tile-pane') 
     if(pane){ const mode=MAP_MODES.find(m=>m.key===mapMode); pane.style.filter=mode?mode.filter:'none'; pane.style.transition='filter .5s' }
   })
 
@@ -250,8 +275,8 @@ export default function TwinLand() {
   },[city])
 
   useEffect(()=>{
-    if(!mapReady||!cafes.length||!(window as any).L||!mapInst.current) return
-    const L=(window as any).L
+    if(!mapReady||!cafes.length||!window.L||!mapInst.current) return
+    const L=window.L
     cafes.forEach(cafe=>{
       if(mksRef.current[cafe.id]) return
       const color=getColor(cafe.name); const n=live[cafe.id]||0; const isChecked=checkedIn.has(cafe.id)
@@ -281,14 +306,14 @@ export default function TwinLand() {
     })
   },[zone,search,mapReady,filtered])
 
-  function panMap(x:number,y:number){ mapInst.current?.panBy([x,y],{animate:true}) }
-  function goZone(z:any){
+  function panMap(x,y){ mapInst.current?.panBy([x,y],{animate:true}) }
+  function goZone(z){
     setZone(z.key)
     if(z.lat&&mapInst.current) mapInst.current.flyTo([z.lat,z.lng],13)
     else if(z.key==='all'&&mapInst.current){ const c=CITIES[city]; mapInst.current.flyTo([c.lat,c.lng],c.zoom) }
   }
 
-  function doCheckin(cafe:any){
+  function doCheckin(cafe){
     if(checkedIn.has(cafe.id)){ showToast('قبلاً اینجا بودی!','warn'); return }
     const isFirst=checkedIn.size===0
     const earned=(cafe.is_top?XP_CONFIG.checkin_top:XP_CONFIG.checkin)+(isFirst?XP_CONFIG.checkin_first:0)+(streak>=3?XP_CONFIG.streak_bonus:0)
@@ -358,5 +383,4 @@ export default function TwinLand() {
       {/* FILTER BAR */}
       <div style={{height:38,flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'0 12px',overflowX:'auto',scrollbarWidth:'none',background:'rgba(255,255,255,.80)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
         {ZONES.map(z=>(
-          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'4px 13px',fontSize:11,fontWeight:zone===z.key?700:400,color:zone===z.key?'white':C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
-        )
+          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.
