@@ -532,7 +532,7 @@ export default function TwinLand() {
             <div style={{position:'absolute',top:0,right:0,bottom:0,width:PANEL_W,zIndex:20,background:'rgba(255,255,255,.82)',backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderLeft:'1px solid rgba(255,255,255,.5)',boxShadow:'-4px 0 32px rgba(0,0,0,.12)',display:'flex',flexDirection:'column',animation:panelIsOverlay?'slideUp .3s ease':'fadeIn .2s ease'}}>
               {/* tabs */}
               <div style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid rgba(0,0,0,.07)',overflowX:'auto',scrollbarWidth:'none'}}>
-                {[{key:'dashboard',icon:'📊',img:null,label:'داشبورد'},{key:'missions',icon:'📋',img:'icon_mission',label:'ماموریت'},{key:'rank',icon:'🏆',img:'icon_rank',label:'رتبه'},{key:'clan',icon:'🛡',img:'icon_clan',label:'کلن'}].map(t=>(
+                {[{key:'dashboard',icon:'📊',img:null,label:'داشبورد'},{key:'missions',icon:'📋',img:'icon_mission',label:'ماموریت'},{key:'rank',icon:'🏆',img:'icon_rank',label:'رتبه'},{key:'clan',icon:'🛡',img:'icon_clan',label:'کلن'},{key:'profile',icon:'👤',img:'icon_profile',label:'پروفایل'}].map(t=>(
                   <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:'rgba(0,0,0,.05)',border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?'white':C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
                     {t.img
                       ? <img src={'/'+t.img+(panelTab===t.key?'_active':'_inactive')+'_L.png'} alt={t.label} width={18} height={18} style={{objectFit:'contain',display:'block'}}/>
@@ -546,6 +546,7 @@ export default function TwinLand() {
                 {panelTab==='missions'&&<MissionsTab C={C} checkedIn={checkedIn} showToast={showToast}/>}
                 {panelTab==='rank'&&<RankTab C={C}/>}
                 {panelTab==='clan'&&<ClanTab C={C}/>}
+                {panelTab==='profile'&&<ProfileTab C={C} xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn}/>}
               </div>
             </div>
           </>
@@ -558,19 +559,13 @@ export default function TwinLand() {
           const active=tab===item.key
           const isz=isMobile?26:30
           const src='/'+item.img+(active?'_active':'_inactive')+'_L.png'
-          // پروفایل مستقیم میره به صفحه‌اش؛ بقیه پنل اسلایدی رو باز می‌کنن
-          if(item.key==='profile'){
-            return <a key={item.key} href="/profile" style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:active?C.accent:C.sub,fontSize:isMobile?9:10,textDecoration:'none',fontFamily:'inherit'}}>
-              <img src={src} alt={item.label} width={isz} height={isz} style={{objectFit:'contain',display:'block'}}/>
-              {item.label}
-            </a>
-          }
           return <button key={item.key} onClick={()=>{
             setTab(item.key)
             if(item.key==='map'){ setPanelOpen(false); return }
             if(item.key==='missions'){ setPanelOpen(true); setPanelTab('missions'); return }
             if(item.key==='clan'){ setPanelOpen(true); setPanelTab('clan'); return }
             if(item.key==='rank'){ setPanelOpen(true); setPanelTab('rank'); return }
+            if(item.key==='profile'){ setPanelOpen(true); setPanelTab('profile'); return }
           }} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:active?C.accent:C.sub,fontSize:isMobile?9:10,position:'relative',fontFamily:'inherit',fontWeight:active?700:400}}>
             <img src={src} alt={item.label} width={isz} height={isz} style={{objectFit:'contain',display:'block'}}/>
             {item.label}
@@ -870,6 +865,33 @@ function ClanTab({C}) {
       ))}
     </div>
     <a href="/clan" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده کامل کلن ›</a>
+  </div>
+}
+
+// ── PROFILE TAB (خلاصه — نسخه کامل در /profile) ────────────────────────────────
+function ProfileTab({C,xp,levelInfo,streak,checkedIn}) {
+  const stats = [
+    { icon:'🔥', value:streak, label:'استریک' },
+    { icon:'☕', value:11,     label:'کافه' },
+    { icon:'📍', value:38,     label:'چک‌این' },
+    { icon:'📅', value:47,     label:'روز فعال' },
+  ]
+  return <div style={{padding:'12px 12px 32px'}}>
+    <div style={{background:C.grad,borderRadius:18,padding:'18px',textAlign:'center',color:'#fff',marginBottom:14}}>
+      <img src="/icon_profile_active@2x.png" alt="پروفایل" width={64} height={64} style={{objectFit:'contain',display:'block',margin:'0 auto 6px'}}/>
+      <div style={{fontSize:19,fontWeight:800}}>دانی</div>
+      <div style={{fontSize:12,opacity:.9,marginTop:2}}>☕ {levelInfo?.name||'کافه‌گرد'} · {xp.toLocaleString('fa')} XP</div>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:14}}>
+      {stats.map((s,i)=>(
+        <div key={i} style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:'10px 4px',textAlign:'center'}}>
+          <div style={{fontSize:18}}>{s.icon}</div>
+          <div style={{fontSize:15,fontWeight:800,color:C.text,marginTop:2}}>{Number(s.value).toLocaleString('fa')}</div>
+          <div style={{fontSize:10,color:C.sub,marginTop:1}}>{s.label}</div>
+        </div>
+      ))}
+    </div>
+    <a href="/profile" style={{display:'block',textAlign:'center',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده پروفایل کامل ›</a>
   </div>
 }
 
