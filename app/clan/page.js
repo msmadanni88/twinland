@@ -42,6 +42,9 @@ export default function ClanPage() {
       </div>
 
       <div style={S.container}>
+        <div style={{textAlign:'center',marginBottom:8}}>
+          <img src="/icon_clan_active@2x.png" alt="کلن" width={88} height={88} style={{objectFit:'contain',display:'inline-block'}}/>
+        </div>
         {joined ? <MyClan /> : <Discover />}
       </div>
     </div>
@@ -126,7 +129,7 @@ function Stat({ icon, value, label }) {
 const S = {
   page: {
     minHeight: '100vh',
-    background: 'linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%)',
+    background: '#ffffff',
     fontFamily: 'Vazirmatn, Tahoma, sans-serif',
     direction: 'rtl', color: '#1f2937', paddingBottom: 40,
   },
