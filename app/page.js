@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { PALETTES, PALETTE_ORDER, DEFAULT_PALETTE, DEFAULT_MODE, buildC, loadPrefs, savePalette, saveMode } from './palettes'
 
 const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
 const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
@@ -48,13 +49,7 @@ const MISSIONS = [
   { id:'m8',icon:'📚',title:'کتاب‌خوان',     desc:'۲ بار در کافه کتاب چک‌این کن',        xp:70,  total:2, done:2, type:'weekly' },
 ]
 
-const C = {
-  bg:'#F2F1F6', card:'#FFFFFF', border:'rgba(0,0,0,.09)',
-  text:'#1C1C1E', sub:'#8E8E93', accent:'#FF6B35', accentL:'#FF6B3518',
-  green:'#34C759', blue:'#007AFF', purple:'#AF52DE',
-  gold:'#FFD60A', chip:'rgba(0,0,0,.06)', danger:'#FF3B30',
-  glass:'rgba(255,255,255,.72)', glassDark:'rgba(255,255,255,.90)',
-}
+// رنگ‌ها (C) حالا داخل کامپوننت از پالت فعال ساخته می‌شوند — به palettes.js نگاه کن
 
 const MAP_MODES = [
   { key:'normal',  label:'🗺 معمولی', filter:'none' },
@@ -141,6 +136,22 @@ export default function TwinLand() {
   const [vw,         setVw]         = useState(800)
   const [boundaryMode, setBoundaryMode] = useState('off') // 'off' | 'province' | 'district'
   const [showBoundary, setShowBoundary] = useState(false)
+  const [paletteKey, setPaletteKey] = useState(DEFAULT_PALETTE)
+  const [themeMode,  setThemeMode]  = useState(DEFAULT_MODE)
+  const [showPalette, setShowPalette] = useState(false)
+
+  // ساخت آبجکت رنگ از پالت فعال (هر بار که پالت یا حالت روز/شب عوض شه)
+  const C = useMemo(()=>buildC(paletteKey, themeMode), [paletteKey, themeMode])
+
+  // خواندن انتخاب ذخیره‌شده کاربر هنگام بازشدن
+  useEffect(()=>{
+    const p = loadPrefs()
+    setPaletteKey(p.palette)
+    setThemeMode(p.mode)
+  },[])
+
+  function pickPalette(key){ setPaletteKey(key); savePalette(key) }
+  function toggleMode(){ const next = themeMode==='dark'?'light':'dark'; setThemeMode(next); saveMode(next) }
   const boundaryLayerRef = useRef(null)
   const boundaryDataRef  = useRef({})
 
@@ -390,7 +401,7 @@ export default function TwinLand() {
   const totalLive=Object.values(live).reduce((a,b)=>a+b,0)
 
   return (
-    <div style={{height:'100dvh',width:'100vw',display:'flex',flexDirection:'column',fontFamily:"'Vazirmatn',system-ui,sans-serif",direction:'rtl',background:C.bg,overflow:'hidden',position:'fixed',inset:0}}>
+    <div style={{height:'100dvh',width:'100vw',display:'flex',flexDirection:'column',fontFamily:"'Estedad','Vazirmatn',system-ui,sans-serif",direction:'rtl',background:C.bg,overflow:'hidden',position:'fixed',inset:0}}>
       <style dangerouslySetInnerHTML={{__html:`
         @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;900&display=swap');
         *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -438,6 +449,9 @@ export default function TwinLand() {
         </button>
         <button onClick={()=>setShowBoundary(true)} style={{background:boundaryMode!=='off'?C.accent:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:boundaryMode!=='off'?'white':C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
           🗺️{!isMobile&&<span> مرزها</span>}
+        </button>
+        <button onClick={()=>setShowPalette(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:14,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
+          🎨{!isMobile&&<span style={{fontSize:12}}> پالت</span>}
         </button>
         <button onClick={()=>setShowCity(true)} style={{background:C.accent,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:'white',fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
           {CITIES[city].name} ▾
@@ -528,10 +542,10 @@ export default function TwinLand() {
                 ))}
               </div>
               <div style={{flex:1,overflowY:'auto',scrollbarWidth:'none'}}>
-                {panelTab==='dashboard'&&<DashboardTab cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP}/>}
-                {panelTab==='missions'&&<MissionsTab checkedIn={checkedIn} showToast={showToast}/>}
-                {panelTab==='rank'&&<RankTab/>}
-                {panelTab==='clan'&&<ClanTab/>}
+                {panelTab==='dashboard'&&<DashboardTab C={C} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP}/>}
+                {panelTab==='missions'&&<MissionsTab C={C} checkedIn={checkedIn} showToast={showToast}/>}
+                {panelTab==='rank'&&<RankTab C={C}/>}
+                {panelTab==='clan'&&<ClanTab C={C}/>}
               </div>
             </div>
           </>
@@ -565,8 +579,8 @@ export default function TwinLand() {
         })}
       </div>
 
-      {selCafe&&<CafePopup cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
-      {showXP&&<XPPanel xp={xp} levelInfo={levelInfo} streak={streak} onClose={()=>setShowXP(false)}/>}
+      {selCafe&&<CafePopup C={C} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
+      {showXP&&<XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={()=>setShowXP(false)}/>}
 
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
@@ -609,6 +623,42 @@ export default function TwinLand() {
         </div>
       )}
 
+      {showPalette&&(
+        <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowPalette(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 18px 40px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease',maxHeight:'80vh',overflowY:'auto'}}>
+            <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 16px'}}/>
+            <div style={{fontSize:18,fontWeight:800,color:C.text,textAlign:'center',marginBottom:4}}>🎨 پالت رنگی</div>
+            <div style={{fontSize:11,color:C.sub,textAlign:'center',marginBottom:16}}>تم دلخواهت رو انتخاب کن — ذخیره می‌شه</div>
+
+            {/* سوییچ روز / شب */}
+            <div style={{display:'flex',background:C.chip,borderRadius:12,padding:4,marginBottom:18}}>
+              <button onClick={()=>themeMode!=='light'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='light'?C.accent:'transparent',color:themeMode==='light'?'#fff':C.sub}}>☀️ روز</button>
+              <button onClick={()=>themeMode!=='dark'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='dark'?C.accent:'transparent',color:themeMode==='dark'?'#fff':C.sub}}>🌙 شب</button>
+            </div>
+
+            {/* لیست پالت‌ها */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {PALETTE_ORDER.map(key=>{
+                const p=PALETTES[key]
+                const pc=p[themeMode]
+                const active=paletteKey===key
+                return (
+                  <button key={key} onClick={()=>pickPalette(key)} style={{textAlign:'right',background:pc.card,border:active?'2.5px solid '+pc.accent:'1.5px solid '+pc.border,borderRadius:16,padding:'12px',fontFamily:'inherit',cursor:'pointer',position:'relative'}}>
+                    <div style={{display:'flex',gap:5,marginBottom:9}}>
+                      <span style={{width:22,height:22,borderRadius:7,background:pc.grad||pc.accent,display:'inline-block'}}/>
+                      <span style={{width:22,height:22,borderRadius:7,background:pc.chip,display:'inline-block',border:'1px solid '+pc.border}}/>
+                      <span style={{width:22,height:22,borderRadius:7,background:pc.bg,display:'inline-block',border:'1px solid '+pc.border}}/>
+                    </div>
+                    <div style={{fontSize:13,fontWeight:800,color:pc.text}}>{p.emoji} {p.name}</div>
+                    {active&&<div style={{position:'absolute',top:8,left:8,width:20,height:20,borderRadius:99,background:pc.accent,color:'#fff',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center'}}>✓</div>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showBoundary&&(
         <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowBoundary(false)}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
@@ -646,7 +696,7 @@ export default function TwinLand() {
 }
 
 // ── DASHBOARD TAB ─────────────────────────────────────────────────────────────
-function DashboardTab({cafes,filtered,live,totalLive,showToast,setSearch,checkedIn,xp,levelInfo,streak,setShowXP}) {
+function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,checkedIn,xp,levelInfo,streak,setShowXP}) {
   return <div>
     <div style={{margin:'14px 12px 0',background:'linear-gradient(135deg,'+levelInfo.current.color+'22,'+levelInfo.current.color+'08)',border:'1.5px solid '+levelInfo.current.color+'33',borderRadius:18,padding:'14px',cursor:'pointer'}} onClick={()=>setShowXP(true)}>
       <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -715,7 +765,7 @@ function DashboardTab({cafes,filtered,live,totalLive,showToast,setSearch,checked
 }
 
 // ── MISSIONS TAB ──────────────────────────────────────────────────────────────
-function MissionsTab({checkedIn,showToast}) {
+function MissionsTab({C,checkedIn,showToast}) {
   const TYPE_LABELS = {daily:'روزانه',weekly:'هفتگی',streak:'استریک',social:'اجتماعی',event:'رویداد'}
   const TYPE_COLORS = {daily:C.blue,weekly:C.purple,streak:C.accent,social:C.green,event:'#FF9500'}
 
@@ -766,7 +816,7 @@ const RANK_PREVIEW = [
   { id:4, name:'مهسا', avatar:'🐱', xp:880 },
   { id:5, name:'رضا',  avatar:'🦁', xp:760 },
 ]
-function RankTab() {
+function RankTab({C}) {
   const medals={1:'🥇',2:'🥈',3:'🥉'}
   return <div style={{padding:'12px 12px 32px'}}>
     <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>برترین‌های این هفته 🏆</div>
@@ -797,7 +847,7 @@ const CLAN_PREVIEW = {
     { id:3, name:'نیما', avatar:'🐧', xp:4310, role:'عضو' },
   ],
 }
-function ClanTab() {
+function ClanTab({C}) {
   const c=CLAN_PREVIEW
   return <div style={{padding:'12px 12px 32px'}}>
     <div style={{background:'linear-gradient(135deg,'+c.color+','+c.color+'cc)',borderRadius:18,padding:'18px',textAlign:'center',color:'#fff',marginBottom:14}}>
@@ -824,7 +874,7 @@ function ClanTab() {
 }
 
 // ── CAFE POPUP ────────────────────────────────────────────────────────────────
-function CafePopup({cafe,live,favs,setFavs,checkedIn,onClose,onCheckin,showToast}) {
+function CafePopup({C,cafe,live,favs,setFavs,checkedIn,onClose,onCheckin,showToast}) {
   const color=getColor(cafe.name); const isChecked=checkedIn.has(cafe.id); const isFav=favs.has(cafe.id)
   const xpAmount=cafe.is_top?XP_CONFIG.checkin_top:XP_CONFIG.checkin
   return <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)'}} onClick={onClose}>
@@ -871,7 +921,7 @@ function CafePopup({cafe,live,favs,setFavs,checkedIn,onClose,onCheckin,showToast
 }
 
 // ── XP PANEL ──────────────────────────────────────────────────────────────────
-function XPPanel({xp,levelInfo,streak,onClose}) {
+function XPPanel({C,xp,levelInfo,streak,onClose}) {
   const {current,next,progress}=levelInfo
   return <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.5)',backdropFilter:'blur(12px)'}} onClick={onClose}>
     <div onClick={(e)=>e.stopPropagation()} style={{position:'absolute',bottom:0,left:0,right:0,maxHeight:'85dvh',overflowY:'auto',background:C.card,borderRadius:'24px 24px 0 0',border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease',padding:'0 0 40px'}}>
