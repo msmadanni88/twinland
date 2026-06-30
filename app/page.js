@@ -73,11 +73,11 @@ const ZONES = [
 ]
 
 const NAV = [
-  { key:'map',      icon:'🗺',  label:'نقشه'    },
-  { key:'missions', icon:'📋', label:'ماموریت' },
-  { key:'clan',     icon:'🛡',  label:'کلن'     },
-  { key:'rank',     icon:'🏆', label:'رتبه'    },
-  { key:'profile',  icon:'👤', label:'پروفایل' },
+  { key:'map',      img:'icon_map',     label:'نقشه'    },
+  { key:'missions', img:'icon_mission', label:'ماموریت' },
+  { key:'clan',     img:'icon_clan',    label:'کلن'     },
+  { key:'rank',     img:'icon_rank',    label:'رتبه'    },
+  { key:'profile',  img:'icon_profile', label:'پروفایل' },
 ]
 
 const QUICK_FILTERS = [
@@ -540,10 +540,12 @@ export default function TwinLand() {
       <div style={{height:BH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'stretch'}}>
         {NAV.map(item=>{
           const active=tab===item.key
+          const isz=isMobile?26:30
+          const src='/'+item.img+(active?'_active':'_inactive')+'_L.png'
           // پروفایل مستقیم میره به صفحه‌اش؛ بقیه پنل اسلایدی رو باز می‌کنن
           if(item.key==='profile'){
-            return <a key={item.key} href="/profile" style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:C.sub,fontSize:isMobile?9:10,textDecoration:'none',fontFamily:'inherit'}}>
-              <span style={{fontSize:isMobile?20:22}}>{item.icon}</span>
+            return <a key={item.key} href="/profile" style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:active?C.accent:C.sub,fontSize:isMobile?9:10,textDecoration:'none',fontFamily:'inherit'}}>
+              <img src={src} alt={item.label} width={isz} height={isz} style={{objectFit:'contain',display:'block'}}/>
               {item.label}
             </a>
           }
@@ -554,7 +556,7 @@ export default function TwinLand() {
             if(item.key==='clan'){ setPanelOpen(true); setPanelTab('clan'); return }
             if(item.key==='rank'){ setPanelOpen(true); setPanelTab('rank'); return }
           }} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:active?C.accent:C.sub,fontSize:isMobile?9:10,position:'relative',fontFamily:'inherit',fontWeight:active?700:400}}>
-            <span style={{fontSize:isMobile?20:22}}>{item.icon}</span>
+            <img src={src} alt={item.label} width={isz} height={isz} style={{objectFit:'contain',display:'block'}}/>
             {item.label}
             {active&&<div style={{position:'absolute',bottom:0,left:'20%',right:'20%',height:2.5,background:C.accent,borderRadius:'2px 2px 0 0'}}/>}
           </button>
