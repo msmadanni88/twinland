@@ -74,6 +74,9 @@ export default function LeaderboardPage() {
       </div>
 
       <div style={S.container}>
+        <div style={{textAlign:'center',marginBottom:8}}>
+          <img src="/icon_rank_active@2x.png" alt="رتبه" width={88} height={88} style={{objectFit:'contain',display:'inline-block'}}/>
+        </div>
         {/* فیلتر زمان */}
         <div style={S.tabs}>
           {TABS.map(t => (
@@ -134,7 +137,7 @@ export default function LeaderboardPage() {
 const S = {
   page: {
     minHeight: '100vh',
-    background: 'linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%)',
+    background: '#ffffff',
     fontFamily: 'Vazirmatn, Tahoma, sans-serif',
     direction: 'rtl', color: '#1f2937', paddingBottom: 40,
   },
