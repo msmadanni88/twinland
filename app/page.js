@@ -453,18 +453,18 @@ export default function TwinLand() {
             )}
             <div style={{position:'absolute',top:0,right:0,bottom:0,width:PANEL_W,zIndex:20,background:'rgba(255,255,255,.82)',backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderLeft:'1px solid rgba(255,255,255,.5)',boxShadow:'-4px 0 32px rgba(0,0,0,.12)',display:'flex',flexDirection:'column',animation:panelIsOverlay?'slideUp .3s ease':'fadeIn .2s ease'}}>
               {/* tabs */}
-              <div style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid rgba(0,0,0,.07)'}}>
-                {[{key:'dashboard',icon:'📊',label:'داشبورد'},{key:'missions',icon:'📋',label:'ماموریت‌ها'}].map(t=>(
-                  <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flex:1,background:panelTab===t.key?C.accent:'rgba(0,0,0,.05)',border:'none',borderRadius:10,padding:'8px 4px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?'white':C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
+              <div style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid rgba(0,0,0,.07)',overflowX:'auto',scrollbarWidth:'none'}}>
+                {[{key:'dashboard',icon:'📊',label:'داشبورد'},{key:'missions',icon:'📋',label:'ماموریت'},{key:'rank',icon:'🏆',label:'رتبه'},{key:'clan',icon:'🛡',label:'کلن'}].map(t=>(
+                  <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:'rgba(0,0,0,.05)',border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?'white':C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
                     <span>{t.icon}</span>{t.label}
                   </button>
                 ))}
               </div>
               <div style={{flex:1,overflowY:'auto',scrollbarWidth:'none'}}>
-                {panelTab==='dashboard'
-                  ?<DashboardTab cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP}/>
-                  :<MissionsTab checkedIn={checkedIn} showToast={showToast}/>
-                }
+                {panelTab==='dashboard'&&<DashboardTab cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP}/>}
+                {panelTab==='missions'&&<MissionsTab checkedIn={checkedIn} showToast={showToast}/>}
+                {panelTab==='rank'&&<RankTab/>}
+                {panelTab==='clan'&&<ClanTab/>}
               </div>
             </div>
           </>
@@ -475,7 +475,20 @@ export default function TwinLand() {
       <div style={{height:BH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'stretch'}}>
         {NAV.map(item=>{
           const active=tab===item.key
-          return <button key={item.key} onClick={()=>{setTab(item.key);if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key!=='map')showToast('📣 '+item.label+' به زودی!')}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:active?C.accent:C.sub,fontSize:isMobile?9:10,position:'relative',fontFamily:'inherit',fontWeight:active?700:400}}>
+          // پروفایل مستقیم میره به صفحه‌اش؛ بقیه پنل اسلایدی رو باز می‌کنن
+          if(item.key==='profile'){
+            return <a key={item.key} href="/profile" style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:C.sub,fontSize:isMobile?9:10,textDecoration:'none',fontFamily:'inherit'}}>
+              <span style={{fontSize:isMobile?20:22}}>{item.icon}</span>
+              {item.label}
+            </a>
+          }
+          return <button key={item.key} onClick={()=>{
+            setTab(item.key)
+            if(item.key==='map'){ setPanelOpen(false); return }
+            if(item.key==='missions'){ setPanelOpen(true); setPanelTab('missions'); return }
+            if(item.key==='clan'){ setPanelOpen(true); setPanelTab('clan'); return }
+            if(item.key==='rank'){ setPanelOpen(true); setPanelTab('rank'); return }
+          }} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:active?C.accent:C.sub,fontSize:isMobile?9:10,position:'relative',fontFamily:'inherit',fontWeight:active?700:400}}>
             <span style={{fontSize:isMobile?20:22}}>{item.icon}</span>
             {item.label}
             {active&&<div style={{position:'absolute',bottom:0,left:'20%',right:'20%',height:2.5,background:C.accent,borderRadius:'2px 2px 0 0'}}/>}
@@ -489,11 +502,26 @@ export default function TwinLand() {
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
           <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:TH+8,right:14,left:14,background:'rgba(255,255,255,.97)',backdropFilter:'blur(24px)',borderRadius:18,border:'1px solid '+C.border,overflow:'hidden',boxShadow:'0 8px 40px rgba(0,0,0,.15)',animation:'fadeIn .2s ease'}}>
-            {[{key:'map',icon:'🗺',label:'نقشه'},{key:'missions',icon:'📋',label:'ماموریت‌ها'},{key:'clans',icon:'🛡',label:'کلن‌ها'},{key:'rank',icon:'🏆',label:'رتبه‌بندی'},{key:'xp',icon:'⭐',label:'سیستم XP'},{key:'settings',icon:'⚙️',label:'تنظیمات'}].map((item,i,arr)=>(
-              <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}setTab(item.key);if(item.key!=='map')showToast('📣 '+item.label+' به زودی!')}} style={{width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none'}}>
+            {[
+              {key:'map',icon:'🗺',label:'نقشه',href:null},
+              {key:'missions',icon:'📋',label:'ماموریت‌ها',href:null},
+              {key:'profile',icon:'👤',label:'پروفایل',href:'/profile'},
+              {key:'rank',icon:'🏆',label:'رتبه‌بندی',href:'/leaderboard'},
+              {key:'clans',icon:'🛡',label:'کلن‌ها',href:'/clan'},
+              {key:'xp',icon:'⭐',label:'سیستم XP',href:null},
+              {key:'settings',icon:'⚙️',label:'تنظیمات',href:null},
+            ].map((item,i,arr)=>{
+              const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
+              if(item.href){
+                return <a key={item.key} href={item.href} style={style}>
+                  <span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>{item.label}
+                  <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
+                </a>
+              }
+              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
                 <span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>{item.label}
               </button>
-            ))}
+            })}
           </div>
         </div>
       )}
@@ -643,6 +671,71 @@ function MissionsTab({checkedIn,showToast}) {
         </div>
       </div>
     })}
+  </div>
+}
+
+// ── RANK TAB (خلاصه — نسخه کامل در /leaderboard) ───────────────────────────────
+const RANK_PREVIEW = [
+  { id:1, name:'سارا', avatar:'🦊', xp:1840 },
+  { id:2, name:'نیما', avatar:'🐧', xp:1620 },
+  { id:3, name:'دانی', avatar:'☕', xp:920, me:true },
+  { id:4, name:'مهسا', avatar:'🐱', xp:880 },
+  { id:5, name:'رضا',  avatar:'🦁', xp:760 },
+]
+function RankTab() {
+  const medals={1:'🥇',2:'🥈',3:'🥉'}
+  return <div style={{padding:'12px 12px 32px'}}>
+    <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>برترین‌های این هفته 🏆</div>
+    <div style={{fontSize:11,color:C.sub,marginBottom:14}}>رتبه خودت رو بین بقیه ببین</div>
+    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+      {RANK_PREVIEW.map((p,i)=>{
+        const rank=i+1
+        return <div key={p.id} style={{display:'flex',alignItems:'center',gap:12,background:p.me?'rgba(255,107,53,.10)':'rgba(255,255,255,.7)',border:p.me?'2px solid '+C.accent:'1px solid rgba(0,0,0,.08)',borderRadius:14,padding:'10px 12px'}}>
+          <div style={{width:24,textAlign:'center',fontSize:rank<=3?18:14,fontWeight:800,color:rank<=3?C.text:C.sub}}>{medals[rank]||rank}</div>
+          <div style={{width:38,height:38,borderRadius:'50%',background:'#fff',border:'2px solid '+C.accent+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{p.avatar}</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.name}{p.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
+          </div>
+          <div style={{fontSize:12,fontWeight:800,color:C.accent}}>{p.xp} XP</div>
+        </div>
+      })}
+    </div>
+    <a href="/leaderboard" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده جدول کامل ›</a>
+  </div>
+}
+
+// ── CLAN TAB (خلاصه — نسخه کامل در /clan) ──────────────────────────────────────
+const CLAN_PREVIEW = {
+  name:'کافه‌نشینان', emblem:'⚔️', color:'#9C27B0', level:4, xp:24800, rank:2,
+  members:[
+    { id:1, name:'سارا', avatar:'🦊', xp:6200, role:'رهبر' },
+    { id:2, name:'دانی', avatar:'☕', xp:4980, role:'افسر', me:true },
+    { id:3, name:'نیما', avatar:'🐧', xp:4310, role:'عضو' },
+  ],
+}
+function ClanTab() {
+  const c=CLAN_PREVIEW
+  return <div style={{padding:'12px 12px 32px'}}>
+    <div style={{background:'linear-gradient(135deg,'+c.color+','+c.color+'cc)',borderRadius:18,padding:'18px',textAlign:'center',color:'#fff',marginBottom:14}}>
+      <div style={{fontSize:38}}>{c.emblem}</div>
+      <div style={{fontSize:19,fontWeight:800,marginTop:2}}>{c.name}</div>
+      <div style={{fontSize:12,opacity:.9,marginTop:3}}>سطح {c.level} · رتبه {c.rank} · {c.xp.toLocaleString('fa')} XP</div>
+    </div>
+    <div style={{fontSize:12,fontWeight:800,color:C.text,marginBottom:8}}>اعضای برتر</div>
+    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+      {c.members.map((m,i)=>(
+        <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,background:m.me?'rgba(255,107,53,.10)':'rgba(255,255,255,.7)',border:m.me?'2px solid '+C.accent:'1px solid rgba(0,0,0,.08)',borderRadius:14,padding:'10px 12px'}}>
+          <div style={{width:22,textAlign:'center',fontWeight:800,color:C.sub,fontSize:14}}>{i+1}</div>
+          <div style={{width:38,height:38,borderRadius:'50%',background:'#fff',border:'2px solid '+c.color+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{m.avatar}</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{m.name}{m.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
+            <div style={{fontSize:11,color:C.sub}}>{m.role}</div>
+          </div>
+          <div style={{fontSize:12,fontWeight:800,color:C.accent}}>{m.xp.toLocaleString('fa')} XP</div>
+        </div>
+      ))}
+    </div>
+    <a href="/clan" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده کامل کلن ›</a>
   </div>
 }
 
