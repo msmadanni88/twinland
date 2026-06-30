@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 
 // ---- همون سیستم لول هماهنگ ----
 const LEVELS = [
@@ -54,6 +55,10 @@ const TABS = [
 ]
 
 export default function LeaderboardPage() {
+  const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
+  useEffect(() => { setPal(loadPrefs()) }, [])
+  const C = buildC(pal.palette, pal.mode)
+  const S = mkS(C)
   const [tab, setTab] = useState('week')
   const list = DATA[tab]
   const top3 = list.slice(0, 3)
@@ -134,52 +139,49 @@ export default function LeaderboardPage() {
   )
 }
 
-const S = {
+const mkS = (C) => ({
   page: {
-    minHeight: '100vh',
-    background: '#ffffff',
-    fontFamily: 'Vazirmatn, Tahoma, sans-serif',
-    direction: 'rtl', color: '#1f2937', paddingBottom: 40,
+    minHeight: '100vh', background: C.bg, fontFamily: 'inherit',
+    direction: 'rtl', color: C.text, paddingBottom: 40,
   },
   topbar: {
     position: 'sticky', top: 0, zIndex: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '12px 16px',
-    background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(0,0,0,0.06)',
+    padding: '12px 16px', background: C.glassDark, backdropFilter: 'blur(20px)',
+    borderBottom: '1px solid ' + C.border,
   },
-  backBtn: { width: 64, fontSize: 15, color: '#f97316', textDecoration: 'none', fontWeight: 700 },
-  brand: { fontWeight: 800, fontSize: 17 },
+  backBtn: { width: 64, fontSize: 15, color: C.accent, textDecoration: 'none', fontWeight: 700 },
+  brand: { fontWeight: 800, fontSize: 17, color: C.text },
   container: { maxWidth: 480, margin: '0 auto', padding: 16 },
 
   tabs: { display: 'flex', gap: 8, marginBottom: 16 },
   tab: {
     flex: 1, padding: 10, borderRadius: 12, border: 'none',
-    background: 'rgba(255,255,255,0.6)', color: '#6b7280',
+    background: C.chip, color: C.sub,
     fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
   },
   tabActive: {
     flex: 1, padding: 10, borderRadius: 12, border: 'none',
-    background: '#f97316', color: '#fff',
+    background: C.accent, color: '#fff',
     fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
   },
 
   podiumCard: {
-    background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(28px)',
-    border: '1px solid rgba(255,255,255,0.6)', borderRadius: 20,
+    background: C.card, backdropFilter: 'blur(28px)',
+    border: '1px solid ' + C.border, borderRadius: 20,
     padding: '20px 12px 0', marginBottom: 16,
     boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
   },
   podiumRow: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 10 },
   podiumCol: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: 110 },
   podiumAvatar: {
-    width: 56, height: 56, borderRadius: '50%', background: '#fff',
+    width: 56, height: 56, borderRadius: '50%', background: C.card,
     border: '3px solid', display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 26, position: 'relative',
   },
   podiumMedal: { position: 'absolute', bottom: -6, fontSize: 18 },
-  podiumName: { fontWeight: 800, fontSize: 13, marginTop: 8 },
-  podiumXp: { fontSize: 12, color: '#6b7280', marginBottom: 6 },
+  podiumName: { fontWeight: 800, fontSize: 13, marginTop: 8, color: C.text },
+  podiumXp: { fontSize: 12, color: C.sub, marginBottom: 6 },
   podiumStand: {
     width: '100%', borderRadius: '10px 10px 0 0',
     display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 8,
@@ -189,18 +191,18 @@ const S = {
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
   row: {
     display: 'flex', alignItems: 'center', gap: 12,
-    background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.6)',
+    background: C.card, border: '1px solid ' + C.border,
     borderRadius: 14, padding: '10px 14px',
     boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
   },
-  rowMe: { border: '2px solid #f97316', background: 'rgba(255,247,237,0.9)' },
-  rank: { width: 22, textAlign: 'center', fontWeight: 800, color: '#9ca3af', fontSize: 15 },
+  rowMe: { border: '2px solid ' + C.accent, background: C.accentL },
+  rank: { width: 22, textAlign: 'center', fontWeight: 800, color: C.sub, fontSize: 15 },
   rowAvatar: {
-    width: 40, height: 40, borderRadius: '50%', background: '#fff', border: '2px solid',
+    width: 40, height: 40, borderRadius: '50%', background: C.card, border: '2px solid',
     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
   },
-  rowName: { fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 },
-  youTag: { fontSize: 10, background: '#f97316', color: '#fff', borderRadius: 999, padding: '1px 7px' },
-  rowLevel: { fontSize: 12, color: '#6b7280' },
-  rowXp: { color: '#f97316', fontWeight: 800, fontSize: 13 },
-}
+  rowName: { fontWeight: 700, fontSize: 14, color: C.text, display: 'flex', alignItems: 'center', gap: 6 },
+  youTag: { fontSize: 10, background: C.accent, color: '#fff', borderRadius: 999, padding: '1px 7px' },
+  rowLevel: { fontSize: 12, color: C.sub },
+  rowXp: { color: C.accent, fontWeight: 800, fontSize: 13 },
+})
