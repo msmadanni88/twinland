@@ -459,7 +459,7 @@ export default function TwinLand() {
       </div>
 
       {/* FILTER BAR */}
-      <div style={{height:38,flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'0 12px',overflowX:'auto',scrollbarWidth:'none',background:'rgba(255,255,255,.80)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
+      <div style={{height:38,flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'0 12px',overflowX:'auto',scrollbarWidth:'none',background:C.glassDark,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
         {ZONES.map(z=>(
           <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'4px 13px',fontSize:11,fontWeight:zone===z.key?700:400,color:zone===z.key?'white':C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
         ))}
@@ -529,11 +529,11 @@ export default function TwinLand() {
             {panelIsOverlay&&(
               <div onClick={()=>setPanelOpen(false)} style={{position:'absolute',inset:0,zIndex:19,background:'rgba(0,0,0,.25)',backdropFilter:'blur(2px)',WebkitBackdropFilter:'blur(2px)'}}/>
             )}
-            <div style={{position:'absolute',top:0,right:0,bottom:0,width:PANEL_W,zIndex:20,background:'rgba(255,255,255,.82)',backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderLeft:'1px solid rgba(255,255,255,.5)',boxShadow:'-4px 0 32px rgba(0,0,0,.12)',display:'flex',flexDirection:'column',animation:panelIsOverlay?'slideUp .3s ease':'fadeIn .2s ease'}}>
+            <div style={{position:'absolute',top:0,right:0,bottom:0,width:PANEL_W,zIndex:20,background:C.glassDark,backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderLeft:'1px solid '+C.border,boxShadow:'-4px 0 32px rgba(0,0,0,.12)',display:'flex',flexDirection:'column',animation:panelIsOverlay?'slideUp .3s ease':'fadeIn .2s ease'}}>
               {/* tabs */}
-              <div style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid rgba(0,0,0,.07)',overflowX:'auto',scrollbarWidth:'none'}}>
+              <div style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid '+C.border,overflowX:'auto',scrollbarWidth:'none'}}>
                 {[{key:'dashboard',icon:'📊',img:null,label:'داشبورد'},{key:'missions',icon:'📋',img:'icon_mission',label:'ماموریت'},{key:'rank',icon:'🏆',img:'icon_rank',label:'رتبه'},{key:'clan',icon:'🛡',img:'icon_clan',label:'کلن'},{key:'profile',icon:'👤',img:'icon_profile',label:'پروفایل'}].map(t=>(
-                  <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:'rgba(0,0,0,.05)',border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?'white':C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
+                  <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:C.chip,border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?'white':C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
                     {t.img
                       ? <img src={'/'+t.img+(panelTab===t.key?'_active':'_inactive')+'_L.png'} alt={t.label} width={18} height={18} style={{objectFit:'contain',display:'block'}}/>
                       : <span>{t.icon}</span>}
@@ -579,7 +579,7 @@ export default function TwinLand() {
 
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:TH+8,right:14,left:14,background:'rgba(255,255,255,.97)',backdropFilter:'blur(24px)',borderRadius:18,border:'1px solid '+C.border,overflow:'hidden',boxShadow:'0 8px 40px rgba(0,0,0,.15)',animation:'fadeIn .2s ease'}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:TH+8,right:14,left:14,background:C.glassDark,backdropFilter:'blur(24px)',borderRadius:18,border:'1px solid '+C.border,overflow:'hidden',boxShadow:'0 8px 40px rgba(0,0,0,.15)',animation:'fadeIn .2s ease'}}>
             {[
               {key:'map',icon:'🗺',label:'نقشه',href:null},
               {key:'missions',icon:'📋',label:'ماموریت‌ها',href:null},
@@ -711,7 +711,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
           <span style={{fontSize:10,color:C.sub}}>تا {levelInfo.next.icon} {levelInfo.next.name}</span>
           <span style={{fontSize:10,fontWeight:700,color:levelInfo.current.color}}>{levelInfo.next.minXP-xp} XP مانده</span>
         </div>
-        <div style={{height:8,background:'rgba(0,0,0,.08)',borderRadius:99,overflow:'hidden'}}>
+        <div style={{height:8,background:C.chip,borderRadius:99,overflow:'hidden'}}>
           <div style={{height:'100%',width:levelInfo.progress+'%',background:'linear-gradient(90deg,'+levelInfo.current.color+','+C.accent+')',borderRadius:99,transition:'width .6s'}}/>
         </div>
       </div>}
@@ -749,7 +749,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
     <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)',paddingBottom:24}}>
       <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>برترین‌ها</div>
       {[{r:'🥇',n:'کاشف_دانی',x:1240},{r:'🥈',n:'قهوه‌باز',x:980},{r:'🥉',n:'تهران‌گرد',x:840}].map(p=>(
-        <div key={p.n} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid rgba(0,0,0,.05)'}}>
+        <div key={p.n} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid '+C.border}}>
           <span style={{fontSize:18}}>{p.r}</span>
           <div style={{flex:1}}><div style={{fontSize:12,color:C.text,fontWeight:700}}>{p.n}</div></div>
           <div style={{fontSize:12,color:C.accent,fontWeight:800}}>{p.x} XP</div>
@@ -774,7 +774,7 @@ function MissionsTab({C,checkedIn,showToast}) {
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {items.map(m=>{
             const pct=Math.round((m.done/m.total)*100); const isDone=m.done>=m.total
-            return <div key={m.id} style={{background:isDone?C.green+'12':'rgba(255,255,255,.7)',border:'1px solid '+(isDone?C.green+'44':'rgba(0,0,0,.08)'),borderRadius:14,padding:'12px',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}}>
+            return <div key={m.id} style={{background:isDone?C.green+'22':C.card,border:'1px solid '+(isDone?C.green+'66':C.border),borderRadius:14,padding:'12px',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}}>
               <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
                 <div style={{width:40,height:40,borderRadius:12,flexShrink:0,background:isDone?C.green+'20':TYPE_COLORS[type]+'15',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{isDone?'✅':m.icon}</div>
                 <div style={{flex:1,minWidth:0}}>
@@ -788,7 +788,7 @@ function MissionsTab({C,checkedIn,showToast}) {
                       <span style={{fontSize:10,color:isDone?C.green:C.sub,fontWeight:isDone?700:400}}>{isDone?'تکمیل شد! ✓':`${m.done} از ${m.total}`}</span>
                       <span style={{fontSize:10,color:C.sub}}>{pct}%</span>
                     </div>
-                    <div style={{height:5,background:'rgba(0,0,0,.08)',borderRadius:99,overflow:'hidden'}}>
+                    <div style={{height:5,background:C.chip,borderRadius:99,overflow:'hidden'}}>
                       <div className="mission-bar" style={{height:'100%',width:pct+'%',background:isDone?'linear-gradient(90deg,'+C.green+',#5AC96C)':'linear-gradient(90deg,'+TYPE_COLORS[type]+','+TYPE_COLORS[type]+'aa)',borderRadius:99}}/>
                     </div>
                   </div>
@@ -819,9 +819,9 @@ function RankTab({C}) {
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
       {RANK_PREVIEW.map((p,i)=>{
         const rank=i+1
-        return <div key={p.id} style={{display:'flex',alignItems:'center',gap:12,background:p.me?'rgba(255,107,53,.10)':'rgba(255,255,255,.7)',border:p.me?'2px solid '+C.accent:'1px solid rgba(0,0,0,.08)',borderRadius:14,padding:'10px 12px'}}>
+        return <div key={p.id} style={{display:'flex',alignItems:'center',gap:12,background:p.me?C.accentL:C.card,border:p.me?'2px solid '+C.accent:'1px solid '+C.border,borderRadius:14,padding:'10px 12px'}}>
           <div style={{width:24,textAlign:'center',fontSize:rank<=3?18:14,fontWeight:800,color:rank<=3?C.text:C.sub}}>{medals[rank]||rank}</div>
-          <div style={{width:38,height:38,borderRadius:'50%',background:'#fff',border:'2px solid '+C.accent+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{p.avatar}</div>
+          <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+C.accent+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{p.avatar}</div>
           <div style={{flex:1}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.name}{p.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
           </div>
@@ -853,9 +853,9 @@ function ClanTab({C}) {
     <div style={{fontSize:12,fontWeight:800,color:C.text,marginBottom:8}}>اعضای برتر</div>
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
       {c.members.map((m,i)=>(
-        <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,background:m.me?'rgba(255,107,53,.10)':'rgba(255,255,255,.7)',border:m.me?'2px solid '+C.accent:'1px solid rgba(0,0,0,.08)',borderRadius:14,padding:'10px 12px'}}>
+        <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,background:m.me?C.accentL:C.card,border:m.me?'2px solid '+C.accent:'1px solid '+C.border,borderRadius:14,padding:'10px 12px'}}>
           <div style={{width:22,textAlign:'center',fontWeight:800,color:C.sub,fontSize:14}}>{i+1}</div>
-          <div style={{width:38,height:38,borderRadius:'50%',background:'#fff',border:'2px solid '+c.color+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{m.avatar}</div>
+          <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+c.color+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{m.avatar}</div>
           <div style={{flex:1}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{m.name}{m.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
             <div style={{fontSize:11,color:C.sub}}>{m.role}</div>
