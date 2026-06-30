@@ -92,6 +92,13 @@ function getColor(name) {
   return CAFE_COLORS[Math.abs(h)%CAFE_COLORS.length]
 }
 
+// ── BOUNDARY LAYERS (استان‌ها / مناطق تهران) ───────────────────────────────────
+const BOUNDARY_PALETTE = ['#FF6B35','#E84393','#7C3AED','#0EA5E9','#10B981','#F59E0B','#EF4444','#8B5CF6']
+const BOUNDARY_SOURCES = {
+  province: { url:'/iran_provinces.json', label:'استان‌ها' },
+  district: { url:'/tehran_districts.json', label:'مناطق تهران' },
+}
+
 const MOCK_CAFES = [
   {id:'c1',name:'کافه نادری', lat:35.6992,lng:51.4165,description:'خیابان نادری، مرکز',  zone:'center',is_top:true, tags:['کلاسیک','صبحانه']},
   {id:'c2',name:'کافه فرانسه',lat:35.7580,lng:51.4080,description:'تجریش، شمال تهران',   zone:'north', is_top:true, tags:['فرانسوی','دنج','اسپشالتی']},
@@ -133,6 +140,10 @@ export default function TwinLand() {
   const [streak,     setStreak]     = useState(3)
   const [xpAnim,     setXpAnim]     = useState(null)
   const [vw,         setVw]         = useState(800)
+  const [boundaryMode, setBoundaryMode] = useState('off') // 'off' | 'province' | 'district'
+  const [showBoundary, setShowBoundary] = useState(false)
+  const boundaryLayerRef = useRef(null)
+  const boundaryDataRef  = useRef({})
 
   useEffect(()=>{
     const check=()=>setVw(window.innerWidth)
@@ -313,6 +324,55 @@ export default function TwinLand() {
     else if(z.key==='all'&&mapInst.current){ const c=CITIES[city]; mapInst.current.flyTo([c.lat,c.lng],c.zoom) }
   }
 
+  // ── BOUNDARY LAYER (استان‌ها / مناطق تهران) ──
+  useEffect(()=>{
+    if(!mapReady||!window.L||!mapInst.current) return
+    const L=window.L
+    if(boundaryLayerRef.current){
+      mapInst.current.removeLayer(boundaryLayerRef.current)
+      boundaryLayerRef.current=null
+    }
+    if(boundaryMode==='off') return
+    let cancelled=false
+
+    const styleFor=(idx)=>{
+      const on=idx>0
+      const color=on?BOUNDARY_PALETTE[(idx-1)%BOUNDARY_PALETTE.length]:'#8E8E93'
+      return {color,weight:on?2.5:1.3,fillColor:color,fillOpacity:on?0.32:0,opacity:on?0.95:0.5}
+    }
+
+    const render=(data)=>{
+      if(cancelled||!mapInst.current) return
+      const regionState={}
+      const layer=L.geoJSON(data,{
+        style:()=>styleFor(0),
+        onEachFeature:(feature,lyr)=>{
+          const name=feature.properties.name||'—'
+          regionState[name]=0
+          lyr.bindTooltip(name,{sticky:true,direction:'top',className:'boundary-tip'})
+          lyr.on('click',(e)=>{
+            L.DomEvent.stopPropagation(e)
+            regionState[name]=(regionState[name]+1)%(BOUNDARY_PALETTE.length+1)
+            lyr.setStyle(styleFor(regionState[name]))
+            showToast(regionState[name]>0?'🎨 '+name:'⬜ '+name+' خاموش شد')
+          })
+        }
+      })
+      layer.addTo(mapInst.current)
+      boundaryLayerRef.current=layer
+    }
+
+    if(boundaryDataRef.current[boundaryMode]){
+      render(boundaryDataRef.current[boundaryMode])
+    } else {
+      fetch(BOUNDARY_SOURCES[boundaryMode].url).then(r=>r.json()).then(data=>{
+        boundaryDataRef.current[boundaryMode]=data
+        render(data)
+      }).catch(()=>showToast('خطا در بارگذاری مرزها'))
+    }
+    return ()=>{ cancelled=true }
+  },[boundaryMode,mapReady,showToast])
+
   function doCheckin(cafe){
     if(checkedIn.has(cafe.id)){ showToast('قبلاً اینجا بودی!','warn'); return }
     const isFirst=checkedIn.size===0
@@ -349,6 +409,8 @@ export default function TwinLand() {
         @keyframes shimmer{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
         .xp-float{animation:xpFloat 1.8s ease forwards}
         .mission-bar{transition:width .8s ease}
+        .boundary-tip{background:rgba(28,28,30,.88)!important;color:#fff!important;border:none!important;border-radius:8px!important;font-family:'Vazirmatn',sans-serif!important;font-size:11px!important;font-weight:600!important;padding:4px 9px!important;box-shadow:0 2px 10px rgba(0,0,0,.25)!important}
+        .boundary-tip::before{display:none!important}
       `}}/>
 
       {/* TOPBAR */}
@@ -374,6 +436,9 @@ export default function TwinLand() {
         </button>
         <button onClick={()=>setShowMode(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.accent,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
           {MAP_MODES.find(m=>m.key===mapMode).label.split(' ')[0]}
+        </button>
+        <button onClick={()=>setShowBoundary(true)} style={{background:boundaryMode!=='off'?C.accent:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:boundaryMode!=='off'?'white':C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
+          🗺️{!isMobile&&<span> مرزها</span>}
         </button>
         <button onClick={()=>setShowCity(true)} style={{background:C.accent,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:'white',fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
           {CITIES[city].name} ▾
@@ -534,6 +599,21 @@ export default function TwinLand() {
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
               {Object.entries(CITIES).map(([k,v])=>(
                 <button key={k} onClick={()=>{setCity(k);setShowCity(false);showToast('✈️ '+v.name)}} style={{background:city===k?C.accent:C.chip,border:'none',borderRadius:12,padding:'12px 6px',fontSize:12,fontWeight:city===k?800:500,color:city===k?'white':C.text,fontFamily:'inherit'}}>{v.name}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBoundary&&(
+        <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowBoundary(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
+            <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 18px'}}/>
+            <div style={{fontSize:17,fontWeight:800,color:C.text,textAlign:'center',marginBottom:6}}>🗺️ مرزهای جغرافیایی</div>
+            <div style={{fontSize:11,color:C.sub,textAlign:'center',marginBottom:16,lineHeight:1.6}}>روی هر منطقه روی نقشه بزن تا رنگش عوض بشه یا خاموش شه</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {[{key:'off',label:'❌ خاموش'},{key:'province',label:'🇮🇷 استان‌های ایران'},{key:'district',label:'🏙️ مناطق ۲۲گانه تهران'}].map(o=>(
+                <button key={o.key} onClick={()=>{setBoundaryMode(o.key);setShowBoundary(false);if(o.key!=='off')showToast(BOUNDARY_SOURCES[o.key]?.label+' فعال شد')}} style={{background:boundaryMode===o.key?C.accent:C.chip,border:boundaryMode===o.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'14px',fontSize:14,fontWeight:boundaryMode===o.key?800:500,color:boundaryMode===o.key?'white':C.text,fontFamily:'inherit',textAlign:'right'}}>{o.label}</button>
               ))}
             </div>
           </div>
