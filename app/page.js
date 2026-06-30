@@ -93,7 +93,6 @@ function getColor(name) {
 }
 
 // ── BOUNDARY LAYERS (استان‌ها / مناطق تهران) ───────────────────────────────────
-const BOUNDARY_PALETTE = ['#FF6B35','#E84393','#7C3AED','#0EA5E9','#10B981','#F59E0B','#EF4444','#8B5CF6']
 const BOUNDARY_SOURCES = {
   province: { url:'/iran_provinces.json', label:'استان‌ها' },
   district: { url:'/tehran_districts.json', label:'مناطق تهران' },
@@ -337,7 +336,7 @@ export default function TwinLand() {
 
     const styleFor=(idx)=>{
       const on=idx>0
-      const color=on?BOUNDARY_PALETTE[(idx-1)%BOUNDARY_PALETTE.length]:'#8E8E93'
+      const color=on?'#000000':'#8E8E93'
       return {color,weight:on?2.5:1.3,fillColor:color,fillOpacity:on?0.32:0,opacity:on?0.95:0.5}
     }
 
@@ -352,9 +351,9 @@ export default function TwinLand() {
           lyr.bindTooltip(name,{sticky:true,direction:'top',className:'boundary-tip'})
           lyr.on('click',(e)=>{
             L.DomEvent.stopPropagation(e)
-            regionState[name]=(regionState[name]+1)%(BOUNDARY_PALETTE.length+1)
+            regionState[name]=regionState[name]?0:1
             lyr.setStyle(styleFor(regionState[name]))
-            showToast(regionState[name]>0?'🎨 '+name:'⬜ '+name+' خاموش شد')
+            showToast(regionState[name]>0?'⬛ '+name:'⬜ '+name+' خاموش شد')
           })
         }
       })
@@ -519,9 +518,12 @@ export default function TwinLand() {
             <div style={{position:'absolute',top:0,right:0,bottom:0,width:PANEL_W,zIndex:20,background:'rgba(255,255,255,.82)',backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderLeft:'1px solid rgba(255,255,255,.5)',boxShadow:'-4px 0 32px rgba(0,0,0,.12)',display:'flex',flexDirection:'column',animation:panelIsOverlay?'slideUp .3s ease':'fadeIn .2s ease'}}>
               {/* tabs */}
               <div style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid rgba(0,0,0,.07)',overflowX:'auto',scrollbarWidth:'none'}}>
-                {[{key:'dashboard',icon:'📊',label:'داشبورد'},{key:'missions',icon:'📋',label:'ماموریت'},{key:'rank',icon:'🏆',label:'رتبه'},{key:'clan',icon:'🛡',label:'کلن'}].map(t=>(
+                {[{key:'dashboard',icon:'📊',img:null,label:'داشبورد'},{key:'missions',icon:'📋',img:'icon_mission',label:'ماموریت'},{key:'rank',icon:'🏆',img:'icon_rank',label:'رتبه'},{key:'clan',icon:'🛡',img:'icon_clan',label:'کلن'}].map(t=>(
                   <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:'rgba(0,0,0,.05)',border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?'white':C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
-                    <span>{t.icon}</span>{t.label}
+                    {t.img
+                      ? <img src={'/'+t.img+(panelTab===t.key?'_active':'_inactive')+'_L.png'} alt={t.label} width={18} height={18} style={{objectFit:'contain',display:'block'}}/>
+                      : <span>{t.icon}</span>}
+                    {t.label}
                   </button>
                 ))}
               </div>
