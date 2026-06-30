@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 
 // ---- داده موک (بعداً از Supabase) ----
 const MY_CLAN = {
@@ -29,6 +30,10 @@ const DISCOVER = [
 ]
 
 export default function ClanPage() {
+  const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
+  useEffect(() => { setPal(loadPrefs()) }, [])
+  const C = buildC(pal.palette, pal.mode)
+  const S = mkS(C)
   const [joined, setJoined] = useState(true) // true = عضو کلن
 
   return (
@@ -45,13 +50,13 @@ export default function ClanPage() {
         <div style={{textAlign:'center',marginBottom:8}}>
           <img src="/icon_clan_active@2x.png" alt="کلن" width={88} height={88} style={{objectFit:'contain',display:'inline-block'}}/>
         </div>
-        {joined ? <MyClan /> : <Discover />}
+        {joined ? <MyClan S={S} /> : <Discover S={S} />}
       </div>
     </div>
   )
 }
 
-function MyClan() {
+function MyClan({ S }) {
   const c = MY_CLAN
   return (
     <>
@@ -64,9 +69,9 @@ function MyClan() {
 
       {/* آمار کلن */}
       <div style={S.statsGrid}>
-        <Stat icon="⭐" value={c.xp.toLocaleString('fa')} label="XP کلن" />
-        <Stat icon="👥" value={c.members.length.toLocaleString('fa')} label="اعضا" />
-        <Stat icon="🏆" value={c.rank.toLocaleString('fa')} label="رتبه" />
+        <Stat S={S} icon="⭐" value={c.xp.toLocaleString("fa")} label="XP کلن" />
+        <Stat S={S} icon="👥" value={c.members.length.toLocaleString("fa")} label="اعضا" />
+        <Stat S={S} icon="🏆" value={c.rank.toLocaleString("fa")} label="رتبه" />
       </div>
 
       {/* اعضا */}
@@ -92,7 +97,7 @@ function MyClan() {
   )
 }
 
-function Discover() {
+function Discover({ S }) {
   return (
     <>
       <div style={S.sectionTitle}>کلن‌های برتر</div>
@@ -116,7 +121,7 @@ function Discover() {
   )
 }
 
-function Stat({ icon, value, label }) {
+function Stat({ icon, value, label, S }) {
   return (
     <div style={S.statCard}>
       <div style={S.statIcon}>{icon}</div>
@@ -126,24 +131,21 @@ function Stat({ icon, value, label }) {
   )
 }
 
-const S = {
+const mkS = (C) => ({
   page: {
-    minHeight: '100vh',
-    background: '#ffffff',
-    fontFamily: 'Vazirmatn, Tahoma, sans-serif',
-    direction: 'rtl', color: '#1f2937', paddingBottom: 40,
+    minHeight: '100vh', background: C.bg, fontFamily: 'inherit',
+    direction: 'rtl', color: C.text, paddingBottom: 40,
   },
   topbar: {
     position: 'sticky', top: 0, zIndex: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '12px 16px',
-    background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(0,0,0,0.06)',
+    padding: '12px 16px', background: C.glassDark, backdropFilter: 'blur(20px)',
+    borderBottom: '1px solid ' + C.border,
   },
-  backBtn: { width: 64, fontSize: 15, color: '#f97316', textDecoration: 'none', fontWeight: 700 },
-  brand: { fontWeight: 800, fontSize: 17 },
+  backBtn: { width: 64, fontSize: 15, color: C.accent, textDecoration: 'none', fontWeight: 700 },
+  brand: { fontWeight: 800, fontSize: 17, color: C.text },
   switchBtn: {
-    width: 64, fontSize: 13, color: '#f97316', background: 'none', border: 'none',
+    width: 64, fontSize: 13, color: C.accent, background: 'none', border: 'none',
     fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
   },
   container: { maxWidth: 480, margin: '0 auto', padding: 16 },
@@ -158,43 +160,43 @@ const S = {
 
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 18 },
   statCard: {
-    background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255,255,255,0.6)', borderRadius: 16,
+    background: C.card, backdropFilter: 'blur(20px)',
+    border: '1px solid ' + C.border, borderRadius: 16,
     padding: '12px 6px', textAlign: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
   },
   statIcon: { fontSize: 20 },
-  statValue: { fontSize: 16, fontWeight: 800, marginTop: 2 },
-  statLabel: { fontSize: 11, color: '#6b7280' },
+  statValue: { fontSize: 16, fontWeight: 800, marginTop: 2, color: C.text },
+  statLabel: { fontSize: 11, color: C.sub },
 
-  sectionTitle: { fontWeight: 800, fontSize: 15, marginBottom: 10 },
+  sectionTitle: { fontWeight: 800, fontSize: 15, marginBottom: 10, color: C.text },
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
   row: {
     display: 'flex', alignItems: 'center', gap: 12,
-    background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.6)',
+    background: C.card, border: '1px solid ' + C.border,
     borderRadius: 14, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
   },
-  rowMe: { border: '2px solid #f97316', background: 'rgba(255,247,237,0.9)' },
-  rank: { width: 22, textAlign: 'center', fontWeight: 800, color: '#9ca3af', fontSize: 15 },
+  rowMe: { border: '2px solid ' + C.accent, background: C.accentL },
+  rank: { width: 22, textAlign: 'center', fontWeight: 800, color: C.sub, fontSize: 15 },
   rowAvatar: {
-    width: 40, height: 40, borderRadius: '50%', background: '#fff', border: '2px solid',
+    width: 40, height: 40, borderRadius: '50%', background: C.card, border: '2px solid',
     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
   },
-  rowName: { fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 },
-  youTag: { fontSize: 10, background: '#f97316', color: '#fff', borderRadius: 999, padding: '1px 7px' },
-  rowRole: { fontSize: 12, color: '#6b7280' },
-  rowXp: { color: '#f97316', fontWeight: 800, fontSize: 13 },
+  rowName: { fontWeight: 700, fontSize: 14, color: C.text, display: 'flex', alignItems: 'center', gap: 6 },
+  youTag: { fontSize: 10, background: C.accent, color: '#fff', borderRadius: 999, padding: '1px 7px' },
+  rowRole: { fontSize: 12, color: C.sub },
+  rowXp: { color: C.accent, fontWeight: 800, fontSize: 13 },
 
   clanCard: {
     display: 'flex', alignItems: 'center', gap: 12,
-    background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.6)',
+    background: C.card, border: '1px solid ' + C.border,
     borderRadius: 16, padding: '12px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
   },
   clanEmblem: {
     width: 46, height: 46, borderRadius: 14, color: '#fff',
     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
   },
-  clanCardName: { fontWeight: 800, fontSize: 15 },
-  clanCardMeta: { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  clanCardName: { fontWeight: 800, fontSize: 15, color: C.text },
+  clanCardMeta: { fontSize: 12, color: C.sub, marginTop: 2 },
   joinBtn: {
     color: '#fff', border: 'none', borderRadius: 999, padding: '8px 16px',
     fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
@@ -202,12 +204,12 @@ const S = {
 
   leaveBtn: {
     width: '100%', marginTop: 18, padding: 14, borderRadius: 14, border: 'none',
-    background: '#fee2e2', color: '#dc2626', fontSize: 15, fontWeight: 700,
+    background: C.accentL, color: C.danger, fontSize: 15, fontWeight: 700,
     cursor: 'pointer', fontFamily: 'inherit',
   },
   createBtn: {
     width: '100%', marginTop: 18, padding: 14, borderRadius: 14, border: 'none',
-    background: '#1f2937', color: '#fff', fontSize: 15, fontWeight: 700,
+    background: C.accent, color: '#fff', fontSize: 15, fontWeight: 700,
     cursor: 'pointer', fontFamily: 'inherit',
   },
-}
+})
