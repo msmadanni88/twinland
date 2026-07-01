@@ -61,6 +61,7 @@ const MAP_MODES = [
 const ZONES = [
   { key:'all',    label:'همه' },
   { key:'north',  label:'شمال', lat:35.766, lng:51.41 },
+  { key:'south',  label:'جنوب', lat:35.635, lng:51.42 },
   { key:'center', label:'مرکز', lat:35.703, lng:51.41 },
   { key:'east',   label:'شرق',  lat:35.721, lng:51.50 },
   { key:'west',   label:'غرب',  lat:35.728, lng:51.34 },
@@ -102,6 +103,8 @@ const MOCK_CAFES = [
   {id:'c6',name:'اسپرسو لاو', lat:35.7300,lng:51.5100,description:'تهرانپارس، شرق',      zone:'east',  is_top:false,tags:['اسپشالتی']},
   {id:'c7',name:'کافه ژاله',  lat:35.7050,lng:51.3200,description:'ستارخان، غرب تهران',  zone:'west',  is_top:false,tags:['دنج','شبانه']},
   {id:'c8',name:'تریا سبز',   lat:35.6890,lng:51.3850,description:'انقلاب، مرکز تهران',  zone:'center',is_top:true, tags:['کتاب','دانشجویی']},
+  {id:'c9',name:'کافه ری',    lat:35.5920,lng:51.4380,description:'شهرری، جنوب تهران',   zone:'south', is_top:false,tags:['سنتی','دنج']},
+  {id:'c10',name:'کافه نازی', lat:35.6420,lng:51.4020,description:'نازی‌آباد، جنوب تهران',zone:'south', is_top:true, tags:['خانگی','صبحانه']},
 ]
 
 const BP = { mobile:640, tablet:1024 }
@@ -424,7 +427,7 @@ export default function TwinLand() {
       `}}/>
 
       {/* TOPBAR */}
-      <div style={{height:TH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',borderBottom:'1px solid '+C.border,padding:'0 12px',display:'flex',alignItems:'center',gap:8,zIndex:300}}>
+      <div style={{height:TH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',borderBottom:'1px solid '+C.border,padding:'0 12px',display:'flex',alignItems:'center',gap:8,zIndex:300,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
         <button onClick={()=>setShowMenu(v=>!v)} style={{background:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>☰</button>
         <img src="/twinland_logo.webp" alt="TwinLand" style={{height:isMobile?32:38,width:'auto',flexShrink:0,objectFit:'contain',display:'block'}}/>
 
