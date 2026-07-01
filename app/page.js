@@ -60,10 +60,10 @@ const MAP_MODES = [
 
 const ZONES = [
   { key:'all',    label:'همه' },
-  { key:'north',  label:'⬆ شمال', lat:35.766, lng:51.41 },
-  { key:'center', label:'⬛ مرکز', lat:35.703, lng:51.41 },
-  { key:'east',   label:'➡ شرق',  lat:35.721, lng:51.50 },
-  { key:'west',   label:'⬅ غرب',  lat:35.728, lng:51.34 },
+  { key:'north',  label:'شمال', lat:35.766, lng:51.41 },
+  { key:'center', label:'مرکز', lat:35.703, lng:51.41 },
+  { key:'east',   label:'شرق',  lat:35.721, lng:51.50 },
+  { key:'west',   label:'غرب',  lat:35.728, lng:51.34 },
   { key:'top',    label:'⭐ برتر' },
 ]
 
@@ -448,7 +448,7 @@ export default function TwinLand() {
           <img src="/map_style@256.png" alt="استایل نقشه" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>
         </button>
         <button onClick={()=>setShowBoundary(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
-          <img src={boundaryMode!=='off'?"/boundaries@256.png":"/boundaries@256_disabled.png"} alt="مرزبندی" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>{!isMobile&&<span> مرزها</span>}
+          <img src="/boundaries@256.png" alt="مرزبندی" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>{!isMobile&&<span> مرزها</span>}
         </button>
         <button onClick={()=>setShowPalette(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:14,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
           <img src="/theme@256.png" alt="پالت" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>{!isMobile&&<span style={{fontSize:12}}> پالت</span>}
@@ -459,13 +459,13 @@ export default function TwinLand() {
       </div>
 
       {/* FILTER BAR */}
-      <div style={{height:38,flexShrink:0,display:'flex',alignItems:'center',gap:6,padding:'0 12px',overflowX:'auto',scrollbarWidth:'none',background:C.glassDark,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
+      <div style={{height:46,flexShrink:0,display:'flex',alignItems:'center',gap:7,padding:'0 12px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',background:C.glassDark,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
         {ZONES.map(z=>(
-          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'4px 13px',fontSize:11,fontWeight:zone===z.key?700:400,color:zone===z.key?'white':C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
+          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'8px 17px',fontSize:13.5,fontWeight:zone===z.key?800:600,color:zone===z.key?'white':C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
         ))}
-        <div style={{width:1,height:18,background:C.border,flexShrink:0,margin:'0 2px'}}/>
+        <div style={{width:1,height:24,background:C.border,flexShrink:0,margin:'0 2px'}}/>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 جستجو..."
-          style={{background:search?C.accentL:'transparent',border:'1.5px solid '+(search?C.accent:'transparent'),borderRadius:99,padding:'3px 12px',fontSize:11,fontFamily:'inherit',color:C.text,width:110,flexShrink:0,transition:'all .2s'}}/>
+          style={{background:search?C.accentL:'transparent',border:'1.5px solid '+(search?C.accent:'transparent'),borderRadius:99,padding:'6px 14px',fontSize:12.5,fontFamily:'inherit',color:C.text,width:120,flexShrink:0,transition:'all .2s'}}/>
       </div>
 
       {/* BODY */}
@@ -624,7 +624,7 @@ export default function TwinLand() {
         <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowPalette(false)}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 18px 40px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease',maxHeight:'80vh',overflowY:'auto'}}>
             <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 16px'}}/>
-            <div style={{fontSize:18,fontWeight:800,color:C.text,textAlign:'center',marginBottom:4}}>🎨 پالت رنگی</div>
+            <div style={{fontSize:18,fontWeight:800,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:4}}><img src="/theme@256.png" alt="" width={30} height={30} style={{objectFit:'contain'}}/>پالت رنگی</div>
             <div style={{fontSize:11,color:C.sub,textAlign:'center',marginBottom:16}}>تم دلخواهت رو انتخاب کن — ذخیره می‌شه</div>
 
             {/* سوییچ روز / شب */}
@@ -660,7 +660,7 @@ export default function TwinLand() {
         <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowBoundary(false)}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
             <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 18px'}}/>
-            <div style={{fontSize:17,fontWeight:800,color:C.text,textAlign:'center',marginBottom:6}}>🗺️ مرزهای جغرافیایی</div>
+            <div style={{fontSize:17,fontWeight:800,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:6}}><img src="/boundaries@256.png" alt="" width={30} height={30} style={{objectFit:'contain'}}/>مرزهای جغرافیایی</div>
             <div style={{fontSize:11,color:C.sub,textAlign:'center',marginBottom:16,lineHeight:1.6}}>روی هر منطقه روی نقشه بزن تا رنگش عوض بشه یا خاموش شه</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {[{key:'off',label:'❌ خاموش'},{key:'province',label:'🇮🇷 استان‌های ایران'},{key:'district',label:'🏙️ مناطق ۲۲گانه تهران'}].map(o=>(
@@ -675,7 +675,7 @@ export default function TwinLand() {
         <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowMode(false)}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
             <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 18px'}}/>
-            <div style={{fontSize:17,fontWeight:800,color:C.text,textAlign:'center',marginBottom:16}}>🎨 استایل نقشه</div>
+            <div style={{fontSize:17,fontWeight:800,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:16}}><img src="/map_style@256.png" alt="" width={30} height={30} style={{objectFit:'contain'}}/>استایل نقشه</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               {MAP_MODES.map(m=>(
                 <button key={m.key} onClick={()=>{setMapMode(m.key);setShowMode(false);showToast(m.label+' فعال شد')}} style={{background:mapMode===m.key?C.accent:C.chip,border:mapMode===m.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'16px',fontSize:14,fontWeight:mapMode===m.key?800:500,color:mapMode===m.key?'white':C.text,fontFamily:'inherit'}}>{m.label}</button>
