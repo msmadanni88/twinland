@@ -135,6 +135,7 @@ export default function TwinLand() {
   const [favs,       setFavs]       = useState(new Set())
   const [xp,         setXp]         = useState(340)
   const [streak,     setStreak]     = useState(3)
+  const [navOpen,    setNavOpen]    = useState(true)
   const [xpAnim,     setXpAnim]     = useState(null)
   const [vw,         setVw]         = useState(800)
   const [boundaryMode, setBoundaryMode] = useState('off') // 'off' | 'province' | 'district'
@@ -476,7 +477,7 @@ export default function TwinLand() {
 
         {/* MAP */}
         <div style={{position:'absolute',inset:0,zIndex:1}}>
-          <div ref={mapRef} style={{position:'absolute',inset:0}}/>
+          <div ref={mapRef} style={{position:'absolute',inset:0,zIndex:1,isolation:'isolate'}}/>
 
           {mapMode==='dark'&&<div style={{position:'absolute',inset:0,pointerEvents:'none',background:'rgba(4,8,28,.72)',zIndex:2}}/>}
 
@@ -501,18 +502,21 @@ export default function TwinLand() {
             </div>
           )}
 
-          {/* live pill */}
-          <div style={{position:'absolute',top:10,right:(isDesktop&&panelOpen)?PANEL_W+14:10,zIndex:10,transition:'right .35s ease',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'5px 13px',display:'flex',gap:8,alignItems:'center',fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
-            <span style={{color:C.text,fontWeight:700}}>☕ {filtered.length}</span>
-            <span style={{color:C.border}}>|</span>
-            <span><span style={{color:C.green,fontSize:8}}>●</span> {totalLive}</span>
-            {checkedIn.size>0&&<><span style={{color:C.border}}>|</span><span style={{color:C.green,fontWeight:700}}>✓ {checkedIn.size}</span></>}
-          </div>
+          {/* nav controls → moved outside the map layer so they always stay on top */}
+        </div>
 
-          {streak>=2&&<div style={{position:'absolute',top:10,left:10,zIndex:10,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
+        {/* live pill + streak — بیرون از لایه‌ی نقشه تا همیشه بالای نقشه دیده بشن */}
+        <div style={{position:'absolute',top:10,right:(isDesktop&&panelOpen)?PANEL_W+14:10,zIndex:18,transition:'right .35s ease',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'5px 13px',display:'flex',gap:8,alignItems:'center',fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
+          <span style={{color:C.text,fontWeight:700}}>☕ {filtered.length}</span>
+          <span style={{color:C.border}}>|</span>
+          <span><span style={{color:C.green,fontSize:8}}>●</span> {totalLive}</span>
+          {checkedIn.size>0&&<><span style={{color:C.border}}>|</span><span style={{color:C.green,fontWeight:700}}>✓ {checkedIn.size}</span></>}
+        </div>
+        {streak>=2&&<div style={{position:'absolute',top:10,left:10,zIndex:18,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
 
-          {/* nav controls */}
-          <div style={{position:'absolute',bottom:14,left:12,zIndex:10,display:'flex',flexDirection:'column',gap:5}}>
+        {/* nav controls — بیرون از لایه‌ی نقشه، با دکمه‌ی مخفی/نمایش. شفافیت ۷۰٪ */}
+        <div style={{position:'absolute',bottom:14,left:12,zIndex:18,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:6}}>
+          <div style={{overflow:'hidden',opacity:navOpen?0.7:0,maxHeight:navOpen?180:0,transform:navOpen?'translateY(0) scale(1)':'translateY(14px) scale(.85)',transformOrigin:'bottom left',pointerEvents:navOpen?'auto':'none',transition:'opacity .3s ease, max-height .34s ease, transform .34s cubic-bezier(.34,1.45,.5,1)',display:'flex',flexDirection:'column',gap:5}}>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,32px)',gap:3}}>
               {[{e:1},{l:'↑',fn:()=>panMap(0,-80)},{e:1},{l:'←',fn:()=>panMap(80,0)},{l:'⌖',fn:()=>{const c=CITIES[city];mapInst.current?.flyTo([c.lat,c.lng],c.zoom)}},{l:'→',fn:()=>panMap(-80,0)},{e:1},{l:'↓',fn:()=>panMap(0,80)},{e:1}].map((b,i)=>
                 b.e?<div key={i}/>:<button key={i} onClick={b.fn} style={{background:C.glass,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',border:'1px solid '+C.border,borderRadius:9,width:32,height:32,fontSize:b.l==='⌖'?10:15,color:C.text,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 6px rgba(0,0,0,.08)'}}>{b.l}</button>
@@ -524,6 +528,9 @@ export default function TwinLand() {
               ))}
             </div>
           </div>
+          <button onClick={()=>setNavOpen(v=>!v)} title={navOpen?'مخفی کردن کنترل‌ها':'نمایش کنترل‌ها'} style={{opacity:0.7,background:C.glass,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',border:'1px solid '+C.border,borderRadius:11,width:38,height:38,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 8px rgba(0,0,0,.1)',cursor:'pointer',fontFamily:'inherit',transition:'transform .2s ease'}} onMouseDown={e=>e.currentTarget.style.transform='scale(.9)'} onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
+            <span style={{display:'inline-block',fontSize:15,fontWeight:900,lineHeight:1,transition:'transform .34s cubic-bezier(.34,1.45,.5,1)',transform:navOpen?'rotate(0deg)':'rotate(180deg)'}}>▾</span>
+          </button>
         </div>
 
         {/* GLASS PANEL */}
