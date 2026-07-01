@@ -426,7 +426,7 @@ export default function TwinLand() {
       {/* TOPBAR */}
       <div style={{height:TH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',borderBottom:'1px solid '+C.border,padding:'0 12px',display:'flex',alignItems:'center',gap:8,zIndex:300}}>
         <button onClick={()=>setShowMenu(v=>!v)} style={{background:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>☰</button>
-        <div style={{fontSize:isMobile?14:17,fontWeight:900,color:C.text,flexShrink:0,letterSpacing:-.5}}>🏙️ Twin<span style={{color:C.accent}}>Land</span></div>
+        <img src="/twinland_logo.webp" alt="TwinLand" style={{height:isMobile?32:38,width:'auto',flexShrink:0,objectFit:'contain',display:'block'}}/>
 
         {!isMobile&&(
           <button onClick={()=>setShowXP(true)} style={{flex:1,background:C.chip,border:'1.5px solid '+C.border,borderRadius:10,padding:'5px 10px',display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
