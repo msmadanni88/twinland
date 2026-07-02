@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { PALETTES, PALETTE_ORDER, DEFAULT_PALETTE, DEFAULT_MODE, buildC, loadPrefs, savePalette, saveMode } from './palettes'
+import AuthGate from './AuthGate'
 
 const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
 const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
@@ -136,6 +137,8 @@ export default function TwinLand() {
   const [xp,         setXp]         = useState(340)
   const [streak,     setStreak]     = useState(3)
   const [navOpen,    setNavOpen]    = useState(true)
+  const [session,    setSession]    = useState(null)
+  const [authReady,  setAuthReady]  = useState(false)
   const [xpAnim,     setXpAnim]     = useState(null)
   const [vw,         setVw]         = useState(800)
   const [boundaryMode, setBoundaryMode] = useState('off') // 'off' | 'province' | 'district'
@@ -404,6 +407,17 @@ export default function TwinLand() {
   const panelIsOverlay=!isDesktop
   const totalLive=Object.values(live).reduce((a,b)=>a+b,0)
 
+  useEffect(()=>{
+    try{
+      const raw = localStorage.getItem('tl_session')
+      if(raw){ const s = JSON.parse(raw); if(s && s.access_token && (!s.expires_at || s.expires_at > Date.now())) setSession(s); else localStorage.removeItem('tl_session') }
+    }catch(e){}
+    setAuthReady(true)
+  },[])
+
+  if(!authReady) return <div style={{position:'fixed',inset:0,background:'#0b0714'}}/>
+  if(!session) return <AuthGate onAuthed={setSession}/>
+
   return (
     <div style={{height:'100dvh',width:'100vw',display:'flex',flexDirection:'column',fontFamily:"'Estedad','Vazirmatn',system-ui,sans-serif",direction:'rtl',background:C.bg,overflow:'hidden',position:'fixed',inset:0}}>
       <style dangerouslySetInnerHTML={{__html:`
@@ -600,6 +614,7 @@ export default function TwinLand() {
               {key:'clans',icon:'🛡',img:'/icon_clan_active@2x.png',label:'کلن‌ها',href:'/clan'},
               {key:'xp',icon:'⭐',img:'/xp_coin@256-1.png',label:'سیستم XP',href:null},
               {key:'settings',icon:'⚙️',img:'/settings@256.png',label:'تنظیمات',href:null},
+              {key:'logout',icon:'🚪',label:'خروج',href:null},
             ].map((item,i,arr)=>{
               const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
               if(item.href){
@@ -608,7 +623,7 @@ export default function TwinLand() {
                   <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
                 </a>
               }
-              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='logout'){try{localStorage.removeItem('tl_session')}catch(e){}setSession(null);return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
                 {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.label}
               </button>
             })}
