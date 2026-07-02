@@ -110,7 +110,7 @@ const MOCK_CAFES = [
 
 const BP = { mobile:640, tablet:1024 }
 
-export default function TwinLand() {
+function TwinLand({ onLogout }) {
   const mapRef   = useRef(null)
   const mapInst  = useRef(null)
   const mksRef   = useRef({})
@@ -137,8 +137,6 @@ export default function TwinLand() {
   const [xp,         setXp]         = useState(340)
   const [streak,     setStreak]     = useState(3)
   const [navOpen,    setNavOpen]    = useState(true)
-  const [session,    setSession]    = useState(null)
-  const [authReady,  setAuthReady]  = useState(false)
   const [xpAnim,     setXpAnim]     = useState(null)
   const [vw,         setVw]         = useState(800)
   const [boundaryMode, setBoundaryMode] = useState('off') // 'off' | 'province' | 'district'
@@ -407,17 +405,6 @@ export default function TwinLand() {
   const panelIsOverlay=!isDesktop
   const totalLive=Object.values(live).reduce((a,b)=>a+b,0)
 
-  useEffect(()=>{
-    try{
-      const raw = localStorage.getItem('tl_session')
-      if(raw){ const s = JSON.parse(raw); if(s && s.access_token && (!s.expires_at || s.expires_at > Date.now())) setSession(s); else localStorage.removeItem('tl_session') }
-    }catch(e){}
-    setAuthReady(true)
-  },[])
-
-  if(!authReady) return <div style={{position:'fixed',inset:0,background:'#0b0714'}}/>
-  if(!session) return <AuthGate onAuthed={setSession}/>
-
   return (
     <div style={{height:'100dvh',width:'100vw',display:'flex',flexDirection:'column',fontFamily:"'Estedad','Vazirmatn',system-ui,sans-serif",direction:'rtl',background:C.bg,overflow:'hidden',position:'fixed',inset:0}}>
       <style dangerouslySetInnerHTML={{__html:`
@@ -623,7 +610,7 @@ export default function TwinLand() {
                   <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
                 </a>
               }
-              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='logout'){try{localStorage.removeItem('tl_session')}catch(e){}setSession(null);return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
                 {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.label}
               </button>
             })}
@@ -1015,4 +1002,19 @@ function XPPanel({C,xp,levelInfo,streak,onClose}) {
       </div>
     </div>
   </div>
+}
+
+export default function Page(){
+  const [session,   setSession]   = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+  useEffect(()=>{
+    try{
+      const raw = localStorage.getItem('tl_session')
+      if(raw){ const s = JSON.parse(raw); if(s && s.access_token && (!s.expires_at || s.expires_at > Date.now())) setSession(s); else localStorage.removeItem('tl_session') }
+    }catch(e){}
+    setAuthReady(true)
+  },[])
+  if(!authReady) return <div style={{position:'fixed',inset:0,background:'#0b0714'}}/>
+  if(!session) return <AuthGate onAuthed={setSession}/>
+  return <TwinLand onLogout={()=>{try{localStorage.removeItem('tl_session')}catch(e){}setSession(null)}}/>
 }
