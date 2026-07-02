@@ -1,3 +1,5 @@
+import { Analytics } from '@vercel/analytics/react'
+
 export const metadata = {
   title: 'TwinLand',
   description: 'کشف کافه‌های تهران',
@@ -27,7 +29,7 @@ export default function RootLayout({ children }) {
           body{margin:0}
         `}</style>
       </head>
-      <body>{children}</body>
+      <body>{children}<Analytics /></body>
     </html>
   )
 }
