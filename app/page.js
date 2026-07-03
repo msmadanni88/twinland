@@ -787,7 +787,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
         <span style={{fontSize:36}}>{levelInfo.current.icon}</span>
         <div style={{flex:1}}>
           <div style={{fontSize:11,color:C.sub}}>لول {levelInfo.current.level} — {levelInfo.current.name}</div>
-          <div style={{fontSize:22,fontWeight:900,color:levelInfo.current.color}}>{xp} XP</div>
+          <div style={{fontSize:22,fontWeight:900,color:levelInfo.current.color}}>{xp.toLocaleString('fa')} XP</div>
         </div>
         {streak>=2&&<div style={{textAlign:'center',background:'rgba(255,107,53,.12)',borderRadius:12,padding:'8px 10px'}}>
           <div style={{fontSize:20}}>🔥</div>
