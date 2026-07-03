@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 
-// ---- همون سیستم لول هماهنگ ----
+const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
+const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
+
 const LEVELS = [
   { min: 0,    name: 'تازه‌وارد',  icon: '🌱', color: '#9ca3af' },
   { min: 100,  name: 'کاشف',      icon: '🧭', color: '#3b82f6' },
@@ -18,53 +20,42 @@ function levelOf(xp) {
   return cur
 }
 
-// ---- داده موک (بعداً از Supabase) ----
-const DATA = {
-  week: [
-    { id: 1, name: 'سارا',   avatar: '🦊', xp: 1840, me: false },
-    { id: 2, name: 'نیما',   avatar: '🐧', xp: 1620, me: false },
-    { id: 3, name: 'دانی',   avatar: '☕', xp: 920,  me: true  },
-    { id: 4, name: 'مهسا',   avatar: '🐱', xp: 880,  me: false },
-    { id: 5, name: 'رضا',    avatar: '🦁', xp: 760,  me: false },
-    { id: 6, name: 'آیدا',   avatar: '🦉', xp: 540,  me: false },
-    { id: 7, name: 'پارسا',  avatar: '🐺', xp: 410,  me: false },
-    { id: 8, name: 'الناز',  avatar: '🦋', xp: 320,  me: false },
-  ],
-  month: [
-    { id: 1, name: 'نیما',   avatar: '🐧', xp: 5210, me: false },
-    { id: 2, name: 'دانی',   avatar: '☕', xp: 4980, me: true  },
-    { id: 3, name: 'سارا',   avatar: '🦊', xp: 4760, me: false },
-    { id: 4, name: 'رضا',    avatar: '🦁', xp: 3300, me: false },
-    { id: 5, name: 'مهسا',   avatar: '🐱', xp: 2980, me: false },
-    { id: 6, name: 'آیدا',   avatar: '🦉', xp: 2540, me: false },
-  ],
-  all: [
-    { id: 1, name: 'سارا',   avatar: '🦊', xp: 18400, me: false },
-    { id: 2, name: 'نیما',   avatar: '🐧', xp: 16250, me: false },
-    { id: 3, name: 'رضا',    avatar: '🦁', xp: 12100, me: false },
-    { id: 4, name: 'دانی',   avatar: '☕', xp: 9200,  me: true  },
-    { id: 5, name: 'مهسا',   avatar: '🐱', xp: 7600,  me: false },
-    { id: 6, name: 'آیدا',   avatar: '🦉', xp: 5400,  me: false },
-  ],
-}
-
-const TABS = [
-  { key: 'week',  label: 'این هفته' },
-  { key: 'month', label: 'این ماه' },
-  { key: 'all',   label: 'کل' },
+// یوزرهای نمونه (واقعی نیستن) — چون هنوز کاربر کم داریم، تا برد شلوغ‌تر دیده شه.
+// با برچسب «نمونه» مشخص شدن. وقتی کاربر واقعی زیاد شد، این‌ها رو حذف می‌کنیم.
+const SAMPLE = [
+  { id: 's1', name: 'سارا',  avatar: '🦊', xp: 1840, sample: true },
+  { id: 's2', name: 'نیما',  avatar: '🐧', xp: 1220, sample: true },
+  { id: 's3', name: 'مهسا',  avatar: '🐱', xp: 760,  sample: true },
+  { id: 's4', name: 'رضا',   avatar: '🦁', xp: 430,  sample: true },
+  { id: 's5', name: 'آیدا',  avatar: '🦉', xp: 210,  sample: true },
+  { id: 's6', name: 'پارسا', avatar: '🐺', xp: 90,   sample: true },
 ]
 
 export default function LeaderboardPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
+  const [rows, setRows] = useState([])
+
   useEffect(() => { setPal(loadPrefs()) }, [])
+
+  useEffect(() => {
+    let sess = null
+    try { const raw = localStorage.getItem('tl_session'); if (raw) sess = JSON.parse(raw) } catch (e) {}
+    const uid = sess?.user?.id || null
+    const h = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + (sess?.access_token || SB_KEY) }
+    fetch(SB_URL + '/rest/v1/profiles?select=id,display_name,xp,avatar_emoji&order=xp.desc&limit=100', { headers: h })
+      .then(r => r.json()).then(list => {
+        const real = Array.isArray(list)
+          ? list.map(p => ({ id: p.id, name: p.display_name || 'کاربر', avatar: p.avatar_emoji || '☕', xp: p.xp || 0, sample: false, me: p.id === uid }))
+          : []
+        setRows([...real, ...SAMPLE].sort((a, b) => b.xp - a.xp))
+      })
+      .catch(() => setRows([...SAMPLE].sort((a, b) => b.xp - a.xp)))
+  }, [])
+
   const C = buildC(pal.palette, pal.mode)
   const S = mkS(C)
-  const [tab, setTab] = useState('week')
-  const list = DATA[tab]
-  const top3 = list.slice(0, 3)
-  const rest = list.slice(3)
-
-  // ترتیب سکو: دوم، اول، سوم
+  const top3 = rows.slice(0, 3)
+  const rest = rows.slice(3)
   const podium = [top3[1], top3[0], top3[2]].filter(Boolean)
   const podiumRank = { [top3[0]?.id]: 1, [top3[1]?.id]: 2, [top3[2]?.id]: 3 }
   const heights = { 1: 92, 2: 70, 3: 56 }
@@ -74,47 +65,43 @@ export default function LeaderboardPage() {
     <div style={S.page}>
       <div style={S.topbar}>
         <a href="/" style={S.backBtn}>‹ نقشه</a>
-        <div style={S.brand}>برترین‌ها 🏆</div>
+        <div style={S.brand}>برترین‌ها</div>
         <div style={{ width: 64 }} />
       </div>
 
       <div style={S.container}>
-        <div style={{textAlign:'center',marginBottom:8}}>
-          <img src="/icon_rank_active@2x.png" alt="رتبه" width={88} height={88} style={{objectFit:'contain',display:'inline-block'}}/>
-        </div>
-        {/* فیلتر زمان */}
-        <div style={S.tabs}>
-          {TABS.map(t => (
-            <button
-              key={t.key}
-              style={tab === t.key ? S.tabActive : S.tab}
-              onClick={() => setTab(t.key)}
-            >{t.label}</button>
-          ))}
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <img src="/icon_rank_active@2x.png" alt="رتبه" width={88} height={88} style={{ objectFit: 'contain', display: 'inline-block' }} />
         </div>
 
+        {rows.length === 0 && (
+          <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '30px 0' }}>در حال بارگذاری…</div>
+        )}
+
         {/* سکوی ۳ نفر برتر */}
-        <div style={S.podiumCard}>
-          <div style={S.podiumRow}>
-            {podium.map(p => {
-              const rank = podiumRank[p.id]
-              const lv = levelOf(p.xp)
-              return (
-                <div key={p.id} style={S.podiumCol}>
-                  <div style={{ ...S.podiumAvatar, borderColor: lv.color }}>
-                    {p.avatar}
-                    <span style={S.podiumMedal}>{medals[rank]}</span>
+        {podium.length > 0 && (
+          <div style={S.podiumCard}>
+            <div style={S.podiumRow}>
+              {podium.map(p => {
+                const rank = podiumRank[p.id]
+                const lv = levelOf(p.xp)
+                return (
+                  <div key={p.id} style={S.podiumCol}>
+                    <div style={{ ...S.podiumAvatar, borderColor: lv.color }}>
+                      {p.avatar}
+                      <span style={S.podiumMedal}>{medals[rank]}</span>
+                    </div>
+                    <div style={S.podiumName}>{p.name}{p.sample && <span style={S.sampleTag}>نمونه</span>}</div>
+                    <div style={S.podiumXp}>{p.xp.toLocaleString('fa')}</div>
+                    <div style={{ ...S.podiumStand, height: heights[rank], background: lv.color }}>
+                      <span style={S.podiumRankNum}>{rank.toLocaleString('fa')}</span>
+                    </div>
                   </div>
-                  <div style={S.podiumName}>{p.name}</div>
-                  <div style={S.podiumXp}>{p.xp.toLocaleString('fa')}</div>
-                  <div style={{ ...S.podiumStand, height: heights[rank], background: lv.color }}>
-                    <span style={S.podiumRankNum}>{rank.toLocaleString('fa')}</span>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* بقیه رتبه‌ها */}
         <div style={S.list}>
@@ -126,7 +113,11 @@ export default function LeaderboardPage() {
                 <div style={S.rank}>{rank.toLocaleString('fa')}</div>
                 <div style={{ ...S.rowAvatar, borderColor: lv.color }}>{p.avatar}</div>
                 <div style={{ flex: 1 }}>
-                  <div style={S.rowName}>{p.name}{p.me && <span style={S.youTag}>تو</span>}</div>
+                  <div style={S.rowName}>
+                    {p.name}
+                    {p.me && <span style={S.youTag}>تو</span>}
+                    {p.sample && <span style={S.sampleTag}>نمونه</span>}
+                  </div>
                   <div style={S.rowLevel}>{lv.icon} {lv.name}</div>
                 </div>
                 <div style={S.rowXp}>{p.xp.toLocaleString('fa')} XP</div>
@@ -140,10 +131,7 @@ export default function LeaderboardPage() {
 }
 
 const mkS = (C) => ({
-  page: {
-    minHeight: '100vh', background: C.bg, fontFamily: 'inherit',
-    direction: 'rtl', color: C.text, paddingBottom: 40,
-  },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: 'inherit', direction: 'rtl', color: C.text, paddingBottom: 40 },
   topbar: {
     position: 'sticky', top: 0, zIndex: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -154,23 +142,10 @@ const mkS = (C) => ({
   brand: { fontWeight: 800, fontSize: 17, color: C.text },
   container: { maxWidth: 480, margin: '0 auto', padding: 16 },
 
-  tabs: { display: 'flex', gap: 8, marginBottom: 16 },
-  tab: {
-    flex: 1, padding: 10, borderRadius: 12, border: 'none',
-    background: C.chip, color: C.sub,
-    fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
-  },
-  tabActive: {
-    flex: 1, padding: 10, borderRadius: 12, border: 'none',
-    background: C.accent, color: '#fff',
-    fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
-  },
-
   podiumCard: {
     background: C.card, backdropFilter: 'blur(28px)',
     border: '1px solid ' + C.border, borderRadius: 20,
-    padding: '20px 12px 0', marginBottom: 16,
-    boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
+    padding: '20px 12px 0', marginBottom: 16, boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
   },
   podiumRow: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 10 },
   podiumCol: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: 110 },
@@ -180,20 +155,16 @@ const mkS = (C) => ({
     fontSize: 26, position: 'relative',
   },
   podiumMedal: { position: 'absolute', bottom: -6, fontSize: 18 },
-  podiumName: { fontWeight: 800, fontSize: 13, marginTop: 8, color: C.text },
+  podiumName: { fontWeight: 800, fontSize: 13, marginTop: 8, color: C.text, display: 'flex', alignItems: 'center', gap: 4 },
   podiumXp: { fontSize: 12, color: C.sub, marginBottom: 6 },
-  podiumStand: {
-    width: '100%', borderRadius: '10px 10px 0 0',
-    display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 8,
-  },
+  podiumStand: { width: '100%', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 8 },
   podiumRankNum: { color: '#fff', fontWeight: 800, fontSize: 20 },
 
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
   row: {
     display: 'flex', alignItems: 'center', gap: 12,
     background: C.card, border: '1px solid ' + C.border,
-    borderRadius: 14, padding: '10px 14px',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
+    borderRadius: 14, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
   },
   rowMe: { border: '2px solid ' + C.accent, background: C.accentL },
   rank: { width: 22, textAlign: 'center', fontWeight: 800, color: C.sub, fontSize: 15 },
@@ -203,6 +174,7 @@ const mkS = (C) => ({
   },
   rowName: { fontWeight: 700, fontSize: 14, color: C.text, display: 'flex', alignItems: 'center', gap: 6 },
   youTag: { fontSize: 10, background: C.accent, color: '#fff', borderRadius: 999, padding: '1px 7px' },
+  sampleTag: { fontSize: 9, background: C.chip, color: C.sub, border: '1px solid ' + C.border, borderRadius: 999, padding: '1px 6px' },
   rowLevel: { fontSize: 12, color: C.sub },
   rowXp: { color: C.accent, fontWeight: 800, fontSize: 13 },
 })
