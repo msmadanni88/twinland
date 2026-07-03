@@ -410,10 +410,36 @@ function TwinLand({ session, onLogout }) {
     return ()=>{ cancelled=true }
   },[boundaryMode,mapReady,showToast])
 
+  const tokenRef      = useRef(session?.access_token)
+  const tokenExpRef   = useRef(session?.expires_at||0)
+  const refreshTokRef = useRef(session?.refresh_token)
+  const refreshingRef = useRef(null)
+  async function freshToken(){
+    if(tokenRef.current && (tokenExpRef.current - Date.now() > 60000)) return tokenRef.current
+    if(!refreshTokRef.current) return tokenRef.current
+    if(!refreshingRef.current){
+      refreshingRef.current = fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+        method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({refresh_token:refreshTokRef.current})
+      }).then(r=>r.json()).then(d=>{
+        refreshingRef.current=null
+        if(d&&d.access_token){
+          tokenRef.current=d.access_token
+          tokenExpRef.current=Date.now()+((d.expires_in||3600)*1000)
+          if(d.refresh_token) refreshTokRef.current=d.refresh_token
+          try{ localStorage.setItem('tl_session',JSON.stringify({access_token:tokenRef.current,refresh_token:refreshTokRef.current,expires_at:tokenExpRef.current,user:(d.user||(session&&session.user))})) }catch(e){}
+        }
+        return tokenRef.current
+      }).catch(()=>{ refreshingRef.current=null; return tokenRef.current })
+    }
+    return refreshingRef.current
+  }
+
   async function resetMe(){
     if(!session||!session.access_token) return
+    const token=await freshToken()
     try{
-      const r=await fetch(SB_URL+'/rest/v1/rpc/reset_me',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'},body:'{}'}).then(r=>r.json())
+      const r=await fetch(SB_URL+'/rest/v1/rpc/reset_me',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:'{}'}).then(r=>r.json())
       if(r&&r.ok){ setXp(0);setStreak(0);setCoins(0);setCheckedIn(new Set()); showToast('حساب ریست شد ♻️','xp') }
       else showToast('ریست نشد','warn')
     }catch(e){ showToast('ریست نشد','warn') }
@@ -424,19 +450,20 @@ function TwinLand({ session, onLogout }) {
     if(!session||!session.access_token){ showToast('اول وارد شو','warn'); return }
     setSelCafe(null)
     const prevLevel=getLevelInfo(xp).current.level
+    const token=await freshToken()
     let res=null
     try{
       res=await fetch(SB_URL+'/rest/v1/rpc/do_checkin',{
         method:'POST',
-        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'},
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify({p_cafe_id:cafe.id})
       }).then(r=>r.json())
     }catch(e){ res=null }
     if(!res||!res.ok){
       const err=res&&res.error
       if(err==='cooldown') showToast('همین الان اینجا چک‌این کردی!','warn')
-      else if(err==='not_authenticated') showToast('نشستت منقضی شده، دوباره وارد شو','warn')
-      else showToast('چک‌این نشد، دوباره امتحان کن','warn')
+      else if(err==='not_authenticated'||(res&&res.code==='PGRST301')) showToast('نشستت منقضی شد، یه‌بار خروج و ورود کن','warn')
+      else showToast('چک‌این نشد: '+((res&&(res.message||res.error))||'خطای ناشناخته'),'warn')
       return
     }
     setXp(res.xp); setStreak(res.streak); setCoins(res.coins)
@@ -460,6 +487,7 @@ function TwinLand({ session, onLogout }) {
         button{cursor:pointer;transition:opacity .15s,transform .1s}
         button:active{opacity:.75;transform:scale(.96)}
         input{outline:none}
+        @keyframes tlNavPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
         input::placeholder{color:#AEAEB2}
         .leaflet-container{background:#E8E4DC !important}
         .leaflet-control-attribution{display:none !important}
@@ -562,7 +590,7 @@ function TwinLand({ session, onLogout }) {
         {streak>=2&&<div style={{position:'absolute',top:10,left:10,zIndex:18,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
 
         {/* nav controls — بیرون از لایه‌ی نقشه، با دکمه‌ی مخفی/نمایش. شفافیت ۷۰٪ */}
-        <div style={{position:'absolute',bottom:14,left:12,zIndex:18,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:6}}>
+        <div style={{position:'absolute',bottom:14,left:8,zIndex:18,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8}}>
           <div style={{overflow:'hidden',opacity:navOpen?0.7:0,maxHeight:navOpen?180:0,transform:navOpen?'translateY(0) scale(1)':'translateY(14px) scale(.85)',transformOrigin:'bottom left',pointerEvents:navOpen?'auto':'none',transition:'opacity .3s ease, max-height .34s ease, transform .34s cubic-bezier(.34,1.45,.5,1)',display:'flex',flexDirection:'column',gap:5}}>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,32px)',gap:3}}>
               {[{e:1},{l:'↑',fn:()=>panMap(0,-80)},{e:1},{l:'←',fn:()=>panMap(80,0)},{l:'⌖',fn:()=>{const c=CITIES[city];mapInst.current?.flyTo([c.lat,c.lng],c.zoom)}},{l:'→',fn:()=>panMap(-80,0)},{e:1},{l:'↓',fn:()=>panMap(0,80)},{e:1}].map((b,i)=>
@@ -575,8 +603,8 @@ function TwinLand({ session, onLogout }) {
               ))}
             </div>
           </div>
-          <button onClick={()=>setNavOpen(v=>!v)} title={navOpen?'مخفی کردن کنترل‌ها':'نمایش کنترل‌ها'} style={{opacity:0.7,background:C.glass,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',border:'1px solid '+C.border,borderRadius:11,width:38,height:38,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 8px rgba(0,0,0,.1)',cursor:'pointer',fontFamily:'inherit',transition:'transform .2s ease'}} onMouseDown={e=>e.currentTarget.style.transform='scale(.9)'} onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
-            <span style={{display:'inline-block',fontSize:15,fontWeight:900,lineHeight:1,transition:'transform .34s cubic-bezier(.34,1.45,.5,1)',transform:navOpen?'rotate(0deg)':'rotate(180deg)'}}>▾</span>
+          <button onClick={()=>setNavOpen(v=>!v)} title={navOpen?'مخفی کردن کنترل‌ها':'نمایش کنترل‌ها'} style={{width:46,height:46,borderRadius:15,border:'none',cursor:'pointer',fontFamily:'inherit',background:navOpen?C.glass:C.grad,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',boxShadow:navOpen?'0 3px 12px rgba(0,0,0,.18)':'0 6px 22px '+C.accent+'99',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .3s ease, box-shadow .3s ease, transform .18s cubic-bezier(.34,1.6,.5,1)',animation:navOpen?'none':'tlNavPulse 2s ease-in-out infinite'}} onMouseDown={e=>e.currentTarget.style.transform='scale(.86)'} onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
+            <span style={{display:'inline-block',fontSize:22,fontWeight:900,lineHeight:1,color:navOpen?C.text:'#fff',transition:'transform .4s cubic-bezier(.34,1.7,.4,1)',transform:navOpen?'rotate(0deg)':'rotate(180deg)'}}>▾</span>
           </button>
         </div>
 
