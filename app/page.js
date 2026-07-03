@@ -110,7 +110,7 @@ const MOCK_CAFES = [
 
 const BP = { mobile:640, tablet:1024 }
 
-function TwinLand({ onLogout }) {
+function TwinLand({ session, onLogout }) {
   const mapRef   = useRef(null)
   const mapInst  = useRef(null)
   const mksRef   = useRef({})
@@ -134,8 +134,11 @@ function TwinLand({ onLogout }) {
   const [live,       setLive]       = useState({})
   const [checkedIn,  setCheckedIn]  = useState(new Set())
   const [favs,       setFavs]       = useState(new Set())
-  const [xp,         setXp]         = useState(340)
-  const [streak,     setStreak]     = useState(3)
+  const [xp,         setXp]         = useState(0)
+  const [streak,     setStreak]     = useState(0)
+  const [coins,      setCoins]      = useState(0)
+  const [userName,   setUserName]   = useState('')
+  const [isAdmin,    setIsAdmin]    = useState(false)
   const [navOpen,    setNavOpen]    = useState(true)
   const [xpAnim,     setXpAnim]     = useState(null)
   const [vw,         setVw]         = useState(800)
@@ -195,6 +198,17 @@ function TwinLand({ onLogout }) {
     }).catch(()=>setCafes(MOCK_CAFES))
   },[])
 
+  // پروفایل واقعی کاربر + چک‌این‌های قبلی رو از دیتابیس بخون
+  useEffect(()=>{
+    if(!session||!session.user||!session.access_token) return
+    const uid=session.user.id
+    const h={'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token}
+    fetch(SB_URL+'/rest/v1/profiles?id=eq.'+uid+'&select=*',{headers:h})
+      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin) } }).catch(()=>{})
+    fetch(SB_URL+'/rest/v1/checkins?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setCheckedIn(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
+  },[session])
+
   // اگه بعد از ۲ ثانیه هنوز کافه‌ای نیومد، mock رو بذار
   useEffect(()=>{
     const t=setTimeout(()=>{ setCafes(prev=>prev.length?prev:MOCK_CAFES) },2000)
@@ -218,6 +232,10 @@ function TwinLand({ onLogout }) {
   useEffect(()=>{
     if(mapInst.current||!mapRef.current) return
     let mounted=true
+
+    const onResize=()=>{ try{ mapInst.current&&mapInst.current.invalidateSize() }catch(e){} }
+    window.addEventListener('resize',onResize)
+    window.addEventListener('orientationchange',onResize)
 
     const timer=setTimeout(()=>{
       if(!mounted||!mapRef.current) return
@@ -283,6 +301,10 @@ function TwinLand({ onLogout }) {
 
           mapInst.current=m
           setMapReady(true)
+
+          // iOS Safari fix: نقشه اول با ارتفاع اشتباه ساخته میشه؛ بعد از settle شدن layout چند بار اصلاح کن
+          ;[120,350,700,1300].forEach(d=>setTimeout(()=>{ if(mounted&&mapInst.current){ try{ mapInst.current.invalidateSize() }catch(e){} } },d))
+          setTimeout(()=>{ if(mounted&&mapInst.current){ try{ mapInst.current.invalidateSize(); mapInst.current.setView([c.lat,c.lng],c.zoom) }catch(e){} } },500)
         } catch(e){ setMapLoading(false) }
       })
     },150)
@@ -388,16 +410,40 @@ function TwinLand({ onLogout }) {
     return ()=>{ cancelled=true }
   },[boundaryMode,mapReady,showToast])
 
-  function doCheckin(cafe){
-    if(checkedIn.has(cafe.id)){ showToast('قبلاً اینجا بودی!','warn'); return }
-    const isFirst=checkedIn.size===0
-    const earned=(cafe.is_top?XP_CONFIG.checkin_top:XP_CONFIG.checkin)+(isFirst?XP_CONFIG.checkin_first:0)+(streak>=3?XP_CONFIG.streak_bonus:0)
-    const prevLevel=getLevelInfo(xp).current.level
-    gainXP(earned); setCheckedIn(prev=>new Set([...prev,cafe.id]))
-    const newLevel=getLevelInfo(xp+earned).current.level
-    if(newLevel>prevLevel) setTimeout(()=>showToast(`🎉 لول آپ! ${getLevelInfo(xp+earned).current.name}`,'level'),400)
-    else showToast(`✅ چک‌این! +${earned} XP`,'xp')
+  async function resetMe(){
+    if(!session||!session.access_token) return
+    try{
+      const r=await fetch(SB_URL+'/rest/v1/rpc/reset_me',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'},body:'{}'}).then(r=>r.json())
+      if(r&&r.ok){ setXp(0);setStreak(0);setCoins(0);setCheckedIn(new Set()); showToast('حساب ریست شد ♻️','xp') }
+      else showToast('ریست نشد','warn')
+    }catch(e){ showToast('ریست نشد','warn') }
+  }
+
+  async function doCheckin(cafe){
+    if(!isAdmin && checkedIn.has(cafe.id)){ showToast('قبلاً اینجا بودی!','warn'); return }
+    if(!session||!session.access_token){ showToast('اول وارد شو','warn'); return }
     setSelCafe(null)
+    const prevLevel=getLevelInfo(xp).current.level
+    let res=null
+    try{
+      res=await fetch(SB_URL+'/rest/v1/rpc/do_checkin',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'},
+        body:JSON.stringify({p_cafe_id:cafe.id})
+      }).then(r=>r.json())
+    }catch(e){ res=null }
+    if(!res||!res.ok){
+      const err=res&&res.error
+      if(err==='cooldown') showToast('همین الان اینجا چک‌این کردی!','warn')
+      else if(err==='not_authenticated') showToast('نشستت منقضی شده، دوباره وارد شو','warn')
+      else showToast('چک‌این نشد، دوباره امتحان کن','warn')
+      return
+    }
+    setXp(res.xp); setStreak(res.streak); setCoins(res.coins)
+    setXpAnim({amount:res.awarded}); setTimeout(()=>setXpAnim(null),1800)
+    setCheckedIn(prev=>new Set([...prev,cafe.id]))
+    if(res.level>prevLevel) setTimeout(()=>showToast(`🎉 لول آپ! ${getLevelInfo(res.xp).current.name}`,'level'),400)
+    else showToast(res.is_new_cafe?`🎉 کافه‌ی جدید! +${res.awarded} XP`:`✅ چک‌این! +${res.awarded} XP`,'xp')
   }
 
   const TH=isMobile?52:56, BH=isMobile?58:62
@@ -559,7 +605,7 @@ function TwinLand({ onLogout }) {
                 {panelTab==='missions'&&<MissionsTab C={C} checkedIn={checkedIn} showToast={showToast}/>}
                 {panelTab==='rank'&&<RankTab C={C}/>}
                 {panelTab==='clan'&&<ClanTab C={C}/>}
-                {panelTab==='profile'&&<ProfileTab C={C} xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn}/>}
+                {panelTab==='profile'&&<ProfileTab C={C} xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn} userName={userName} coins={coins}/>}
               </div>
             </div>
           </>
@@ -601,8 +647,9 @@ function TwinLand({ onLogout }) {
               {key:'clans',icon:'🛡',img:'/icon_clan_active@2x.png',label:'کلن‌ها',href:'/clan'},
               {key:'xp',icon:'⭐',img:'/xp_coin@256-1.png',label:'سیستم XP',href:null},
               {key:'settings',icon:'⚙️',img:'/settings@256.png',label:'تنظیمات',href:null},
+              {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
               {key:'logout',icon:'🚪',label:'خروج',href:null},
-            ].map((item,i,arr)=>{
+            ].filter(item=>!item.adminOnly||isAdmin).map((item,i,arr)=>{
               const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
               if(item.href){
                 return <a key={item.key} href={item.href} style={style}>
@@ -610,7 +657,7 @@ function TwinLand({ onLogout }) {
                   <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
                 </a>
               }
-              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
                 {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.label}
               </button>
             })}
@@ -883,18 +930,18 @@ function ClanTab({C}) {
 }
 
 // ── PROFILE TAB (خلاصه — نسخه کامل در /profile) ────────────────────────────────
-function ProfileTab({C,xp,levelInfo,streak,checkedIn}) {
+function ProfileTab({C,xp,levelInfo,streak,checkedIn,userName,coins}) {
   const stats = [
-    { icon:'🔥', value:streak, label:'استریک' },
-    { icon:'☕', value:11,     label:'کافه' },
-    { icon:'📍', value:38,     label:'چک‌این' },
-    { icon:'📅', value:47,     label:'روز فعال' },
+    { icon:'🔥', value:streak,        label:'استریک' },
+    { icon:'☕', value:checkedIn.size, label:'کافه' },
+    { icon:'🪙', value:coins,         label:'سکه' },
+    { icon:'⭐', value:levelInfo?.current?.level||1, label:'لِوِل' },
   ]
   return <div style={{padding:'12px 12px 32px'}}>
     <div style={{background:C.grad,borderRadius:18,padding:'18px',textAlign:'center',color:'#fff',marginBottom:14}}>
       <img src="/icon_profile_active@2x.png" alt="پروفایل" width={64} height={64} style={{objectFit:'contain',display:'block',margin:'0 auto 6px'}}/>
-      <div style={{fontSize:19,fontWeight:800}}>دانی</div>
-      <div style={{fontSize:12,opacity:.9,marginTop:2}}>☕ {levelInfo?.name||'کافه‌گرد'} · {xp.toLocaleString('fa')} XP</div>
+      <div style={{fontSize:19,fontWeight:800}}>{userName||'کاربر'}</div>
+      <div style={{fontSize:12,opacity:.9,marginTop:2}}>☕ {levelInfo?.current?.name||'کافه‌گرد'} · {xp.toLocaleString('fa')} XP</div>
     </div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:14}}>
       {stats.map((s,i)=>(
@@ -1016,5 +1063,5 @@ export default function Page(){
   },[])
   if(!authReady) return <div style={{position:'fixed',inset:0,background:'#0b0714'}}/>
   if(!session) return <AuthGate onAuthed={setSession}/>
-  return <TwinLand onLogout={()=>{try{localStorage.removeItem('tl_session')}catch(e){}setSession(null)}}/>
+  return <TwinLand session={session} onLogout={()=>{try{localStorage.removeItem('tl_session')}catch(e){}setSession(null)}}/>
 }
