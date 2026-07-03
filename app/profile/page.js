@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 
+const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
+const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
+
 // ---- همون سیستم XP که توی نقشه داریم (هماهنگ) ----
 const LEVELS = [
   { min: 0,    name: 'تازه‌وارد',  icon: '🌱', color: '#9ca3af' },
@@ -28,77 +31,92 @@ function levelInfo(xp) {
   return { current, next, pct }
 }
 
-// ---- داده موک (بعداً از Supabase میاد) ----
-const USER = {
-  name: 'دانی',
-  username: '@dani',
-  xp: 920,
-  joinedDays: 47,
-  checkins: 38,
-  cafesVisited: 11,
-  streak: 3,
+// مدال‌ها: قفل/باز بر اساس آمار واقعی. (تاریخ کسب در فاز ۵ اضافه می‌شه)
+const BADGE_DEFS = [
+  { icon: '🥇', name: 'اولین چک‌این', ok: s => s.checkins >= 1 },
+  { icon: '🔥', name: 'استریک ۳ روز', ok: s => s.streak >= 3 },
+  { icon: '⭐', name: '۱۰ کافه',      ok: s => s.cafes >= 10 },
+  { icon: '🗺️', name: '۵ منطقه',      ok: s => s.zones >= 5 },
+  { icon: '👑', name: '۵۰ چک‌این',    ok: s => s.checkins >= 50 },
+  { icon: '💎', name: 'کلکسیونر ۲۰',  ok: s => s.cafes >= 20 },
+  { icon: '🌙', name: 'شب‌گرد',        ok: s => false },
+  { icon: '🏆', name: 'قهرمان هفته',  ok: s => false },
+]
+
+function faWhen(iso) {
+  const d = new Date(iso).getTime()
+  const days = Math.floor((Date.now() - d) / 86400000)
+  if (days <= 0) return 'امروز'
+  if (days === 1) return 'دیروز'
+  return days.toLocaleString('fa') + ' روز پیش'
 }
-
-const BADGES = [
-  { id: 1, icon: '🥇', name: 'اولین چک‌این', earned: true },
-  { id: 2, icon: '🌙', name: 'شب‌گرد',      earned: true },
-  { id: 3, icon: '🔥', name: 'استریک ۳ روز', earned: true },
-  { id: 4, icon: '🗺️', name: '۵ منطقه',      earned: true },
-  { id: 5, icon: '⭐', name: '۱۰ کافه',      earned: true },
-  { id: 6, icon: '👑', name: '۵۰ چک‌این',    earned: false },
-  { id: 7, icon: '💎', name: 'کلکسیونر',     earned: false },
-  { id: 8, icon: '🏆', name: 'قهرمان هفته',  earned: false },
-]
-
-const HISTORY = [
-  { id: 1, cafe: 'کافه لمیز',    area: 'ولنجک',    xp: 50, when: 'امروز' },
-  { id: 2, cafe: 'کافه نام',     area: 'فرشته',    xp: 30, when: 'دیروز' },
-  { id: 3, cafe: 'کافه راز',     area: 'تجریش',    xp: 50, when: '۲ روز پیش' },
-  { id: 4, cafe: 'کافه پاتوق',   area: 'انقلاب',   xp: 30, when: '۳ روز پیش' },
-  { id: 5, cafe: 'کافه ویونا',   area: 'سعادت‌آباد', xp: 40, when: '۴ روز پیش' },
-]
 
 export default function ProfilePage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
+  const [tab, setTab] = useState('badges')
+  const [profile, setProfile] = useState(null)
+  const [checkins, setCheckins] = useState([])   // ردیف‌های واقعی چک‌این (با کافه)
+
   useEffect(() => { setPal(loadPrefs()) }, [])
+
+  useEffect(() => {
+    let sess = null
+    try { const raw = localStorage.getItem('tl_session'); if (raw) sess = JSON.parse(raw) } catch (e) {}
+    if (!sess || !sess.user) { window.location.href = '/'; return }
+    const uid = sess.user.id
+    const h = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + (sess.access_token || SB_KEY) }
+    // پروفایل واقعی (حتی با توکن منقضی هم قابل خواندنه)
+    fetch(SB_URL + '/rest/v1/profiles?id=eq.' + uid + '&select=*', { headers: h })
+      .then(r => r.json()).then(rows => { if (Array.isArray(rows) && rows[0]) setProfile(rows[0]) }).catch(() => {})
+    // چک‌این‌های واقعی + اطلاعات کافه (برای آمار، تاریخچه، مدال‌ها)
+    fetch(SB_URL + '/rest/v1/checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone)&order=created_at.desc&limit=50', { headers: h })
+      .then(r => r.json()).then(rows => { if (Array.isArray(rows)) setCheckins(rows) }).catch(() => {})
+  }, [])
+
   const C = buildC(pal.palette, pal.mode)
   const S = mkS(C)
-  const [tab, setTab] = useState('badges') // badges | history
-  const { current, next, pct } = levelInfo(USER.xp)
+
+  const xp = profile?.xp || 0
+  const { current, next, pct } = levelInfo(xp)
+  const name = profile?.display_name || 'کاربر'
+  const streak = profile?.streak || 0
+  const joinedDays = profile?.created_at
+    ? Math.max(1, Math.ceil((Date.now() - new Date(profile.created_at).getTime()) / 86400000)) : 1
+
+  const checkinCount = checkins.length
+  const cafeCount = new Set(checkins.map(c => c.cafe_id)).size
+  const zoneCount = new Set(checkins.map(c => c.cafes?.zone).filter(Boolean)).size
+  const stats = { checkins: checkinCount, cafes: cafeCount, streak, zones: zoneCount }
 
   return (
     <div style={S.page}>
       {/* نوار بالا */}
       <div style={S.topbar}>
         <a href="/" style={S.backBtn}>‹ نقشه</a>
-        <div style={S.brand}>TwinLand 🏙️</div>
+        <div style={S.brand}>پروفایل</div>
         <div style={{ width: 64 }} />
       </div>
 
       <div style={S.container}>
-        <div style={{textAlign:'center',marginBottom:8}}>
-          <img src="/icon_profile_active@2x.png" alt="پروفایل" width={88} height={88} style={{objectFit:'contain',display:'inline-block'}}/>
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <img src="/icon_profile_active@2x.png" alt="پروفایل" width={88} height={88} style={{ objectFit: 'contain', display: 'inline-block' }} />
         </div>
+
         {/* هدر پروفایل */}
         <div style={S.card}>
           <div style={S.headerRow}>
-            <div style={{ ...S.avatar, borderColor: current.color }}>
-              {current.icon}
-            </div>
+            <div style={{ ...S.avatar, borderColor: current.color }}>{current.icon}</div>
             <div style={{ flex: 1 }}>
-              <div style={S.name}>{USER.name}</div>
-              <div style={S.username}>{USER.username}</div>
-              <div style={{ ...S.levelPill, background: current.color }}>
-                {current.icon} {current.name}
-              </div>
+              <div style={S.name}>{name}</div>
+              <div style={{ ...S.levelPill, background: current.color }}>{current.icon} {current.name}</div>
             </div>
           </div>
 
           {/* نوار XP */}
           <div style={S.xpRow}>
-            <span style={S.xpLabel}>{USER.xp.toLocaleString('fa')} XP</span>
+            <span style={S.xpLabel}>{xp.toLocaleString('fa')} XP</span>
             <span style={S.xpNext}>
-              {next ? `تا ${next.name}: ${(next.min - USER.xp).toLocaleString('fa')} XP` : 'حداکثر لول!'}
+              {next ? `تا ${next.name}: ${(next.min - xp).toLocaleString('fa')} XP` : 'حداکثر لول!'}
             </span>
           </div>
           <div style={S.xpTrack}>
@@ -106,48 +124,50 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* آمار */}
+        {/* آمار واقعی */}
         <div style={S.statsGrid}>
-          <Stat S={S} icon="📍" value={USER.checkins} label="چک‌این" />
-          <Stat S={S} icon="☕" value={USER.cafesVisited} label="کافه" />
-          <Stat S={S} icon="🔥" value={USER.streak} label="استریک" />
-          <Stat S={S} icon="📅" value={USER.joinedDays} label="روز فعال" />
+          <Stat S={S} icon="📍" value={checkinCount} label="چک‌این" />
+          <Stat S={S} icon="☕" value={cafeCount} label="کافه" />
+          <Stat S={S} icon="🔥" value={streak} label="استریک" />
+          <Stat S={S} icon="📅" value={joinedDays} label="روز فعال" />
         </div>
 
         {/* تب‌ها */}
         <div style={S.tabs}>
-          <button
-            style={tab === 'badges' ? S.tabActive : S.tab}
-            onClick={() => setTab('badges')}
-          >مدال‌ها</button>
-          <button
-            style={tab === 'history' ? S.tabActive : S.tab}
-            onClick={() => setTab('history')}
-          >تاریخچه</button>
+          <button style={tab === 'badges' ? S.tabActive : S.tab} onClick={() => setTab('badges')}>مدال‌ها</button>
+          <button style={tab === 'history' ? S.tabActive : S.tab} onClick={() => setTab('history')}>تاریخچه</button>
         </div>
 
         {tab === 'badges' && (
           <div style={S.badgeGrid}>
-            {BADGES.map(b => (
-              <div key={b.id} style={{ ...S.badge, opacity: b.earned ? 1 : 0.35 }}>
-                <div style={S.badgeIcon}>{b.icon}</div>
-                <div style={S.badgeName}>{b.name}</div>
-                {!b.earned && <div style={S.badgeLock}>قفل</div>}
-              </div>
-            ))}
+            {BADGE_DEFS.map((b, i) => {
+              const earned = b.ok(stats)
+              return (
+                <div key={i} style={{ ...S.badge, opacity: earned ? 1 : 0.35 }}>
+                  <div style={S.badgeIcon}>{b.icon}</div>
+                  <div style={S.badgeName}>{b.name}</div>
+                  {!earned && <div style={S.badgeLock}>قفل</div>}
+                </div>
+              )
+            })}
           </div>
         )}
 
         {tab === 'history' && (
           <div style={S.historyList}>
-            {HISTORY.map(h => (
-              <div key={h.id} style={S.historyItem}>
+            {checkins.length === 0 && (
+              <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '24px 0' }}>
+                هنوز چک‌این نکردی. برو روی نقشه یه کافه رو بزن! ☕
+              </div>
+            )}
+            {checkins.map((h, i) => (
+              <div key={i} style={S.historyItem}>
                 <div style={S.historyIcon}>☕</div>
                 <div style={{ flex: 1 }}>
-                  <div style={S.historyCafe}>{h.cafe}</div>
-                  <div style={S.historyArea}>{h.area} · {h.when}</div>
+                  <div style={S.historyCafe}>{h.cafes?.name || 'کافه'}</div>
+                  <div style={S.historyArea}>{(h.cafes?.description || '') + ' · ' + faWhen(h.created_at)}</div>
                 </div>
-                <div style={S.historyXp}>+{h.xp} XP</div>
+                <div style={S.historyXp}>+{(h.xp_awarded || 0).toLocaleString('fa')} XP</div>
               </div>
             ))}
           </div>
@@ -194,8 +214,7 @@ const mkS = (C) => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 34, background: C.card, border: '3px solid', flexShrink: 0,
   },
-  name: { fontSize: 20, fontWeight: 800, color: C.text },
-  username: { fontSize: 13, color: C.sub, marginBottom: 6 },
+  name: { fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 6 },
   levelPill: {
     display: 'inline-block', color: '#fff', fontSize: 12, fontWeight: 700,
     padding: '3px 10px', borderRadius: 999,
