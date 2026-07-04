@@ -318,6 +318,52 @@ export function clanLevel(xpTotal) {
   return Math.floor((Number(xpTotal) || 0) / 1000) + 1
 }
 
+// ── لیدربورد منطقه‌ای (بر اساس فعالیت در آن منطقه) ────────────────────────────
+// region: شماره‌ی منطقه به‌صورت رشته، مثل '1'
+export async function fetchRegionLeaderboard(sess, region, limit = 20) {
+  const s = sess || getSession()
+  const uid = s && s.user && s.user.id
+  try {
+    const rows = await fetch(
+      SB_URL + '/rest/v1/region_leaderboard?region=eq.' + encodeURIComponent(region) +
+      '&select=user_id,display_name,avatar_emoji,region_xp,region_checkins&order=region_xp.desc&limit=' + limit,
+      { headers: authHeaders(s) }
+    ).then(r => r.json())
+    if (!Array.isArray(rows)) return []
+    return rows.map((r, i) => ({
+      rank: i + 1,
+      user_id: r.user_id,
+      name: r.display_name || 'کاربر',
+      avatar: r.avatar_emoji || '☕',
+      xp: r.region_xp || 0,
+      checkins: r.region_checkins || 0,
+      me: r.user_id === uid,
+    }))
+  } catch (e) { return [] }
+}
+
+// ── کلن‌های فعال منطقه (بر اساس فعالیت اعضا در آن منطقه) ─────────────────────
+export async function fetchRegionClans(sess, region, limit = 20) {
+  const s = sess || getSession()
+  try {
+    const rows = await fetch(
+      SB_URL + '/rest/v1/region_clan_leaderboard?region=eq.' + encodeURIComponent(region) +
+      '&select=clan_id,clan_name,emblem,color,region_xp,active_members&order=region_xp.desc&limit=' + limit,
+      { headers: authHeaders(s) }
+    ).then(r => r.json())
+    if (!Array.isArray(rows)) return []
+    return rows.map((r, i) => ({
+      rank: i + 1,
+      clan_id: r.clan_id,
+      name: r.clan_name || 'کلن',
+      emblem: r.emblem || '⚔️',
+      color: r.color || '#8b5cf6',
+      xp: r.region_xp || 0,
+      members: r.active_members || 0,
+    }))
+  } catch (e) { return [] }
+}
+
 // نگاشت reason → متن فارسی برای نمایش در تاریخچه
 export const REASON_LABELS = {
   checkin: 'چک‌این',
