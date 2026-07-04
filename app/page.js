@@ -155,7 +155,7 @@ function TwinLand({ session, onLogout }) {
   const [coins,      setCoins]      = useState(0)
   const [userName,   setUserName]   = useState('')
   const [isAdmin,    setIsAdmin]    = useState(false)
-  const [navOpen,    setNavOpen]    = useState(true)
+  const [navOpen,    setNavOpen]    = useState(false)
   const [xpAnim,     setXpAnim]     = useState(null)
   const [vw,         setVw]         = useState(800)
   const [boundaryMode, setBoundaryMode] = useState('off') // 'off' | 'province' | 'district'
@@ -740,7 +740,8 @@ function TwinLand({ session, onLogout }) {
         </div>
         {streak>=2&&<div style={{position:'absolute',top:10,left:10,zIndex:18,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
 
-        {/* nav controls — بیرون از لایه‌ی نقشه، با دکمه‌ی مخفی/نمایش. شفافیت ۷۰٪ */}
+        {/* nav controls — بیرون از لایه‌ی نقشه. هنگام باز بودن هر پاپ‌آپ مخفی می‌شه */}
+        {!(showRegionFilter||showRegionResults||showXP||showMenu||showCity||showMode||showBoundary||showPalette||panelOpen) && (
         <div style={{position:'absolute',bottom:14,left:8,zIndex:18,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8}}>
           <div style={{overflow:'hidden',opacity:navOpen?0.7:0,maxHeight:navOpen?180:0,transform:navOpen?'translateY(0) scale(1)':'translateY(14px) scale(.85)',transformOrigin:'bottom left',pointerEvents:navOpen?'auto':'none',transition:'opacity .3s ease, max-height .34s ease, transform .34s cubic-bezier(.34,1.45,.5,1)',display:'flex',flexDirection:'column',gap:5}}>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,32px)',gap:3}}>
@@ -754,10 +755,11 @@ function TwinLand({ session, onLogout }) {
               ))}
             </div>
           </div>
-          <button onClick={()=>setNavOpen(v=>!v)} title={navOpen?'مخفی کردن کنترل‌ها':'نمایش کنترل‌ها'} style={{width:46,height:46,borderRadius:15,border:'none',cursor:'pointer',fontFamily:'inherit',background:navOpen?C.glass:C.grad,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',boxShadow:navOpen?'0 3px 12px rgba(0,0,0,.18)':'0 6px 22px '+C.accent+'99',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .3s ease, box-shadow .3s ease, transform .18s cubic-bezier(.34,1.6,.5,1)',animation:navOpen?'none':'tlNavPulse 2s ease-in-out infinite'}} onMouseDown={e=>e.currentTarget.style.transform='scale(.86)'} onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
-            <span style={{display:'inline-block',fontSize:22,fontWeight:900,lineHeight:1,color:navOpen?C.text:'#fff',transition:'transform .4s cubic-bezier(.34,1.7,.4,1)',transform:navOpen?'rotate(0deg)':'rotate(180deg)'}}>▾</span>
+          <button onClick={()=>setNavOpen(v=>!v)} title={navOpen?'مخفی کردن کنترل‌ها':'نمایش کنترل‌ها'} style={{width:32,height:32,borderRadius:9,border:navOpen?'1px solid '+C.border:'none',cursor:'pointer',fontFamily:'inherit',background:navOpen?C.glass:C.grad,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',boxShadow:navOpen?'0 2px 6px rgba(0,0,0,.08)':'0 6px 22px '+C.accent+'99',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .3s ease, box-shadow .3s ease, transform .18s cubic-bezier(.34,1.6,.5,1)',animation:navOpen?'none':'tlNavPulse 2s ease-in-out infinite'}} onMouseDown={e=>e.currentTarget.style.transform='scale(.86)'} onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
+            <span style={{display:'inline-block',fontSize:16,fontWeight:900,lineHeight:1,color:navOpen?C.text:'#fff',transition:'transform .4s cubic-bezier(.34,1.7,.4,1)',transform:navOpen?'rotate(0deg)':'rotate(180deg)'}}>▾</span>
           </button>
         </div>
+        )}
 
         {/* GLASS PANEL */}
         {panelOpen&&(
@@ -1018,10 +1020,10 @@ function RegionResultsPanel({ C, pages, onClose }) {
   function onTouchEnd(e){
     if(touchX.current==null) return
     const dx=e.changedTouches[0].clientX-touchX.current
-    if(Math.abs(dx)>50){
-      // RTL: سوایپ چپ → صفحه بعد، راست → قبل
-      if(dx<0 && idx<pages.length-1) setIdx(idx+1)
-      if(dx>0 && idx>0) setIdx(idx-1)
+    if(Math.abs(dx)>40){
+      // RTL: سوایپ به راست → صفحه‌ی بعد، سوایپ به چپ → صفحه‌ی قبل
+      if(dx>0 && idx<pages.length-1) setIdx(idx+1)
+      if(dx<0 && idx>0) setIdx(idx-1)
     }
     touchX.current=null
   }
@@ -1037,11 +1039,11 @@ function RegionResultsPanel({ C, pages, onClose }) {
           <div style={{fontSize:18,fontWeight:800,color:C.text}}>منطقه {Number(data.region).toLocaleString('fa')}</div>
           {multi&&(
             <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <button onClick={()=>setIdx(Math.max(0,idx-1))} disabled={idx===0}
-                style={{border:'none',background:idx===0?C.chip:C.accent,color:idx===0?C.sub:'#fff',width:30,height:30,borderRadius:'50%',fontSize:16,cursor:idx===0?'default':'pointer',fontFamily:'inherit'}}>›</button>
-              <span style={{fontSize:12,color:C.sub,fontWeight:700}}>{(idx+1).toLocaleString('fa')} / {pages.length.toLocaleString('fa')}</span>
               <button onClick={()=>setIdx(Math.min(pages.length-1,idx+1))} disabled={idx===pages.length-1}
                 style={{border:'none',background:idx===pages.length-1?C.chip:C.accent,color:idx===pages.length-1?C.sub:'#fff',width:30,height:30,borderRadius:'50%',fontSize:16,cursor:idx===pages.length-1?'default':'pointer',fontFamily:'inherit'}}>‹</button>
+              <span style={{fontSize:12,color:C.sub,fontWeight:700}}>{(idx+1).toLocaleString('fa')} / {pages.length.toLocaleString('fa')}</span>
+              <button onClick={()=>setIdx(Math.max(0,idx-1))} disabled={idx===0}
+                style={{border:'none',background:idx===0?C.chip:C.accent,color:idx===0?C.sub:'#fff',width:30,height:30,borderRadius:'50%',fontSize:16,cursor:idx===0?'default':'pointer',fontFamily:'inherit'}}>›</button>
             </div>
           )}
         </div>
