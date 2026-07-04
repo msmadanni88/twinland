@@ -2,34 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
-
-const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
-const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
-
-const LEVELS = [
-  { min: 0,    name: 'تازه‌وارد',  icon: '🌱', color: '#9ca3af' },
-  { min: 100,  name: 'کاشف',      icon: '🧭', color: '#3b82f6' },
-  { min: 300,  name: 'ماجراجو',   icon: '⚡', color: '#8b5cf6' },
-  { min: 700,  name: 'کافه‌گرد',  icon: '☕', color: '#ec4899' },
-  { min: 1500, name: 'استاد',     icon: '🔥', color: '#f97316' },
-  { min: 3000, name: 'افسانه‌ای', icon: '👑', color: '#eab308' },
-]
-function levelOf(xp) {
-  let cur = LEVELS[0]
-  for (const l of LEVELS) if (xp >= l.min) cur = l
-  return cur
-}
-
-// یوزرهای نمونه (واقعی نیستن) — چون هنوز کاربر کم داریم، تا برد شلوغ‌تر دیده شه.
-// با برچسب «نمونه» مشخص شدن. وقتی کاربر واقعی زیاد شد، این‌ها رو حذف می‌کنیم.
-const SAMPLE = [
-  { id: 's1', name: 'سارا',  avatar: '🦊', xp: 1840, sample: true },
-  { id: 's2', name: 'نیما',  avatar: '🐧', xp: 1220, sample: true },
-  { id: 's3', name: 'مهسا',  avatar: '🐱', xp: 760,  sample: true },
-  { id: 's4', name: 'رضا',   avatar: '🦁', xp: 430,  sample: true },
-  { id: 's5', name: 'آیدا',  avatar: '🦉', xp: 210,  sample: true },
-  { id: 's6', name: 'پارسا', avatar: '🐺', xp: 90,   sample: true },
-]
+import { getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile } from '../gameSystem'
 
 export default function LeaderboardPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
@@ -38,18 +11,14 @@ export default function LeaderboardPage() {
   useEffect(() => { setPal(loadPrefs()) }, [])
 
   useEffect(() => {
-    let sess = null
-    try { const raw = localStorage.getItem('tl_session'); if (raw) sess = JSON.parse(raw) } catch (e) {}
-    const uid = sess?.user?.id || null
-    const h = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + (sess?.access_token || SB_KEY) }
-    fetch(SB_URL + '/rest/v1/profiles?select=id,display_name,xp,avatar_emoji&order=xp.desc&limit=100', { headers: h })
-      .then(r => r.json()).then(list => {
-        const real = Array.isArray(list)
-          ? list.map(p => ({ id: p.id, name: p.display_name || 'کاربر', avatar: p.avatar_emoji || '☕', xp: p.xp || 0, sample: false, me: p.id === uid }))
-          : []
-        setRows([...real, ...SAMPLE].sort((a, b) => b.xp - a.xp))
-      })
-      .catch(() => setRows([...SAMPLE].sort((a, b) => b.xp - a.xp)))
+    const sess = getSession()
+    let alive = true
+    const load = () => fetchLeaderboard(sess).then(list => { if (alive) setRows(list) })
+    load()
+    // realtime: با هر تغییر XP خودم، جدول رو دوباره بساز تا رتبه‌ها به‌روز شن
+    const uid = sess?.user?.id
+    const unsub = subscribeToProfile(uid, () => load())
+    return () => { alive = false; unsub() }
   }, [])
 
   const C = buildC(pal.palette, pal.mode)
@@ -84,14 +53,14 @@ export default function LeaderboardPage() {
             <div style={S.podiumRow}>
               {podium.map(p => {
                 const rank = podiumRank[p.id]
-                const lv = levelOf(p.xp)
+                const lv = getLevelInfo(p.xp).current
                 return (
                   <div key={p.id} style={S.podiumCol}>
                     <div style={{ ...S.podiumAvatar, borderColor: lv.color }}>
                       {p.avatar}
                       <span style={S.podiumMedal}>{medals[rank]}</span>
                     </div>
-                    <div style={S.podiumName}>{p.name}{p.sample && <span style={S.sampleTag}>نمونه</span>}</div>
+                    <div style={S.podiumName}>{p.name}{p.sample && <span style={S.sampleTag}>نمونه</span>}{p.me && <span style={S.youTag}>تو</span>}</div>
                     <div style={S.podiumXp}>{p.xp.toLocaleString('fa')}</div>
                     <div style={{ ...S.podiumStand, height: heights[rank], background: lv.color }}>
                       <span style={S.podiumRankNum}>{rank.toLocaleString('fa')}</span>
@@ -105,12 +74,11 @@ export default function LeaderboardPage() {
 
         {/* بقیه رتبه‌ها */}
         <div style={S.list}>
-          {rest.map((p, i) => {
-            const rank = i + 4
-            const lv = levelOf(p.xp)
+          {rest.map((p) => {
+            const lv = getLevelInfo(p.xp).current
             return (
               <div key={p.id} style={{ ...S.row, ...(p.me ? S.rowMe : {}) }}>
-                <div style={S.rank}>{rank.toLocaleString('fa')}</div>
+                <div style={S.rank}>{p.rank.toLocaleString('fa')}</div>
                 <div style={{ ...S.rowAvatar, borderColor: lv.color }}>{p.avatar}</div>
                 <div style={{ flex: 1 }}>
                   <div style={S.rowName}>
