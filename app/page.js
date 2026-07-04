@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { PALETTES, PALETTE_ORDER, DEFAULT_PALETTE, DEFAULT_MODE, buildC, loadPrefs, savePalette, saveMode } from './palettes'
 import AuthGate from './AuthGate'
-import { LEVELS, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile, fetchMyClans, fetchClanStandings, fetchClanMembers, clanLevel } from './gameSystem'
+import { LEVELS, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile, fetchMyClans, fetchClanStandings, fetchClanMembers, clanLevel, fetchRegionLeaderboard, fetchRegionClans } from './gameSystem'
 
 const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
 const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
@@ -168,6 +168,8 @@ function TwinLand({ session, onLogout }) {
   })
   const [filterApplied, setFilterApplied] = useState(false)
   const regionLayersRef = useRef({})   // نگاشت نام منطقه → لایه Leaflet (برای زوم)
+  const [regionResults, setRegionResults] = useState(null) // {leaderboard:[], clans:[], region:'1'} یا null
+  const [showRegionResults, setShowRegionResults] = useState(false)
   const [paletteKey, setPaletteKey] = useState(DEFAULT_PALETTE)
   const [themeMode,  setThemeMode]  = useState(DEFAULT_MODE)
   const [showPalette, setShowPalette] = useState(false)
@@ -425,6 +427,22 @@ function TwinLand({ session, onLogout }) {
       })
       if(bounds) mapInst.current.flyToBounds(bounds,{padding:[40,40],maxZoom:15})
     }
+    // اگه لیدربورد یا کلن منطقه روشنه، داده‌شو بگیر و پنل نتایج رو نشون بده
+    if(regionFilter.showLeaderboard || regionFilter.showClans){
+      const region=digitsOnly(selectedRegions[0]||'')  // اولین منطقه‌ی انتخابی
+      if(region){
+        const sess=getSession()
+        Promise.all([
+          regionFilter.showLeaderboard?fetchRegionLeaderboard(sess,region):Promise.resolve([]),
+          regionFilter.showClans?fetchRegionClans(sess,region):Promise.resolve([]),
+        ]).then(([lb,cl])=>{
+          setRegionResults({region,leaderboard:lb,clans:cl})
+          setShowRegionResults(true)
+        })
+      }
+    } else {
+      setRegionResults(null); setShowRegionResults(false)
+    }
     showToast('✅ فیلتر اعمال شد')
   }
   function clearRegionFilter(){
@@ -670,6 +688,11 @@ function TwinLand({ session, onLogout }) {
               C={C} regions={selectedRegions} value={regionFilter} setValue={setRegionFilter}
               onApply={applyRegionFilter} onClose={()=>setShowRegionFilter(false)}
             />
+          )}
+
+          {/* پنل نتایج منطقه: لیدربورد و کلن‌های منطقه */}
+          {showRegionResults && regionResults && (
+            <RegionResultsPanel C={C} data={regionResults} onClose={()=>setShowRegionResults(false)} />
           )}
 
           {mapMode==='dark'&&<div style={{position:'absolute',inset:0,pointerEvents:'none',background:'rgba(4,8,28,.72)',zIndex:2}}/>}
@@ -965,6 +988,66 @@ function RegionFilterPopup({ C, regions, value, setValue, onApply, onClose }) {
             fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer',boxShadow:'0 6px 20px '+C.accent+'55'}}>
           نمایش نتایج
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ── پنل نتایج منطقه: لیدربورد و کلن‌های منطقه ─────────────────────────────────
+function RegionResultsPanel({ C, data, onClose }) {
+  const [tab,setTab]=useState(data.leaderboard.length?'lb':'clan')
+  const medals={1:'🥇',2:'🥈',3:'🥉'}
+  const hasLb=data.leaderboard.length>0
+  const hasClan=data.clans.length>0
+  return (
+    <div onClick={onClose} style={{position:'absolute',inset:0,zIndex:39,background:'rgba(0,0,0,.4)',backdropFilter:'blur(2px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:C.bg,borderRadius:'24px 24px 0 0',padding:'20px 18px 28px',maxHeight:'78%',overflowY:'auto',boxShadow:'0 -8px 40px rgba(0,0,0,.3)'}}>
+        <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 16px'}}/>
+        <div style={{fontSize:18,fontWeight:800,color:C.text,marginBottom:4}}>منطقه {Number(data.region).toLocaleString('fa')}</div>
+        <div style={{fontSize:12,color:C.sub,marginBottom:16}}>رتبه‌بندی بر اساس فعالیت در این منطقه</div>
+
+        {hasLb&&hasClan&&(
+          <div style={{display:'flex',gap:8,marginBottom:14}}>
+            <button onClick={()=>setTab('lb')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='lb'?C.accent:C.chip,color:tab==='lb'?'#fff':C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🏆 برترین‌ها</button>
+            <button onClick={()=>setTab('clan')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='clan'?C.accent:C.chip,color:tab==='clan'?'#fff':C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🛡️ کلن‌ها</button>
+          </div>
+        )}
+
+        {(tab==='lb'&&hasLb)&&(
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {data.leaderboard.map(u=>(
+              <div key={u.user_id} style={{display:'flex',alignItems:'center',gap:12,background:u.me?C.accentL:C.card,border:u.me?'2px solid '+C.accent:'1px solid '+C.border,borderRadius:14,padding:'10px 14px'}}>
+                <div style={{width:26,textAlign:'center',fontSize:u.rank<=3?18:14,fontWeight:800,color:u.rank<=3?C.text:C.sub}}>{medals[u.rank]||u.rank.toLocaleString('fa')}</div>
+                <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+C.accent+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{u.avatar}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{u.name}{u.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
+                  <div style={{fontSize:11,color:C.sub}}>{u.checkins.toLocaleString('fa')} چک‌این در منطقه</div>
+                </div>
+                <div style={{fontSize:13,fontWeight:800,color:C.accent}}>{u.xp.toLocaleString('fa')} XP</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {(tab==='clan'&&hasClan)&&(
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {data.clans.map(c=>(
+              <div key={c.clan_id} style={{display:'flex',alignItems:'center',gap:12,background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:'10px 14px'}}>
+                <div style={{width:26,textAlign:'center',fontSize:c.rank<=3?18:14,fontWeight:800,color:c.rank<=3?C.text:C.sub}}>{medals[c.rank]||c.rank.toLocaleString('fa')}</div>
+                <div style={{width:40,height:40,borderRadius:12,background:c.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{c.emblem}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:800,color:C.text}}>{c.name}</div>
+                  <div style={{fontSize:11,color:C.sub}}>{c.members.toLocaleString('fa')} عضو فعال در منطقه</div>
+                </div>
+                <div style={{fontSize:13,fontWeight:800,color:C.accent}}>{c.xp.toLocaleString('fa')} XP</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {((tab==='lb'&&!hasLb)||(tab==='clan'&&!hasClan))&&(
+          <div style={{textAlign:'center',color:C.sub,fontSize:13,padding:'30px 0'}}>هنوز فعالیتی در این منطقه ثبت نشده</div>
+        )}
       </div>
     </div>
   )
