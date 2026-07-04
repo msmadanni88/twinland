@@ -230,6 +230,94 @@ export function subscribeToProfile(uid, cb) {
   }
 }
 
+// ============================================================================
+// ── سیستم کلن ────────────────────────────────────────────────────────────────
+// ============================================================================
+
+function rpc(sess, name, body) {
+  const s = sess || getSession()
+  const token = (s && s.access_token) || SB_KEY
+  return fetch(SB_URL + '/rest/v1/rpc/' + name, {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  }).then(r => r.json()).catch(() => null)
+}
+
+// رتبه‌بندی همه‌ی کلن‌ها (XP زنده از مجموع اعضا)
+export async function fetchClanStandings(sess) {
+  const s = sess || getSession()
+  try {
+    const list = await fetch(
+      SB_URL + '/rest/v1/clan_standings?select=*&order=xp_total.desc',
+      { headers: authHeaders(s) }
+    ).then(r => r.json())
+    if (!Array.isArray(list)) return []
+    return list.map((c, i) => ({ ...c, rank: i + 1 }))
+  } catch (e) { return [] }
+}
+
+// کلن‌هایی که کاربر عضوشونه (با نقش و کلن فعال)
+export async function fetchMyClans(sess) {
+  const s = sess || getSession()
+  const uid = s && s.user && s.user.id
+  if (!uid) return []
+  try {
+    const rows = await fetch(
+      SB_URL + '/rest/v1/clan_members?user_id=eq.' + uid +
+      '&select=clan_id,role,is_active,clans(id,name,emblem,color,bio,leader_id,join_code)',
+      { headers: authHeaders(s) }
+    ).then(r => r.json())
+    return Array.isArray(rows) ? rows : []
+  } catch (e) { return [] }
+}
+
+// اعضای یک کلن با XP واقعی (از profiles، تک‌منبع)
+export async function fetchClanMembers(sess, clanId) {
+  const s = sess || getSession()
+  try {
+    const rows = await fetch(
+      SB_URL + '/rest/v1/clan_members?clan_id=eq.' + clanId +
+      '&select=role,is_active,user_id,profiles(display_name,xp,avatar_emoji)&order=joined_at.asc',
+      { headers: authHeaders(s) }
+    ).then(r => r.json())
+    if (!Array.isArray(rows)) return []
+    const uid = s && s.user && s.user.id
+    return rows
+      .map(r => ({
+        user_id: r.user_id,
+        role: r.role,
+        name: r.profiles?.display_name || 'کاربر',
+        xp: r.profiles?.xp || 0,
+        avatar: r.profiles?.avatar_emoji || '☕',
+        me: r.user_id === uid,
+      }))
+      .sort((a, b) => b.xp - a.xp)
+  } catch (e) { return [] }
+}
+
+// ماموریت‌های یک کلن
+export async function fetchClanMissions(sess, clanId) {
+  const s = sess || getSession()
+  try {
+    const rows = await fetch(
+      SB_URL + '/rest/v1/clan_missions?clan_id=eq.' + clanId + '&select=*&order=created_at.desc',
+      { headers: authHeaders(s) }
+    ).then(r => r.json())
+    return Array.isArray(rows) ? rows : []
+  } catch (e) { return [] }
+}
+
+export const clanCreate     = (sess, name, emblem, color, bio) => rpc(sess, 'clan_create', { p_name: name, p_emblem: emblem, p_color: color, p_bio: bio })
+export const clanJoin       = (sess, clanId, code) => rpc(sess, 'clan_join', { p_clan_id: clanId || null, p_code: code || null })
+export const clanLeave      = (sess, clanId) => rpc(sess, 'clan_leave', { p_clan_id: clanId })
+export const clanSetActive  = (sess, clanId) => rpc(sess, 'clan_set_active', { p_clan_id: clanId })
+
+// سطح کلن از XP کل
+export function clanLevel(xpTotal) {
+  return Math.floor((Number(xpTotal) || 0) / 1000) + 1
+}
+
 // نگاشت reason → متن فارسی برای نمایش در تاریخچه
 export const REASON_LABELS = {
   checkin: 'چک‌این',
