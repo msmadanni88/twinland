@@ -2,36 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
+import {
+  SB_URL, SB_KEY, getLevelInfo, getSession,
+  fetchMyProfile, fetchXpHistory, fetchAwards, subscribeToProfile, REASON_LABELS,
+} from '../gameSystem'
 
-const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
-const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
-
-// ---- همون سیستم XP که توی نقشه داریم (هماهنگ) ----
-const LEVELS = [
-  { min: 0,    name: 'تازه‌وارد',  icon: '🌱', color: '#9ca3af' },
-  { min: 100,  name: 'کاشف',      icon: '🧭', color: '#3b82f6' },
-  { min: 300,  name: 'ماجراجو',   icon: '⚡', color: '#8b5cf6' },
-  { min: 700,  name: 'کافه‌گرد',  icon: '☕', color: '#ec4899' },
-  { min: 1500, name: 'استاد',     icon: '🔥', color: '#f97316' },
-  { min: 3000, name: 'افسانه‌ای', icon: '👑', color: '#eab308' },
-]
-
-function levelInfo(xp) {
-  let current = LEVELS[0]
-  let next = null
-  for (let i = 0; i < LEVELS.length; i++) {
-    if (xp >= LEVELS[i].min) {
-      current = LEVELS[i]
-      next = LEVELS[i + 1] || null
-    }
-  }
-  const span = next ? next.min - current.min : 1
-  const into = xp - current.min
-  const pct = next ? Math.min(100, Math.round((into / span) * 100)) : 100
-  return { current, next, pct }
-}
-
-// مدال‌ها: قفل/باز بر اساس آمار واقعی. (تاریخ کسب در فاز ۵ اضافه می‌شه)
+// مدال‌های محاسبه‌شده از آمار واقعی (fallback وقتی جدول awards هنوز پر نشده)
 const BADGE_DEFS = [
   { icon: '🥇', name: 'اولین چک‌این', ok: s => s.checkins >= 1 },
   { icon: '🔥', name: 'استریک ۳ روز', ok: s => s.streak >= 3 },
@@ -45,8 +21,12 @@ const BADGE_DEFS = [
 
 function faWhen(iso) {
   const d = new Date(iso).getTime()
-  const days = Math.floor((Date.now() - d) / 86400000)
-  if (days <= 0) return 'امروز'
+  const mins = Math.floor((Date.now() - d) / 60000)
+  if (mins < 1) return 'همین الان'
+  if (mins < 60) return mins.toLocaleString('fa') + ' دقیقه پیش'
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return hrs.toLocaleString('fa') + ' ساعت پیش'
+  const days = Math.floor(hrs / 24)
   if (days === 1) return 'دیروز'
   return days.toLocaleString('fa') + ' روز پیش'
 }
@@ -55,29 +35,42 @@ export default function ProfilePage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [tab, setTab] = useState('badges')
   const [profile, setProfile] = useState(null)
-  const [checkins, setCheckins] = useState([])   // ردیف‌های واقعی چک‌این (با کافه)
+  const [checkins, setCheckins] = useState([])
+  const [xpHistory, setXpHistory] = useState([])
+  const [awards, setAwards] = useState([])
 
   useEffect(() => { setPal(loadPrefs()) }, [])
 
   useEffect(() => {
-    let sess = null
-    try { const raw = localStorage.getItem('tl_session'); if (raw) sess = JSON.parse(raw) } catch (e) {}
+    const sess = getSession()
     if (!sess || !sess.user) { window.location.href = '/'; return }
     const uid = sess.user.id
     const h = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + (sess.access_token || SB_KEY) }
-    // پروفایل واقعی (حتی با توکن منقضی هم قابل خواندنه)
-    fetch(SB_URL + '/rest/v1/profiles?id=eq.' + uid + '&select=*', { headers: h })
-      .then(r => r.json()).then(rows => { if (Array.isArray(rows) && rows[0]) setProfile(rows[0]) }).catch(() => {})
-    // چک‌این‌های واقعی + اطلاعات کافه (برای آمار، تاریخچه، مدال‌ها)
+
+    let alive = true
+    // پروفایل واقعی (منبع واحد XP)
+    fetchMyProfile(sess).then(p => { if (alive && p) setProfile(p) })
+    // چک‌این‌های واقعی (برای آمار و مدال‌ها)
     fetch(SB_URL + '/rest/v1/checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone)&order=created_at.desc&limit=50', { headers: h })
-      .then(r => r.json()).then(rows => { if (Array.isArray(rows)) setCheckins(rows) }).catch(() => {})
+      .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setCheckins(rows) }).catch(() => {})
+    // تاریخچه‌ی دقیق XP + جوایز
+    fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) })
+    fetchAwards(sess).then(rows => { if (alive) setAwards(rows) })
+
+    // realtime: XP خودم لحظه‌ای آپدیت شه
+    const unsub = subscribeToProfile(uid, (rec) => {
+      if (!alive) return
+      setProfile(prev => ({ ...(prev || {}), ...rec }))
+      fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) })
+    })
+    return () => { alive = false; unsub() }
   }, [])
 
   const C = buildC(pal.palette, pal.mode)
   const S = mkS(C)
 
   const xp = profile?.xp || 0
-  const { current, next, pct } = levelInfo(xp)
+  const { current, next, progress } = getLevelInfo(xp)
   const name = profile?.display_name || 'کاربر'
   const streak = profile?.streak || 0
   const joinedDays = profile?.created_at
@@ -88,9 +81,12 @@ export default function ProfilePage() {
   const zoneCount = new Set(checkins.map(c => c.cafes?.zone).filter(Boolean)).size
   const stats = { checkins: checkinCount, cafes: cafeCount, streak, zones: zoneCount }
 
+  // مدال‌ها: اگه جدول awards پر شده از همون استفاده کن، وگرنه از آمار محاسبه کن
+  const earnedBadges = awards.filter(a => a.kind === 'badge')
+  const useRealAwards = earnedBadges.length > 0
+
   return (
     <div style={S.page}>
-      {/* نوار بالا */}
       <div style={S.topbar}>
         <a href="/" style={S.backBtn}>‹ نقشه</a>
         <div style={S.brand}>پروفایل</div>
@@ -112,15 +108,14 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* نوار XP */}
           <div style={S.xpRow}>
             <span style={S.xpLabel}>{xp.toLocaleString('fa')} XP</span>
             <span style={S.xpNext}>
-              {next ? `تا ${next.name}: ${(next.min - xp).toLocaleString('fa')} XP` : 'حداکثر لول!'}
+              {next ? `تا ${next.name}: ${(next.minXP - xp).toLocaleString('fa')} XP` : 'حداکثر لول!'}
             </span>
           </div>
           <div style={S.xpTrack}>
-            <div style={{ ...S.xpFill, width: pct + '%', background: current.color }} />
+            <div style={{ ...S.xpFill, width: progress + '%', background: current.color }} />
           </div>
         </div>
 
@@ -140,28 +135,44 @@ export default function ProfilePage() {
 
         {tab === 'badges' && (
           <div style={S.badgeGrid}>
-            {BADGE_DEFS.map((b, i) => {
-              const earned = b.ok(stats)
-              return (
-                <div key={i} style={{ ...S.badge, opacity: earned ? 1 : 0.35 }}>
-                  <div style={S.badgeIcon}>{b.icon}</div>
-                  <div style={S.badgeName}>{b.name}</div>
-                  {!earned && <div style={S.badgeLock}>قفل</div>}
+            {useRealAwards
+              ? earnedBadges.map((b, i) => (
+                <div key={i} style={S.badge}>
+                  <div style={S.badgeIcon}>{b.icon || '🏅'}</div>
+                  <div style={S.badgeName}>{b.title}</div>
+                  <div style={S.badgeWhen}>{faWhen(b.earned_at)}</div>
                 </div>
-              )
-            })}
+              ))
+              : BADGE_DEFS.map((b, i) => {
+                const earned = b.ok(stats)
+                return (
+                  <div key={i} style={{ ...S.badge, opacity: earned ? 1 : 0.35 }}>
+                    <div style={S.badgeIcon}>{b.icon}</div>
+                    <div style={S.badgeName}>{b.name}</div>
+                    {!earned && <div style={S.badgeLock}>قفل</div>}
+                  </div>
+                )
+              })}
           </div>
         )}
 
         {tab === 'history' && (
           <div style={S.historyList}>
-            {checkins.length === 0 && (
-              <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '24px 0' }}>
-                هنوز چک‌این نکردی. برو روی نقشه یه کافه رو بزن! ☕
+            {/* تاریخچه‌ی دقیق XP از جدول xp_history */}
+            {xpHistory.length > 0 && xpHistory.map((h, i) => (
+              <div key={'xp' + i} style={S.historyItem}>
+                <div style={S.historyIcon}>⭐</div>
+                <div style={{ flex: 1 }}>
+                  <div style={S.historyCafe}>{REASON_LABELS[h.reason] || h.reason}</div>
+                  <div style={S.historyArea}>{faWhen(h.created_at)} · مجموع: {(h.resulting_xp || 0).toLocaleString('fa')}</div>
+                </div>
+                <div style={S.historyXp}>+{(h.amount || 0).toLocaleString('fa')} XP</div>
               </div>
-            )}
-            {checkins.map((h, i) => (
-              <div key={i} style={S.historyItem}>
+            ))}
+
+            {/* اگه هنوز تاریخچه‌ی XP نداریم، از چک‌این‌ها نشون بده */}
+            {xpHistory.length === 0 && checkins.map((h, i) => (
+              <div key={'ci' + i} style={S.historyItem}>
                 <div style={S.historyIcon}>☕</div>
                 <div style={{ flex: 1 }}>
                   <div style={S.historyCafe}>{h.cafes?.name || 'کافه'}</div>
@@ -170,6 +181,12 @@ export default function ProfilePage() {
                 <div style={S.historyXp}>+{(h.xp_awarded || 0).toLocaleString('fa')} XP</div>
               </div>
             ))}
+
+            {xpHistory.length === 0 && checkins.length === 0 && (
+              <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '24px 0' }}>
+                هنوز چک‌این نکردی. برو روی نقشه یه کافه رو بزن! ☕
+              </div>
+            )}
           </div>
         )}
 
@@ -257,6 +274,7 @@ const mkS = (C) => ({
   badgeIcon: { fontSize: 26 },
   badgeName: { fontSize: 10, color: C.text, marginTop: 4, lineHeight: 1.3 },
   badgeLock: { fontSize: 9, color: C.sub, marginTop: 2 },
+  badgeWhen: { fontSize: 8, color: C.accent, marginTop: 2 },
 
   historyList: { display: 'flex', flexDirection: 'column', gap: 8 },
   historyItem: {
