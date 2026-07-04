@@ -584,26 +584,22 @@ function TwinLand({ session, onLogout }) {
 
   async function claimSecretXP(){
     const s=getSession(); const token=s&&s.access_token; const uid=s&&s.user&&s.user.id
-    if(!uid){ return }
+    if(!uid) return
     try{
-      // چک کن قبلاً گرفته یا نه (badge زرنگ)
-      const has=await fetch(SB_URL+'/rest/v1/awards?user_id=eq.'+uid+'&code=eq.zerang&select=code',
-        {headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(token||SB_KEY)}}).then(r=>r.json())
-      if(Array.isArray(has)&&has.length>0){ showToast('🎁 قبلاً جایزه‌ی زرنگ رو گرفتی!'); return }
-      // ثبت badge و XP از طریق منبع واحد
-      await fetch(SB_URL+'/rest/v1/awards',{
-        method:'POST',
-        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(token||SB_KEY),'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({user_id:uid,kind:'badge',code:'zerang',title:'زرنگ',icon:'🧠'})
-      })
-      const res=await fetch(SB_URL+'/rest/v1/rpc/award_xp',{
+      const res=await fetch(SB_URL+'/rest/v1/rpc/claim_secret_xp',{
         method:'POST',
         headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(token||SB_KEY),'Content-Type':'application/json'},
-        body:JSON.stringify({p_user:uid,p_amount:100,p_reason:'secret_zerang',p_ref:null})
+        body:'{}'
       }).then(r=>r.json())
       const row=Array.isArray(res)?res[0]:res
-      if(row&&row.new_xp!=null) setXp(row.new_xp)
-      showToast('🧠 آفرین زرنگ! ۱۰۰ XP گرفتی!')
+      if(row&&row.ok){
+        if(row.xp!=null) setXp(row.xp)
+        showToast('🧠 آفرین زرنگ! ۱۰۰ XP گرفتی!')
+      } else if(row&&row.error==='already_claimed'){
+        showToast('🎁 قبلاً جایزه‌ی زرنگ رو گرفتی!')
+      } else {
+        showToast('یه مشکلی پیش اومد')
+      }
     }catch(e){ showToast('یه مشکلی پیش اومد') }
   }
   function goZone(z){
@@ -951,28 +947,8 @@ function TwinLand({ session, onLogout }) {
         )}
       </div>
 
-      {/* LED AD BAR — نوار تبلیغاتی باریک (تستی) */}
-      <div style={{height:26,flexShrink:0,overflow:'hidden',position:'relative',background:'linear-gradient(90deg,#0a0a12,#141426,#0a0a12)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'center'}}>
-        <div style={{position:'absolute',whiteSpace:'nowrap',animation:'ledScroll 22s linear infinite',fontSize:12,fontWeight:700,letterSpacing:.3,display:'flex',alignItems:'center',gap:40}}>
-          {[
-            {t:'☕ کافه روستا فرشته — قهوه‌ی امروز نصف‌قیمت!',c:'#ffd60a'},
-            {t:'🔥 چالش این هفته: ۵ کافه‌ی جدید = ۳۰۰ XP',c:'#ff453a'},
-            {t:'🎁 اینجا می‌تونه تبلیغ کافه‌ی شما باشه — twinland.ir',c:'#30d158'},
-            {t:'🏆 رقابت کلن‌های تهران داغه! کلنت رو بساز',c:'#0a84ff'},
-          ].map((ad,i)=>(
-            <span key={i} style={{color:ad.c}}>{ad.t}</span>
-          ))}
-          {/* تکرار برای پیوستگی */}
-          {[
-            {t:'☕ کافه روستا فرشته — قهوه‌ی امروز نصف‌قیمت!',c:'#ffd60a'},
-            {t:'🔥 چالش این هفته: ۵ کافه‌ی جدید = ۳۰۰ XP',c:'#ff453a'},
-            {t:'🎁 اینجا می‌تونه تبلیغ کافه‌ی شما باشه — twinland.ir',c:'#30d158'},
-            {t:'🏆 رقابت کلن‌های تهران داغه! کلنت رو بساز',c:'#0a84ff'},
-          ].map((ad,i)=>(
-            <span key={'r'+i} style={{color:ad.c}}>{ad.t}</span>
-          ))}
-        </div>
-      </div>
+      {/* LED AD BAR — نوار تبلیغاتی سبک استادیوم با افکت پیکسل RGB (تستی) */}
+      <LedAdBar C={C} />
 
       {/* BOTTOM NAV */}
       <div style={{height:BH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'stretch'}}>
@@ -1335,6 +1311,104 @@ function MapSettingsPopup({ C, value, setValue, onClose }) {
       </div>
     </div>
   )
+}
+
+// ── نوار LED تبلیغاتی سبک استادیوم (افکت پیکسل RGB روی همه‌ی تبلیغات) ─────────
+// تبلیغات: هر اسلاید {type:'text'|'anim', ...}. بعداً کافه‌ها انیمیشن آپلود می‌کنن.
+const LED_ADS = [
+  { type:'anim', bg:['#1a1a2e','#c1121f'], title:'کافه روستا فرشته', sub:'قهوه‌ی امروز نصف‌قیمت ☕', accent:'#ffd60a' },
+  { type:'anim', bg:['#0d1b2a','#1b998b'], title:'چالش این هفته', sub:'۵ کافه‌ی جدید = ۳۰۰ XP 🔥', accent:'#ffffff' },
+  { type:'anim', bg:['#231942','#e0aaff'], title:'جای تبلیغ شما', sub:'twinland.ir 🎁', accent:'#ffffff' },
+  { type:'anim', bg:['#03071e','#0a84ff'], title:'رقابت کلن‌های تهران', sub:'کلنت رو بساز 🏆', accent:'#ffd60a' },
+]
+function LedAdBar({ C }) {
+  const canvasRef=useRef(null)
+  const [idx,setIdx]=useState(0)
+  const idxRef=useRef(0)
+  const progRef=useRef(0)   // پیشرفت انیمیشن اسلاید فعلی (0..1)
+
+  // چرخش اسلایدها
+  useEffect(()=>{
+    const t=setInterval(()=>{ idxRef.current=(idxRef.current+1)%LED_ADS.length; setIdx(idxRef.current); progRef.current=0 },4500)
+    return ()=>clearInterval(t)
+  },[])
+
+  // رندر canvas با افکت پیکسل RGB
+  useEffect(()=>{
+    const cv=canvasRef.current; if(!cv) return
+    const ctx=cv.getContext('2d'); let raf
+    const dpr=Math.min(window.devicePixelRatio||1,2)
+    function resize(){
+      const w=cv.clientWidth, h=cv.clientHeight
+      cv.width=w*dpr; cv.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0)
+    }
+    resize(); window.addEventListener('resize',resize)
+
+    let t0=performance.now()
+    function draw(now){
+      const w=cv.clientWidth, h=cv.clientHeight
+      const ad=LED_ADS[idxRef.current]
+      const p=Math.min(1,(now-t0)/700)  // fade-in سریع
+      progRef.current=Math.min(1,progRef.current+0.004)
+
+      // پس‌زمینه‌ی گرادیان متحرک
+      const g=ctx.createLinearGradient(0,0,w,0)
+      const shift=(Math.sin(now/1400)+1)/2
+      g.addColorStop(0,ad.bg[0]); g.addColorStop(Math.max(.35,shift),ad.bg[1]); g.addColorStop(1,ad.bg[0])
+      ctx.globalAlpha=1; ctx.fillStyle=g; ctx.fillRect(0,0,w,h)
+
+      // متن اسلاید — از راست وارد می‌شه (RTL)
+      const slideX=(1-easeOut(p))* 40
+      ctx.globalAlpha=p
+      ctx.textBaseline='middle'; ctx.direction='rtl'; ctx.textAlign='right'
+      ctx.font='800 13px Estedad, sans-serif'
+      ctx.fillStyle=ad.accent
+      ctx.fillText(ad.title, w-14+slideX, h/2-1)
+      const tw=ctx.measureText(ad.title).width
+      ctx.font='600 12px Estedad, sans-serif'; ctx.fillStyle='rgba(255,255,255,.92)'
+      ctx.fillText(ad.sub, w-20-tw+slideX, h/2)
+
+      // نقطه‌ی نور متحرک (مثل اسکن LED)
+      const scan=(now/12)%(w+120)-60
+      const lg=ctx.createRadialGradient(scan,h/2,0,scan,h/2,70)
+      lg.addColorStop(0,'rgba(255,255,255,.18)'); lg.addColorStop(1,'rgba(255,255,255,0)')
+      ctx.globalAlpha=1; ctx.fillStyle=lg; ctx.fillRect(0,0,w,h)
+
+      // ── افکت پیکسل RGB روی کل نوار (لایه‌ی مشبک) ──
+      drawRGBGrid(ctx,w,h)
+
+      raf=requestAnimationFrame(draw)
+    }
+    raf=requestAnimationFrame(draw)
+    return ()=>{ cancelAnimationFrame(raf); window.removeEventListener('resize',resize) }
+  },[])
+
+  return (
+    <div style={{height:30,flexShrink:0,position:'relative',borderTop:'1px solid '+C.border,overflow:'hidden',background:'#000'}}>
+      <canvas ref={canvasRef} style={{width:'100%',height:'100%',display:'block'}}/>
+      {/* نقطه‌های اندیکاتور اسلاید */}
+      <div style={{position:'absolute',bottom:2,left:8,display:'flex',gap:3}}>
+        {LED_ADS.map((_,i)=>(
+          <span key={i} style={{width:i===idx?10:4,height:2.5,borderRadius:2,background:i===idx?'#fff':'rgba(255,255,255,.35)',transition:'.3s'}}/>
+        ))}
+      </div>
+    </div>
+  )
+}
+function easeOut(t){ return 1-Math.pow(1-t,3) }
+// شبکه‌ی پیکسل RGB که ظاهر LED استادیوم می‌ده — روی هر محتوایی می‌شینه
+function drawRGBGrid(ctx,w,h){
+  const cell=4                    // اندازه‌ی هر پیکسل LED
+  ctx.globalAlpha=0.20
+  for(let y=0;y<h;y+=cell){
+    // خطوط افقی تیره بین ردیف‌ها
+    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,y+cell-1,w,1)
+  }
+  ctx.globalAlpha=0.13
+  for(let x=0;x<w;x+=cell){
+    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(x+cell-1,0,1,h)
+  }
+  ctx.globalAlpha=1
 }
 
 function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,checkedIn,xp,levelInfo,streak,setShowXP}) {
