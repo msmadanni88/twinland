@@ -130,6 +130,7 @@ function TwinLand({ session, onLogout }) {
   const mapRef   = useRef(null)
   const mapInst  = useRef(null)
   const mksRef   = useRef({})
+  const clusterRef = useRef(null)   // گروه خوشه‌بندی مارکرها
 
   const [cafes,      setCafes]      = useState([])
   const [city,       setCity]       = useState('tehran')
@@ -278,17 +279,30 @@ function TwinLand({ session, onLogout }) {
       if(!mounted||!mapRef.current) return
 
       const loadLeaflet=(cb)=>{
-        if(window.L){ cb(); return }
+        if(window.L&&window.L.markerClusterGroup){ cb(); return }
+        const loadCluster=()=>{
+          if(window.L&&window.L.markerClusterGroup){ cb(); return }
+          // CSS خوشه‌بندی
+          const cc=document.createElement('link'); cc.rel='stylesheet'
+          cc.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css'
+          document.head.appendChild(cc)
+          const cjs=document.createElement('script')
+          cjs.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js'
+          cjs.onload=cb
+          cjs.onerror=cb  // اگه نشد، بدون خوشه‌بندی ادامه بده
+          document.head.appendChild(cjs)
+        }
+        if(window.L){ loadCluster(); return }
         const css=document.createElement('link'); css.rel='stylesheet'
         css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
         document.head.appendChild(css)
         const js=document.createElement('script')
         js.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
-        js.onload=cb
+        js.onload=loadCluster
         js.onerror=()=>{
           const js2=document.createElement('script')
           js2.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-          js2.onload=cb; document.head.appendChild(js2)
+          js2.onload=loadCluster; document.head.appendChild(js2)
         }
         document.head.appendChild(js)
       }
@@ -339,6 +353,27 @@ function TwinLand({ session, onLogout }) {
           mapInst.current=m
           setMapReady(true)
 
+          // ── گروه خوشه‌بندی: پین‌های نزدیک رو جمع می‌کنه (برای مقیاس ده‌ها هزار) ──
+          if(L.markerClusterGroup){
+            clusterRef.current=L.markerClusterGroup({
+              chunkedLoading:true,           // رندر تدریجی برای تعداد زیاد
+              maxClusterRadius:55,           // شعاع خوشه (پیکسل)
+              spiderfyOnMaxZoom:true,
+              showCoverageOnHover:false,
+              disableClusteringAtZoom:17,    // در زوم بالا، تک‌تک نشون بده
+              iconCreateFunction:(cluster)=>{
+                const count=cluster.getChildCount()
+                const size=count<10?38:count<100?46:56
+                const bg=count<10?'#3b82f6':count<100?'#f97316':'#ef4444'
+                return L.divIcon({
+                  html:'<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+bg+';border:3px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:'+(count<100?14:12)+'px;font-family:inherit">'+count.toLocaleString('fa')+'</div>',
+                  className:'',iconSize:[size,size]
+                })
+              }
+            })
+            m.addLayer(clusterRef.current)
+          }
+
           // iOS Safari fix: نقشه اول با ارتفاع اشتباه ساخته میشه؛ بعد از settle شدن layout چند بار اصلاح کن
           ;[120,350,700,1300].forEach(d=>setTimeout(()=>{ if(mounted&&mapInst.current){ try{ mapInst.current.invalidateSize() }catch(e){} } },d))
           setTimeout(()=>{ if(mounted&&mapInst.current){ try{ mapInst.current.invalidateSize(); mapInst.current.setView([c.lat,c.lng],c.zoom) }catch(e){} } },500)
@@ -374,7 +409,11 @@ function TwinLand({ session, onLogout }) {
       </div>`
       const icon=L.divIcon({html,iconSize:[44,52],iconAnchor:[22,52],className:''})
       const mk=L.marker([cafe.lat,cafe.lng],{icon})
-      mk.on('click',()=>setSelCafe(cafe)); mk.addTo(mapInst.current); mksRef.current[cafe.id]=mk
+      mk.on('click',()=>setSelCafe(cafe))
+      // اگه خوشه‌بندی فعاله، به گروه اضافه کن؛ وگرنه مستقیم به نقشه
+      if(clusterRef.current) clusterRef.current.addLayer(mk)
+      else mk.addTo(mapInst.current)
+      mksRef.current[cafe.id]=mk
     })
   },[mapReady,cafes,checkedIn])
 
@@ -402,9 +441,18 @@ function TwinLand({ session, onLogout }) {
 
   useEffect(()=>{
     if(!mapReady||!mapInst.current) return
+    const cluster=clusterRef.current
     Object.entries(mksRef.current).forEach(([id,mk])=>{
       const show=filtered.find(c=>c.id===id)
-      try{ if(show){if(!mapInst.current.hasLayer(mk))mk.addTo(mapInst.current)} else mapInst.current.removeLayer(mk) }catch(e){}
+      try{
+        if(cluster){
+          if(show){ if(!cluster.hasLayer(mk)) cluster.addLayer(mk) }
+          else cluster.removeLayer(mk)
+        } else {
+          if(show){ if(!mapInst.current.hasLayer(mk)) mk.addTo(mapInst.current) }
+          else mapInst.current.removeLayer(mk)
+        }
+      }catch(e){}
     })
   },[zone,search,mapReady,filtered,filterApplied,selectedRegions,regionFilter])
 
