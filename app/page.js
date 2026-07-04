@@ -447,6 +447,7 @@ function TwinLand({ session, onLogout }) {
   }
   function clearRegionFilter(){
     setFilterApplied(false); setSelectedRegions([]); setShowRegionFilter(false)
+    setRegionResults(null); setShowRegionResults(false)
     Object.values(regionLayersRef.current).forEach(lyr=>{
       try{ lyr.setStyle({color:'#8E8E93',weight:1.3,fillColor:'#8E8E93',fillOpacity:0,opacity:0.5}) }catch(e){}
     })
@@ -677,6 +678,15 @@ function TwinLand({ session, onLogout }) {
                     padding:'8px 16px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
                     boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
                   پاک کردن فیلتر
+                </button>
+              )}
+              {regionResults && !showRegionResults && (
+                <button onClick={()=>setShowRegionResults(true)}
+                  style={{background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                    color:C.text,border:'1px solid '+C.border,borderRadius:99,
+                    padding:'8px 16px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
+                    boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+                  نتایج منطقه
                 </button>
               )}
             </div>
