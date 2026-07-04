@@ -427,19 +427,19 @@ function TwinLand({ session, onLogout }) {
       })
       if(bounds) mapInst.current.flyToBounds(bounds,{padding:[40,40],maxZoom:15})
     }
-    // اگه لیدربورد یا کلن منطقه روشنه، داده‌شو بگیر و پنل نتایج رو نشون بده
+    // اگه لیدربورد یا کلن منطقه روشنه، برای همه‌ی مناطق انتخابی داده بگیر
     if(regionFilter.showLeaderboard || regionFilter.showClans){
-      const region=digitsOnly(selectedRegions[0]||'')  // اولین منطقه‌ی انتخابی
-      if(region){
-        const sess=getSession()
+      const sess=getSession()
+      const regionNums=selectedRegions.map(r=>digitsOnly(r)).filter(Boolean)
+      Promise.all(regionNums.map(region=>
         Promise.all([
           regionFilter.showLeaderboard?fetchRegionLeaderboard(sess,region):Promise.resolve([]),
           regionFilter.showClans?fetchRegionClans(sess,region):Promise.resolve([]),
-        ]).then(([lb,cl])=>{
-          setRegionResults({region,leaderboard:lb,clans:cl})
-          setShowRegionResults(true)
-        })
-      }
+        ]).then(([lb,cl])=>({region,leaderboard:lb,clans:cl}))
+      )).then(pages=>{
+        setRegionResults(pages)   // آرایه‌ای از صفحات، هر کدوم یک منطقه
+        setShowRegionResults(true)
+      })
     } else {
       setRegionResults(null); setShowRegionResults(false)
     }
@@ -660,31 +660,31 @@ function TwinLand({ session, onLogout }) {
         <div style={{position:'absolute',inset:0,zIndex:1}}>
           <div ref={mapRef} style={{position:'absolute',inset:0,zIndex:1,isolation:'isolate'}}/>
 
-          {/* دکمه فیلتر منطقه — ظاهر شیشه‌ای هم‌سبک نوار آمار */}
+          {/* دکمه فیلتر منطقه — ظاهر شیشه‌ای هم‌سبک نوار آمار، هر سه هم‌اندازه */}
           {selectedRegions.length>0 && !showRegionFilter && (
-            <div style={{position:'absolute',top:14,left:14,zIndex:20,display:'flex',flexDirection:'column',gap:8,alignItems:'flex-start'}}>
+            <div style={{position:'absolute',top:14,left:14,zIndex:20,display:'flex',flexDirection:'column',gap:7,alignItems:'stretch',width:170}}>
               <button onClick={()=>setShowRegionFilter(true)}
-                style={{display:'flex',alignItems:'center',gap:7,
+                style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,width:'100%',
                   background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
-                  color:C.text,border:'1px solid '+C.border,borderRadius:99,padding:'10px 18px',
-                  fontSize:13.5,fontWeight:800,fontFamily:'inherit',cursor:'pointer',
+                  color:C.text,border:'1px solid '+C.border,borderRadius:99,padding:'7px 14px',
+                  fontSize:12.5,fontWeight:800,fontFamily:'inherit',cursor:'pointer',
                   boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
                 فیلتر {selectedRegions.length.toLocaleString('fa')} منطقه
               </button>
               {filterApplied && (
                 <button onClick={clearRegionFilter}
-                  style={{background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                  style={{width:'100%',background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
                     color:C.text,border:'1px solid '+C.border,borderRadius:99,
-                    padding:'8px 16px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
+                    padding:'7px 14px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
                     boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
                   پاک کردن فیلتر
                 </button>
               )}
-              {regionResults && !showRegionResults && (
+              {Array.isArray(regionResults) && regionResults.length>0 && !showRegionResults && (
                 <button onClick={()=>setShowRegionResults(true)}
-                  style={{background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                  style={{width:'100%',background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
                     color:C.text,border:'1px solid '+C.border,borderRadius:99,
-                    padding:'8px 16px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
+                    padding:'7px 14px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
                     boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
                   نتایج منطقه
                 </button>
@@ -700,9 +700,9 @@ function TwinLand({ session, onLogout }) {
             />
           )}
 
-          {/* پنل نتایج منطقه: لیدربورد و کلن‌های منطقه */}
-          {showRegionResults && regionResults && (
-            <RegionResultsPanel C={C} data={regionResults} onClose={()=>setShowRegionResults(false)} />
+          {/* پنل نتایج منطقه: لیدربورد و کلن‌های منطقه (چند-صفحه‌ای) */}
+          {showRegionResults && Array.isArray(regionResults) && regionResults.length>0 && (
+            <RegionResultsPanel C={C} pages={regionResults} onClose={()=>setShowRegionResults(false)} />
           )}
 
           {mapMode==='dark'&&<div style={{position:'absolute',inset:0,pointerEvents:'none',background:'rgba(4,8,28,.72)',zIndex:2}}/>}
@@ -1003,18 +1003,49 @@ function RegionFilterPopup({ C, regions, value, setValue, onApply, onClose }) {
   )
 }
 
-// ── پنل نتایج منطقه: لیدربورد و کلن‌های منطقه ─────────────────────────────────
-function RegionResultsPanel({ C, data, onClose }) {
-  const [tab,setTab]=useState(data.leaderboard.length?'lb':'clan')
+// ── پنل نتایج منطقه: چند-صفحه‌ای (هر منطقه یک صفحه، قابل اسلاید) ──────────────
+function RegionResultsPanel({ C, pages, onClose }) {
+  const [idx,setIdx]=useState(0)
+  const [tab,setTab]=useState('lb')
+  const touchX=useRef(null)
+  const data=pages[idx]||{region:'',leaderboard:[],clans:[]}
   const medals={1:'🥇',2:'🥈',3:'🥉'}
   const hasLb=data.leaderboard.length>0
   const hasClan=data.clans.length>0
+  const multi=pages.length>1
+
+  function onTouchStart(e){ touchX.current=e.touches[0].clientX }
+  function onTouchEnd(e){
+    if(touchX.current==null) return
+    const dx=e.changedTouches[0].clientX-touchX.current
+    if(Math.abs(dx)>50){
+      // RTL: سوایپ چپ → صفحه بعد، راست → قبل
+      if(dx<0 && idx<pages.length-1) setIdx(idx+1)
+      if(dx>0 && idx>0) setIdx(idx-1)
+    }
+    touchX.current=null
+  }
+
   return (
     <div onClick={onClose} style={{position:'absolute',inset:0,zIndex:39,background:'rgba(0,0,0,.4)',backdropFilter:'blur(2px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:C.bg,borderRadius:'24px 24px 0 0',padding:'20px 18px 28px',maxHeight:'78%',overflowY:'auto',boxShadow:'0 -8px 40px rgba(0,0,0,.3)'}}>
+      <div onClick={e=>e.stopPropagation()} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+        style={{width:'100%',maxWidth:480,background:C.bg,borderRadius:'24px 24px 0 0',padding:'20px 18px 28px',maxHeight:'78%',overflowY:'auto',boxShadow:'0 -8px 40px rgba(0,0,0,.3)'}}>
         <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 16px'}}/>
-        <div style={{fontSize:18,fontWeight:800,color:C.text,marginBottom:4}}>منطقه {Number(data.region).toLocaleString('fa')}</div>
-        <div style={{fontSize:12,color:C.sub,marginBottom:16}}>رتبه‌بندی بر اساس فعالیت در این منطقه</div>
+
+        {/* هدر + ناوبری بین مناطق */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+          <div style={{fontSize:18,fontWeight:800,color:C.text}}>منطقه {Number(data.region).toLocaleString('fa')}</div>
+          {multi&&(
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <button onClick={()=>setIdx(Math.max(0,idx-1))} disabled={idx===0}
+                style={{border:'none',background:idx===0?C.chip:C.accent,color:idx===0?C.sub:'#fff',width:30,height:30,borderRadius:'50%',fontSize:16,cursor:idx===0?'default':'pointer',fontFamily:'inherit'}}>›</button>
+              <span style={{fontSize:12,color:C.sub,fontWeight:700}}>{(idx+1).toLocaleString('fa')} / {pages.length.toLocaleString('fa')}</span>
+              <button onClick={()=>setIdx(Math.min(pages.length-1,idx+1))} disabled={idx===pages.length-1}
+                style={{border:'none',background:idx===pages.length-1?C.chip:C.accent,color:idx===pages.length-1?C.sub:'#fff',width:30,height:30,borderRadius:'50%',fontSize:16,cursor:idx===pages.length-1?'default':'pointer',fontFamily:'inherit'}}>‹</button>
+            </div>
+          )}
+        </div>
+        <div style={{fontSize:12,color:C.sub,marginBottom:16}}>رتبه‌بندی بر اساس فعالیت در این منطقه{multi&&' · برای جابه‌جایی اسلاید کن'}</div>
 
         {hasLb&&hasClan&&(
           <div style={{display:'flex',gap:8,marginBottom:14}}>
@@ -1023,7 +1054,7 @@ function RegionResultsPanel({ C, data, onClose }) {
           </div>
         )}
 
-        {(tab==='lb'&&hasLb)&&(
+        {((tab==='lb'||!hasClan)&&hasLb)&&(
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {data.leaderboard.map(u=>(
               <div key={u.user_id} style={{display:'flex',alignItems:'center',gap:12,background:u.me?C.accentL:C.card,border:u.me?'2px solid '+C.accent:'1px solid '+C.border,borderRadius:14,padding:'10px 14px'}}>
@@ -1039,7 +1070,7 @@ function RegionResultsPanel({ C, data, onClose }) {
           </div>
         )}
 
-        {(tab==='clan'&&hasClan)&&(
+        {((tab==='clan'&&hasClan))&&(
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {data.clans.map(c=>(
               <div key={c.clan_id} style={{display:'flex',alignItems:'center',gap:12,background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:'10px 14px'}}>
@@ -1055,8 +1086,17 @@ function RegionResultsPanel({ C, data, onClose }) {
           </div>
         )}
 
-        {((tab==='lb'&&!hasLb)||(tab==='clan'&&!hasClan))&&(
+        {!hasLb&&!hasClan&&(
           <div style={{textAlign:'center',color:C.sub,fontSize:13,padding:'30px 0'}}>هنوز فعالیتی در این منطقه ثبت نشده</div>
+        )}
+
+        {/* نقطه‌های صفحه (اندیکاتور) */}
+        {multi&&(
+          <div style={{display:'flex',justifyContent:'center',gap:6,marginTop:18}}>
+            {pages.map((_,i)=>(
+              <span key={i} onClick={()=>setIdx(i)} style={{width:i===idx?20:7,height:7,borderRadius:99,background:i===idx?C.accent:C.border,transition:'.2s',cursor:'pointer'}}/>
+            ))}
+          </div>
         )}
       </div>
     </div>
