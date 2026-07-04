@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { PALETTES, PALETTE_ORDER, DEFAULT_PALETTE, DEFAULT_MODE, buildC, loadPrefs, savePalette, saveMode } from './palettes'
 import AuthGate from './AuthGate'
+import { LEVELS, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile } from './gameSystem'
 
 const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
 const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
@@ -21,23 +22,7 @@ const XP_CONFIG = {
   checkin:20, checkin_top:30, checkin_first:50, streak_bonus:10, event_bonus:40,
 }
 
-const LEVELS = [
-  { level:1, name:'تازه‌وارد',  minXP:0,    icon:'🌱', color:'#8BC34A' },
-  { level:2, name:'کافه‌رو',    minXP:100,  icon:'☕', color:'#FF9800' },
-  { level:3, name:'کاشف',      minXP:300,  icon:'🔍', color:'#2196F3' },
-  { level:4, name:'ماجراجو',   minXP:600,  icon:'⚡', color:'#9C27B0' },
-  { level:5, name:'اسطوره',    minXP:1000, icon:'🏆', color:'#FF5722' },
-  { level:6, name:'افسانه‌ای', minXP:2000, icon:'👑', color:'#FFD700' },
-]
-
-function getLevelInfo(xp) {
-  let current = LEVELS[0], next = LEVELS[1]
-  for (let i=0;i<LEVELS.length;i++) {
-    if (xp>=LEVELS[i].minXP) { current=LEVELS[i]; next=LEVELS[i+1]||null }
-  }
-  const progress = next ? ((xp-current.minXP)/(next.minXP-current.minXP))*100 : 100
-  return { current, next, progress: Math.min(progress,100) }
-}
+// LEVELS و getLevelInfo حالا از gameSystem.js میان (منبع واحد) — تعریف محلی حذف شد
 
 const MISSIONS = [
   { id:'m1',icon:'☕',title:'اولین قدم',     desc:'اولین چک‌این خود را ثبت کن',          xp:50,  total:1, done:0, type:'daily'  },
@@ -207,6 +192,17 @@ function TwinLand({ session, onLogout }) {
       .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin) } }).catch(()=>{})
     fetch(SB_URL+'/rest/v1/checkins?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
       .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setCheckedIn(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
+  },[session])
+
+  // realtime: با هر تغییر XP در دیتابیس، مقادیر محلی فوراً سینک شن (بدون رفرش)
+  useEffect(()=>{
+    if(!session||!session.user||!session.user.id) return
+    const unsub = subscribeToProfile(session.user.id,(rec)=>{
+      if(rec.xp!=null) setXp(rec.xp)
+      if(rec.streak!=null) setStreak(rec.streak)
+      if(rec.coins!=null) setCoins(rec.coins)
+    })
+    return ()=>unsub()
   },[session])
 
   // اگه بعد از ۲ ثانیه هنوز کافه‌ای نیومد، mock رو بذار
@@ -781,6 +777,16 @@ function TwinLand({ session, onLogout }) {
 
 // ── DASHBOARD TAB ─────────────────────────────────────────────────────────────
 function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,checkedIn,xp,levelInfo,streak,setShowXP}) {
+  const [topPlayers,setTopPlayers]=useState([])
+  useEffect(()=>{
+    const sess=getSession()
+    let alive=true
+    const load=()=>fetchLeaderboard(sess).then(list=>{ if(alive) setTopPlayers(list.slice(0,3)) })
+    load()
+    const unsub=subscribeToProfile(sess?.user?.id,()=>load())
+    return ()=>{ alive=false; unsub() }
+  },[])
+  const medals={1:'🥇',2:'🥈',3:'🥉'}
   return <div>
     <div style={{margin:'14px 12px 0',background:'linear-gradient(135deg,'+levelInfo.current.color+'22,'+levelInfo.current.color+'08)',border:'1.5px solid '+levelInfo.current.color+'33',borderRadius:18,padding:'14px',cursor:'pointer'}} onClick={()=>setShowXP(true)}>
       <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -837,11 +843,11 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
     </div>
     <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)',paddingBottom:24}}>
       <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>برترین‌ها</div>
-      {[{r:'🥇',n:'کاشف_دانی',x:1240},{r:'🥈',n:'قهوه‌باز',x:980},{r:'🥉',n:'تهران‌گرد',x:840}].map(p=>(
-        <div key={p.n} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid '+C.border}}>
-          <span style={{fontSize:18}}>{p.r}</span>
-          <div style={{flex:1}}><div style={{fontSize:12,color:C.text,fontWeight:700}}>{p.n}</div></div>
-          <div style={{fontSize:12,color:C.accent,fontWeight:800}}>{p.x} XP</div>
+      {topPlayers.map(p=>(
+        <div key={p.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid '+C.border}}>
+          <span style={{fontSize:18}}>{medals[p.rank]}</span>
+          <div style={{flex:1}}><div style={{fontSize:12,color:C.text,fontWeight:700,display:'flex',alignItems:'center',gap:5}}>{p.name}{p.me&&<span style={{fontSize:8,background:C.accent,color:'#fff',borderRadius:99,padding:'0 6px'}}>تو</span>}</div></div>
+          <div style={{fontSize:12,color:C.accent,fontWeight:800}}>{p.xp.toLocaleString('fa')} XP</div>
         </div>
       ))}
     </div>
@@ -892,29 +898,31 @@ function MissionsTab({C,checkedIn,showToast}) {
   </div>
 }
 
-// ── RANK TAB (خلاصه — نسخه کامل در /leaderboard) ───────────────────────────────
-const RANK_PREVIEW = [
-  { id:1, name:'سارا', avatar:'🦊', xp:1840 },
-  { id:2, name:'نیما', avatar:'🐧', xp:1620 },
-  { id:3, name:'دانی', avatar:'☕', xp:920, me:true },
-  { id:4, name:'مهسا', avatar:'🐱', xp:880 },
-  { id:5, name:'رضا',  avatar:'🦁', xp:760 },
-]
+// ── RANK TAB (خلاصه — داده واقعی از gameSystem، نسخه کامل در /leaderboard) ──────
 function RankTab({C}) {
   const medals={1:'🥇',2:'🥈',3:'🥉'}
+  const [rows,setRows]=useState([])
+  useEffect(()=>{
+    const sess=getSession()
+    let alive=true
+    const load=()=>fetchLeaderboard(sess).then(list=>{ if(alive) setRows(list.slice(0,5)) })
+    load()
+    const unsub=subscribeToProfile(sess?.user?.id,()=>load())
+    return ()=>{ alive=false; unsub() }
+  },[])
   return <div style={{padding:'12px 12px 32px'}}>
     <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>برترین‌های این هفته 🏆</div>
     <div style={{fontSize:11,color:C.sub,marginBottom:14}}>رتبه خودت رو بین بقیه ببین</div>
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
-      {RANK_PREVIEW.map((p,i)=>{
-        const rank=i+1
+      {rows.map((p)=>{
+        const rank=p.rank
         return <div key={p.id} style={{display:'flex',alignItems:'center',gap:12,background:p.me?C.accentL:C.card,border:p.me?'2px solid '+C.accent:'1px solid '+C.border,borderRadius:14,padding:'10px 12px'}}>
-          <div style={{width:24,textAlign:'center',fontSize:rank<=3?18:14,fontWeight:800,color:rank<=3?C.text:C.sub}}>{medals[rank]||rank}</div>
+          <div style={{width:24,textAlign:'center',fontSize:rank<=3?18:14,fontWeight:800,color:rank<=3?C.text:C.sub}}>{medals[rank]||rank.toLocaleString('fa')}</div>
           <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+C.accent+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{p.avatar}</div>
           <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.name}{p.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.name}{p.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}{p.sample&&<span style={{fontSize:9,background:C.chip,color:C.sub,border:'1px solid '+C.border,borderRadius:99,padding:'1px 6px'}}>نمونه</span>}</div>
           </div>
-          <div style={{fontSize:12,fontWeight:800,color:C.accent}}>{p.xp} XP</div>
+          <div style={{fontSize:12,fontWeight:800,color:C.accent}}>{p.xp.toLocaleString('fa')} XP</div>
         </div>
       })}
     </div>
