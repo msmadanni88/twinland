@@ -129,6 +129,14 @@ function TwinLand({ session, onLogout }) {
   const [vw,         setVw]         = useState(800)
   const [boundaryMode, setBoundaryMode] = useState('off') // 'off' | 'province' | 'district'
   const [showBoundary, setShowBoundary] = useState(false)
+  // ── فیلتر منطقه‌ای ──
+  const [selectedRegions, setSelectedRegions] = useState([])   // نام مناطق انتخاب‌شده روی نقشه
+  const [showRegionFilter, setShowRegionFilter] = useState(false) // پاپ‌آپ فیلتر
+  const [regionFilter, setRegionFilter] = useState({            // انتخاب‌های کاربر در پاپ‌آپ
+    categories: ['cafe','restaurant'], showClans:false, showLeaderboard:false, showHeatmap:false,
+  })
+  const [filterApplied, setFilterApplied] = useState(false)
+  const regionLayersRef = useRef({})   // نگاشت نام منطقه → لایه Leaflet (برای زوم)
   const [paletteKey, setPaletteKey] = useState(DEFAULT_PALETTE)
   const [themeMode,  setThemeMode]  = useState(DEFAULT_MODE)
   const [showPalette, setShowPalette] = useState(false)
@@ -339,7 +347,19 @@ function TwinLand({ session, onLogout }) {
 
   const filtered=cafes.filter(c=>{
     const zOk=zone==='all'||c.zone===zone||(zone==='top'&&c.is_top)
-    const sOk=!search||c.name.includes(search); return zOk&&sOk
+    const sOk=!search||c.name.includes(search)
+    // فیلتر منطقه‌ای اعمال‌شده
+    let rOk=true
+    if(filterApplied && selectedRegions.length){
+      // تطبیق منطقه: district کافه مثل «منطقه ۱ / زعفرانیه» — با نام منطقه انتخابی چک کن
+      const inRegion=selectedRegions.some(rn=>{
+        const d=c.district||''
+        return d.includes(rn)||d.includes(rn.replace('منطقه ',''))||('منطقه '+rn)===d.split(' / ')[0]
+      })
+      const catOk=!regionFilter.categories.length || regionFilter.categories.includes(c.category||'cafe')
+      rOk=inRegion&&catOk
+    }
+    return zOk&&sOk&&rOk
   })
 
   useEffect(()=>{
@@ -348,7 +368,36 @@ function TwinLand({ session, onLogout }) {
       const show=filtered.find(c=>c.id===id)
       try{ if(show){if(!mapInst.current.hasLayer(mk))mk.addTo(mapInst.current)} else mapInst.current.removeLayer(mk) }catch(e){}
     })
-  },[zone,search,mapReady,filtered])
+  },[zone,search,mapReady,filtered,filterApplied,selectedRegions,regionFilter])
+
+  // اعمال فیلتر منطقه: زوم روی مناطق انتخابی + محو بقیه
+  function applyRegionFilter(){
+    setFilterApplied(true)
+    setShowRegionFilter(false)
+    const L=window.L
+    if(L&&mapInst.current&&selectedRegions.length){
+      // محو کردن مناطق انتخاب‌نشده، پررنگ‌کردن انتخابی‌ها، و زوم
+      let bounds=null
+      Object.entries(regionLayersRef.current).forEach(([name,lyr])=>{
+        const on=selectedRegions.includes(name)
+        try{
+          lyr.setStyle(on
+            ?{color:'#000',weight:2.5,fillColor:'#000',fillOpacity:0.12,opacity:0.95}
+            :{color:'#8E8E93',weight:0.5,fillColor:'#8E8E93',fillOpacity:0,opacity:0.15})
+          if(on){ const b=lyr.getBounds?.(); if(b){ bounds=bounds?bounds.extend(b):b } }
+        }catch(e){}
+      })
+      if(bounds) mapInst.current.flyToBounds(bounds,{padding:[40,40],maxZoom:15})
+    }
+    showToast('✅ فیلتر اعمال شد')
+  }
+  function clearRegionFilter(){
+    setFilterApplied(false); setSelectedRegions([]); setShowRegionFilter(false)
+    Object.values(regionLayersRef.current).forEach(lyr=>{
+      try{ lyr.setStyle({color:'#8E8E93',weight:1.3,fillColor:'#8E8E93',fillOpacity:0,opacity:0.5}) }catch(e){}
+    })
+    const c=CITIES[city]; if(mapInst.current&&c) mapInst.current.flyTo([c.lat,c.lng],c.zoom)
+  }
 
   function panMap(x,y){ mapInst.current?.panBy([x,y],{animate:true}) }
   function goZone(z){
@@ -377,17 +426,23 @@ function TwinLand({ session, onLogout }) {
     const render=(data)=>{
       if(cancelled||!mapInst.current) return
       const regionState={}
+      regionLayersRef.current={}
       const layer=L.geoJSON(data,{
         style:()=>styleFor(0),
         onEachFeature:(feature,lyr)=>{
           const name=feature.properties.name||'—'
           regionState[name]=0
+          regionLayersRef.current[name]=lyr
           lyr.bindTooltip(name,{sticky:true,direction:'top',className:'boundary-tip'})
           lyr.on('click',(e)=>{
             L.DomEvent.stopPropagation(e)
             regionState[name]=regionState[name]?0:1
             lyr.setStyle(styleFor(regionState[name]))
-            showToast(regionState[name]>0?'⬛ '+name:'⬜ '+name+' خاموش شد')
+            // به‌روزرسانی state ری‌اکت برای نمایش دکمه فیلتر
+            setSelectedRegions(prev=>{
+              if(regionState[name]>0) return prev.includes(name)?prev:[...prev,name]
+              return prev.filter(n=>n!==name)
+            })
           })
         }
       })
@@ -549,6 +604,34 @@ function TwinLand({ session, onLogout }) {
         {/* MAP */}
         <div style={{position:'absolute',inset:0,zIndex:1}}>
           <div ref={mapRef} style={{position:'absolute',inset:0,zIndex:1,isolation:'isolate'}}/>
+
+          {/* دکمه فیلتر منطقه — وقتی حداقل یک منطقه انتخاب شده */}
+          {selectedRegions.length>0 && !showRegionFilter && (
+            <button onClick={()=>setShowRegionFilter(true)}
+              style={{position:'absolute',top:14,left:14,zIndex:20,display:'flex',alignItems:'center',gap:8,
+                background:C.accent,color:'#fff',border:'none',borderRadius:99,padding:'11px 18px',
+                fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer',
+                boxShadow:'0 6px 20px '+C.accent+'66'}}>
+              <span style={{fontSize:16}}>⚙️</span>
+              فیلتر {selectedRegions.length.toLocaleString('fa')} منطقه
+            </button>
+          )}
+          {filterApplied && (
+            <button onClick={clearRegionFilter}
+              style={{position:'absolute',top:14,right:14,zIndex:20,background:C.card,color:C.text,
+                border:'1px solid '+C.border,borderRadius:99,padding:'9px 15px',fontSize:12.5,fontWeight:700,
+                fontFamily:'inherit',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,.12)'}}>
+              ✕ پاک کردن فیلتر
+            </button>
+          )}
+
+          {/* پاپ‌آپ فیلتر حرفه‌ای */}
+          {showRegionFilter && (
+            <RegionFilterPopup
+              C={C} regions={selectedRegions} value={regionFilter} setValue={setRegionFilter}
+              onApply={applyRegionFilter} onClose={()=>setShowRegionFilter(false)}
+            />
+          )}
 
           {mapMode==='dark'&&<div style={{position:'absolute',inset:0,pointerEvents:'none',background:'rgba(4,8,28,.72)',zIndex:2}}/>}
 
@@ -776,6 +859,78 @@ function TwinLand({ session, onLogout }) {
 }
 
 // ── DASHBOARD TAB ─────────────────────────────────────────────────────────────
+// ── پاپ‌آپ فیلتر منطقه‌ای ──────────────────────────────────────────────────────
+const CATEGORY_OPTIONS = [
+  { key:'cafe',       icon:'☕', label:'کافه' },
+  { key:'restaurant', icon:'🍽️', label:'رستوران' },
+  { key:'beauty',     icon:'💇', label:'سالن زیبایی', soon:true },
+  { key:'gym',        icon:'🏋️', label:'باشگاه', soon:true },
+  { key:'academy',    icon:'📚', label:'آموزشگاه', soon:true },
+  { key:'flower',     icon:'🌷', label:'گل‌فروشی', soon:true },
+]
+const REGION_VIEW_OPTIONS = [
+  { key:'showClans',       icon:'🛡️', label:'کلن‌های فعال منطقه' },
+  { key:'showLeaderboard', icon:'🏆', label:'لیدربورد منطقه' },
+  { key:'showHeatmap',     icon:'🔥', label:'Heatmap منطقه' },
+]
+function RegionFilterPopup({ C, regions, value, setValue, onApply, onClose }) {
+  const toggleCat=(k)=>setValue(v=>({...v, categories: v.categories.includes(k)?v.categories.filter(x=>x!==k):[...v.categories,k]}))
+  const toggleView=(k)=>setValue(v=>({...v, [k]: !v[k]}))
+  return (
+    <div onClick={onClose} style={{position:'absolute',inset:0,zIndex:40,background:'rgba(0,0,0,.45)',backdropFilter:'blur(3px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:C.bg,borderRadius:'24px 24px 0 0',padding:'20px 18px 28px',maxHeight:'82%',overflowY:'auto',boxShadow:'0 -8px 40px rgba(0,0,0,.3)'}}>
+        <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 16px'}}/>
+        <div style={{fontSize:18,fontWeight:800,color:C.text,marginBottom:4}}>فیلتر منطقه</div>
+        <div style={{fontSize:12,color:C.sub,marginBottom:18}}>{regions.join('، ')}</div>
+
+        <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:10}}>روی نقشه چی ببینم؟</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:20}}>
+          {CATEGORY_OPTIONS.map(o=>{
+            const on=value.categories.includes(o.key)
+            return (
+              <button key={o.key} disabled={o.soon} onClick={()=>toggleCat(o.key)}
+                style={{display:'flex',alignItems:'center',gap:8,padding:'12px 14px',borderRadius:14,
+                  border:'2px solid '+(on?C.accent:C.border),background:on?C.accentL:C.card,
+                  color:o.soon?C.sub:C.text,fontSize:13.5,fontWeight:700,fontFamily:'inherit',
+                  cursor:o.soon?'default':'pointer',opacity:o.soon?0.55:1,textAlign:'right'}}>
+                <span style={{fontSize:18}}>{o.icon}</span>
+                <span style={{flex:1}}>{o.label}</span>
+                {o.soon&&<span style={{fontSize:9,background:C.chip,color:C.sub,borderRadius:99,padding:'2px 6px'}}>به‌زودی</span>}
+                {on&&!o.soon&&<span style={{color:C.accent,fontWeight:800}}>✓</span>}
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:10}}>اطلاعات منطقه</div>
+        <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:24}}>
+          {REGION_VIEW_OPTIONS.map(o=>{
+            const on=value[o.key]
+            return (
+              <button key={o.key} onClick={()=>toggleView(o.key)}
+                style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderRadius:14,
+                  border:'2px solid '+(on?C.accent:C.border),background:on?C.accentL:C.card,
+                  color:C.text,fontSize:13.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',textAlign:'right'}}>
+                <span style={{fontSize:18}}>{o.icon}</span>
+                <span style={{flex:1}}>{o.label}</span>
+                <span style={{width:38,height:22,borderRadius:99,background:on?C.accent:C.chip,position:'relative',transition:'.2s',flexShrink:0}}>
+                  <span style={{position:'absolute',top:2,left:on?18:2,width:18,height:18,borderRadius:'50%',background:'#fff',transition:'.2s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <button onClick={onApply}
+          style={{width:'100%',padding:15,borderRadius:14,border:'none',background:C.accent,color:'#fff',
+            fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer',boxShadow:'0 6px 20px '+C.accent+'55'}}>
+          نمایش نتایج
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,checkedIn,xp,levelInfo,streak,setShowXP}) {
   const [topPlayers,setTopPlayers]=useState([])
   useEffect(()=>{
