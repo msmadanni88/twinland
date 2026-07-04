@@ -161,6 +161,7 @@ function TwinLand({ session, onLogout }) {
   const [mapMode,    setMapMode]    = useState('normal')
   const [zone,       setZone]       = useState('all')
   const [search,     setSearch]     = useState('')
+  const logoTapRef = useRef({count:0,timer:null})
   const [selCafe,    setSelCafe]    = useState(null)
   const [tab,        setTab]        = useState('map')
   const [panelOpen,  setPanelOpen]  = useState(false)
@@ -431,7 +432,8 @@ function TwinLand({ session, onLogout }) {
         mk=L.circleMarker([cafe.lat,cafe.lng],{
           radius:mapDisplay.dotSize||8,
           fillColor:isChecked?C.green:mapDisplay.dotColor||'#3b82f6',
-          color:'#fff',weight:1.5,fillOpacity:0.9,
+          color:(mapDisplay.dotColor==='#ffffff'||mapDisplay.dotColor==='#9ca3af')?'#374151':'#fff',
+          weight:1.5,fillOpacity:0.9,
         })
       }else{
         // حالت پین (default) — آیکون کامل فنجان
@@ -559,6 +561,51 @@ function TwinLand({ session, onLogout }) {
   }
 
   function panMap(x,y){ mapInst.current?.panBy([x,y],{animate:true}) }
+
+  // تپ روی لوگو: ۱ بار = صفحه اصلی، ۳ بار = XP مخفی (فقط یک‌بار برای هر کاربر)
+  async function onLogoTap(){
+    const t=logoTapRef.current
+    t.count++
+    clearTimeout(t.timer)
+    if(t.count>=3){
+      t.count=0
+      claimSecretXP()
+      return
+    }
+    t.timer=setTimeout(()=>{
+      if(t.count===1){
+        // یک تپ: برو صفحه اصلی (بستن پنل‌ها و رفتن به نمای نقشه)
+        setPanelOpen(false); setTab('map')
+        const c=CITIES[city]; if(mapInst.current&&c) mapInst.current.flyTo([c.lat,c.lng],c.zoom)
+      }
+      t.count=0
+    },450)
+  }
+
+  async function claimSecretXP(){
+    const s=getSession(); const token=s&&s.access_token; const uid=s&&s.user&&s.user.id
+    if(!uid){ return }
+    try{
+      // چک کن قبلاً گرفته یا نه (badge زرنگ)
+      const has=await fetch(SB_URL+'/rest/v1/awards?user_id=eq.'+uid+'&code=eq.zerang&select=code',
+        {headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(token||SB_KEY)}}).then(r=>r.json())
+      if(Array.isArray(has)&&has.length>0){ showToast('🎁 قبلاً جایزه‌ی زرنگ رو گرفتی!'); return }
+      // ثبت badge و XP از طریق منبع واحد
+      await fetch(SB_URL+'/rest/v1/awards',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(token||SB_KEY),'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({user_id:uid,kind:'badge',code:'zerang',title:'زرنگ',icon:'🧠'})
+      })
+      const res=await fetch(SB_URL+'/rest/v1/rpc/award_xp',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(token||SB_KEY),'Content-Type':'application/json'},
+        body:JSON.stringify({p_user:uid,p_amount:100,p_reason:'secret_zerang',p_ref:null})
+      }).then(r=>r.json())
+      const row=Array.isArray(res)?res[0]:res
+      if(row&&row.new_xp!=null) setXp(row.new_xp)
+      showToast('🧠 آفرین زرنگ! ۱۰۰ XP گرفتی!')
+    }catch(e){ showToast('یه مشکلی پیش اومد') }
+  }
   function goZone(z){
     setZone(z.key)
     if(z.lat&&mapInst.current) mapInst.current.flyTo([z.lat,z.lng],13)
@@ -706,6 +753,7 @@ function TwinLand({ session, onLogout }) {
         @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
         @keyframes xpFloat{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1;transform:translateY(-44px) scale(1.2)}100%{opacity:0;transform:translateY(-70px) scale(.9)}}
         @keyframes shimmer{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
+        @keyframes ledScroll{from{transform:translateX(-50%)}to{transform:translateX(0)}}
         .xp-float{animation:xpFloat 1.8s ease forwards}
         .mission-bar{transition:width .8s ease}
         .boundary-tip{background:rgba(28,28,30,.88)!important;color:#fff!important;border:none!important;border-radius:8px!important;font-family:'Vazirmatn',sans-serif!important;font-size:11px!important;font-weight:600!important;padding:4px 9px!important;box-shadow:0 2px 10px rgba(0,0,0,.25)!important}
@@ -715,7 +763,7 @@ function TwinLand({ session, onLogout }) {
       {/* TOPBAR */}
       <div style={{height:TH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',borderBottom:'1px solid '+C.border,padding:'0 12px',display:'flex',alignItems:'center',gap:8,zIndex:300,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
         <button onClick={()=>setShowMenu(v=>!v)} style={{background:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>☰</button>
-        <img src="/twinland_logo.webp" alt="TwinLand" style={{height:isMobile?32:38,width:'auto',flexShrink:0,objectFit:'contain',display:'block'}}/>
+        <img src="/twinland_logo.webp" alt="TwinLand" onClick={onLogoTap} style={{height:isMobile?32:38,width:'auto',flexShrink:0,objectFit:'contain',display:'block',cursor:'pointer'}}/>
 
         {!isMobile&&(
           <button onClick={()=>setShowXP(true)} style={{flex:1,background:C.chip,border:'1.5px solid '+C.border,borderRadius:10,padding:'5px 10px',display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
@@ -753,8 +801,14 @@ function TwinLand({ session, onLogout }) {
           <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'8px 17px',fontSize:13.5,fontWeight:zone===z.key?800:600,color:zone===z.key?'white':C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
         ))}
         <div style={{width:1,height:24,background:C.border,flexShrink:0,margin:'0 2px'}}/>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 جستجو..."
-          style={{background:search?C.accentL:'transparent',border:'1.5px solid '+(search?C.accent:'transparent'),borderRadius:99,padding:'6px 14px',fontSize:12.5,fontFamily:'inherit',color:C.text,width:120,flexShrink:0,transition:'all .2s'}}/>
+        <div style={{position:'relative',display:'flex',alignItems:'center',flexShrink:0}}>
+          <span style={{position:'absolute',right:12,fontSize:13,pointerEvents:'none',opacity:0.6}}>🔍</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="جستجوی کافه..."
+            style={{background:search?C.accentL:C.chip,border:'1.5px solid '+(search?C.accent:'transparent'),borderRadius:99,padding:'8px 34px 8px 30px',fontSize:12.5,fontFamily:'inherit',color:C.text,width:search?170:140,flexShrink:0,transition:'all .25s',outline:'none'}}/>
+          {search&&(
+            <button onClick={()=>setSearch('')} style={{position:'absolute',left:8,background:C.border,border:'none',borderRadius:'50%',width:18,height:18,fontSize:11,color:C.text,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>✕</button>
+          )}
+        </div>
       </div>
 
       {/* BODY */}
@@ -895,6 +949,29 @@ function TwinLand({ session, onLogout }) {
             </div>
           </>
         )}
+      </div>
+
+      {/* LED AD BAR — نوار تبلیغاتی باریک (تستی) */}
+      <div style={{height:26,flexShrink:0,overflow:'hidden',position:'relative',background:'linear-gradient(90deg,#0a0a12,#141426,#0a0a12)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'center'}}>
+        <div style={{position:'absolute',whiteSpace:'nowrap',animation:'ledScroll 22s linear infinite',fontSize:12,fontWeight:700,letterSpacing:.3,display:'flex',alignItems:'center',gap:40}}>
+          {[
+            {t:'☕ کافه روستا فرشته — قهوه‌ی امروز نصف‌قیمت!',c:'#ffd60a'},
+            {t:'🔥 چالش این هفته: ۵ کافه‌ی جدید = ۳۰۰ XP',c:'#ff453a'},
+            {t:'🎁 اینجا می‌تونه تبلیغ کافه‌ی شما باشه — twinland.ir',c:'#30d158'},
+            {t:'🏆 رقابت کلن‌های تهران داغه! کلنت رو بساز',c:'#0a84ff'},
+          ].map((ad,i)=>(
+            <span key={i} style={{color:ad.c}}>{ad.t}</span>
+          ))}
+          {/* تکرار برای پیوستگی */}
+          {[
+            {t:'☕ کافه روستا فرشته — قهوه‌ی امروز نصف‌قیمت!',c:'#ffd60a'},
+            {t:'🔥 چالش این هفته: ۵ کافه‌ی جدید = ۳۰۰ XP',c:'#ff453a'},
+            {t:'🎁 اینجا می‌تونه تبلیغ کافه‌ی شما باشه — twinland.ir',c:'#30d158'},
+            {t:'🏆 رقابت کلن‌های تهران داغه! کلنت رو بساز',c:'#0a84ff'},
+          ].map((ad,i)=>(
+            <span key={'r'+i} style={{color:ad.c}}>{ad.t}</span>
+          ))}
+        </div>
       </div>
 
       {/* BOTTOM NAV */}
@@ -1225,7 +1302,7 @@ function MapSettingsPopup({ C, value, setValue, onClose }) {
       </div>
     </div>
   )
-  const dotColors=['#3b82f6','#ef4444','#10b981','#f97316','#8b5cf6','#ec4899','#eab308']
+  const dotColors=['#3b82f6','#ef4444','#10b981','#f97316','#8b5cf6','#ec4899','#eab308','#14b8a6','#f43f5e','#6366f1','#000000','#ffffff','#9ca3af','#6b7280','#78350f']
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:3100,background:'rgba(0,0,0,.4)',backdropFilter:'blur(3px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
       <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:C.bg,borderRadius:'24px 24px 0 0',padding:'20px 18px 28px',maxHeight:'85%',overflowY:'auto',direction:'rtl'}}>
