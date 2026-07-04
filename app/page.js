@@ -24,6 +24,37 @@ const XP_CONFIG = {
 
 // LEVELS و getLevelInfo حالا از gameSystem.js میان (منبع واحد) — تعریف محلی حذف شد
 
+// تبدیل ارقام فارسی/عربی به لاتین و استخراج فقط عددها (برای تطبیق نام منطقه)
+function digitsOnly(s){
+  if(!s) return ''
+  const map={'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9','٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'}
+  return String(s).replace(/[۰-۹٠-٩]/g,d=>map[d]||d).replace(/[^0-9]/g,'')
+}
+
+// نقطه داخل چندضلعی؟ (ray-casting). ring آرایه‌ای از [lng,lat] یا {lat,lng}
+function pointInRing(lat,lng,ring){
+  let inside=false
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const yi=ring[i].lat, xi=ring[i].lng, yj=ring[j].lat, xj=ring[j].lng
+    const intersect=((yi>lat)!==(yj>lat)) && (lng < (xj-xi)*(lat-yi)/(yj-yi)+xi)
+    if(intersect) inside=!inside
+  }
+  return inside
+}
+// کافه داخل یک لایه‌ی Leaflet (polygon/multipolygon)؟
+function cafeInLayer(lat,lng,lyr){
+  try{
+    const gj=lyr.toGeoJSON()
+    const geom=gj.geometry
+    const polys = geom.type==='Polygon' ? [geom.coordinates] : geom.type==='MultiPolygon' ? geom.coordinates : []
+    for(const poly of polys){
+      const outer=poly[0].map(c=>({lng:c[0],lat:c[1]}))
+      if(pointInRing(lat,lng,outer)) return true
+    }
+  }catch(e){}
+  return false
+}
+
 const MISSIONS = [
   { id:'m1',icon:'☕',title:'اولین قدم',     desc:'اولین چک‌این خود را ثبت کن',          xp:50,  total:1, done:0, type:'daily'  },
   { id:'m2',icon:'🔥',title:'استریک ۳ روزه', desc:'۳ روز پشت‌هم چک‌این کن',              xp:80,  total:3, done:2, type:'streak' },
@@ -351,11 +382,16 @@ function TwinLand({ session, onLogout }) {
     // فیلتر منطقه‌ای اعمال‌شده
     let rOk=true
     if(filterApplied && selectedRegions.length){
-      // تطبیق منطقه: district کافه مثل «منطقه ۱ / زعفرانیه» — با نام منطقه انتخابی چک کن
-      const inRegion=selectedRegions.some(rn=>{
-        const d=c.district||''
-        return d.includes(rn)||d.includes(rn.replace('منطقه ',''))||('منطقه '+rn)===d.split(' / ')[0]
-      })
+      // تشخیص منطقه از روی مختصات GPS کافه (نقطه داخل چندضلعی منطقه)
+      // این برای همه‌ی کافه‌ها کار می‌کنه، حتی اونایی که district ندارن، و برای هر ۲۲ منطقه
+      const lat=Number(c.lat), lng=Number(c.lng)
+      let inRegion=false
+      if(!isNaN(lat)&&!isNaN(lng)){
+        inRegion=selectedRegions.some(rn=>{
+          const lyr=regionLayersRef.current[rn]
+          return lyr && cafeInLayer(lat,lng,lyr)
+        })
+      }
       const catOk=!regionFilter.categories.length || regionFilter.categories.includes(c.category||'cafe')
       rOk=inRegion&&catOk
     }
@@ -605,24 +641,27 @@ function TwinLand({ session, onLogout }) {
         <div style={{position:'absolute',inset:0,zIndex:1}}>
           <div ref={mapRef} style={{position:'absolute',inset:0,zIndex:1,isolation:'isolate'}}/>
 
-          {/* دکمه فیلتر منطقه — وقتی حداقل یک منطقه انتخاب شده */}
+          {/* دکمه فیلتر منطقه — ظاهر شیشه‌ای هم‌سبک نوار آمار */}
           {selectedRegions.length>0 && !showRegionFilter && (
-            <button onClick={()=>setShowRegionFilter(true)}
-              style={{position:'absolute',top:14,left:14,zIndex:20,display:'flex',alignItems:'center',gap:8,
-                background:C.accent,color:'#fff',border:'none',borderRadius:99,padding:'11px 18px',
-                fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer',
-                boxShadow:'0 6px 20px '+C.accent+'66'}}>
-              <span style={{fontSize:16}}>⚙️</span>
-              فیلتر {selectedRegions.length.toLocaleString('fa')} منطقه
-            </button>
-          )}
-          {filterApplied && (
-            <button onClick={clearRegionFilter}
-              style={{position:'absolute',top:14,right:14,zIndex:20,background:C.card,color:C.text,
-                border:'1px solid '+C.border,borderRadius:99,padding:'9px 15px',fontSize:12.5,fontWeight:700,
-                fontFamily:'inherit',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,.12)'}}>
-              ✕ پاک کردن فیلتر
-            </button>
+            <div style={{position:'absolute',top:14,left:14,zIndex:20,display:'flex',flexDirection:'column',gap:8,alignItems:'flex-start'}}>
+              <button onClick={()=>setShowRegionFilter(true)}
+                style={{display:'flex',alignItems:'center',gap:7,
+                  background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                  color:C.text,border:'1px solid '+C.border,borderRadius:99,padding:'10px 18px',
+                  fontSize:13.5,fontWeight:800,fontFamily:'inherit',cursor:'pointer',
+                  boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+                فیلتر {selectedRegions.length.toLocaleString('fa')} منطقه
+              </button>
+              {filterApplied && (
+                <button onClick={clearRegionFilter}
+                  style={{background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                    color:C.text,border:'1px solid '+C.border,borderRadius:99,
+                    padding:'8px 16px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
+                    boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+                  پاک کردن فیلتر
+                </button>
+              )}
+            </div>
           )}
 
           {/* پاپ‌آپ فیلتر حرفه‌ای */}
