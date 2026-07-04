@@ -106,6 +106,30 @@ function getColor(name) {
 }
 
 // ── BOUNDARY LAYERS (استان‌ها / مناطق تهران) ───────────────────────────────────
+// شعاع خوشه‌بندی بر اساس شدت انتخابی کاربر
+function clusterRadiusOf(level){
+  return level==='off'?0 : level==='low'?30 : level==='high'?90 : 55  // medium=55
+}
+// ساخت گروه خوشه‌بندی با شعاع دلخواه
+function makeClusterGroup(L,radius){
+  return L.markerClusterGroup({
+    chunkedLoading:true,
+    maxClusterRadius:radius>0?radius:1,        // ۰ عملاً یعنی بدون خوشه
+    spiderfyOnMaxZoom:true,
+    showCoverageOnHover:false,
+    disableClusteringAtZoom:radius>0?17:1,
+    iconCreateFunction:(cluster)=>{
+      const count=cluster.getChildCount()
+      const size=count<10?38:count<100?46:56
+      const bg=count<10?'#3b82f6':count<100?'#f97316':'#ef4444'
+      return L.divIcon({
+        html:'<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+bg+';border:3px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:'+(count<100?14:12)+'px;font-family:inherit">'+count.toLocaleString('fa')+'</div>',
+        className:'',iconSize:[size,size]
+      })
+    }
+  })
+}
+
 const BOUNDARY_SOURCES = {
   province: { url:'/iran_provinces.json', label:'استان‌ها' },
   district: { url:'/tehran_districts.json', label:'مناطق تهران' },
@@ -161,6 +185,15 @@ function TwinLand({ session, onLogout }) {
   const [vw,         setVw]         = useState(800)
   const [boundaryMode, setBoundaryMode] = useState('off') // 'off' | 'province' | 'district'
   const [showBoundary, setShowBoundary] = useState(false)
+  const [showMapSettings, setShowMapSettings] = useState(false)
+  // تنظیمات نمایش نقشه (ذخیره در localStorage)
+  const [mapDisplay, setMapDisplay] = useState(()=>{
+    if(typeof window==='undefined') return {markerMode:'pin',cluster:'auto',regionCluster:'off',dotColor:'#3b82f6',dotSize:8}
+    try{ const s=JSON.parse(localStorage.getItem('tl_mapDisplay')||'{}')
+      return {markerMode:s.markerMode||'pin',cluster:s.cluster||'auto',regionCluster:s.regionCluster||'off',dotColor:s.dotColor||'#3b82f6',dotSize:s.dotSize||8}
+    }catch(e){ return {markerMode:'pin',cluster:'auto',regionCluster:'off',dotColor:'#3b82f6',dotSize:8} }
+  })
+  useEffect(()=>{ try{ localStorage.setItem('tl_mapDisplay',JSON.stringify(mapDisplay)) }catch(e){} },[mapDisplay])
   // ── فیلتر منطقه‌ای ──
   const [selectedRegions, setSelectedRegions] = useState([])   // نام مناطق انتخاب‌شده روی نقشه
   const [showRegionFilter, setShowRegionFilter] = useState(false) // پاپ‌آپ فیلتر
@@ -355,22 +388,8 @@ function TwinLand({ session, onLogout }) {
 
           // ── گروه خوشه‌بندی: پین‌های نزدیک رو جمع می‌کنه (برای مقیاس ده‌ها هزار) ──
           if(L.markerClusterGroup){
-            clusterRef.current=L.markerClusterGroup({
-              chunkedLoading:true,           // رندر تدریجی برای تعداد زیاد
-              maxClusterRadius:55,           // شعاع خوشه (پیکسل)
-              spiderfyOnMaxZoom:true,
-              showCoverageOnHover:false,
-              disableClusteringAtZoom:17,    // در زوم بالا، تک‌تک نشون بده
-              iconCreateFunction:(cluster)=>{
-                const count=cluster.getChildCount()
-                const size=count<10?38:count<100?46:56
-                const bg=count<10?'#3b82f6':count<100?'#f97316':'#ef4444'
-                return L.divIcon({
-                  html:'<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+bg+';border:3px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:'+(count<100?14:12)+'px;font-family:inherit">'+count.toLocaleString('fa')+'</div>',
-                  className:'',iconSize:[size,size]
-                })
-              }
-            })
+            const radius=clusterRadiusOf(mapDisplay.cluster==='auto'?'medium':mapDisplay.cluster)
+            clusterRef.current=makeClusterGroup(L,radius)
             m.addLayer(clusterRef.current)
           }
 
@@ -397,25 +416,62 @@ function TwinLand({ session, onLogout }) {
   useEffect(()=>{
     if(!mapReady||!cafes.length||!window.L||!mapInst.current) return
     const L=window.L
+    const mode=mapDisplay.markerMode  // 'pin' | 'dot' | 'auto'
+    // اگه حالت نمایش عوض شده، همه‌ی مارکرهای قبلی رو پاک کن و از نو بساز
+    Object.values(mksRef.current).forEach(mk=>{
+      try{ if(clusterRef.current) clusterRef.current.removeLayer(mk); else mapInst.current.removeLayer(mk) }catch(e){}
+    })
+    mksRef.current={}
+
     cafes.forEach(cafe=>{
-      if(mksRef.current[cafe.id]) return
       const color=getColor(cafe.name); const n=live[cafe.id]||0; const isChecked=checkedIn.has(cafe.id)
-      const html=`<div style="position:relative;width:44px;height:52px;cursor:pointer;filter:drop-shadow(0 4px 8px ${color}55)">
-        <div style="background:${isChecked?C.green:color};border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);width:40px;height:40px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15)">
-          <span style="transform:rotate(45deg);font-size:18px">${isChecked?'✓':'☕'}</span>
-        </div>
-        ${cafe.is_top?'<div style="position:absolute;top:-10px;right:-4px;font-size:14px">⭐</div>':''}
-        <div id="lv-${cafe.id}" style="position:absolute;top:-6px;left:-4px;background:#FF3B30;color:white;border:2px solid white;border-radius:99px;font-size:9px;font-weight:800;min-width:18px;height:18px;display:${n>0?'flex':'none'};align-items:center;justify-content:center;padding:0 3px">${n>0?n:''}</div>
-      </div>`
-      const icon=L.divIcon({html,iconSize:[44,52],iconAnchor:[22,52],className:''})
-      const mk=L.marker([cafe.lat,cafe.lng],{icon})
+      let mk
+      if(mode==='dot'){
+        // حالت نقطه: circleMarker روی canvas — خیلی سبک برای تعداد زیاد
+        mk=L.circleMarker([cafe.lat,cafe.lng],{
+          radius:mapDisplay.dotSize||8,
+          fillColor:isChecked?C.green:mapDisplay.dotColor||'#3b82f6',
+          color:'#fff',weight:1.5,fillOpacity:0.9,
+        })
+      }else{
+        // حالت پین (default) — آیکون کامل فنجان
+        const html=`<div style="position:relative;width:44px;height:52px;cursor:pointer;filter:drop-shadow(0 4px 8px ${color}55)">
+          <div style="background:${isChecked?C.green:color};border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);width:40px;height:40px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+            <span style="transform:rotate(45deg);font-size:18px">${isChecked?'✓':'☕'}</span>
+          </div>
+          ${cafe.is_top?'<div style="position:absolute;top:-10px;right:-4px;font-size:14px">⭐</div>':''}
+          <div id="lv-${cafe.id}" style="position:absolute;top:-6px;left:-4px;background:#FF3B30;color:white;border:2px solid white;border-radius:99px;font-size:9px;font-weight:800;min-width:18px;height:18px;display:${n>0?'flex':'none'};align-items:center;justify-content:center;padding:0 3px">${n>0?n:''}</div>
+        </div>`
+        const icon=L.divIcon({html,iconSize:[44,52],iconAnchor:[22,52],className:''})
+        mk=L.marker([cafe.lat,cafe.lng],{icon})
+      }
       mk.on('click',()=>setSelCafe(cafe))
-      // اگه خوشه‌بندی فعاله، به گروه اضافه کن؛ وگرنه مستقیم به نقشه
       if(clusterRef.current) clusterRef.current.addLayer(mk)
       else mk.addTo(mapInst.current)
       mksRef.current[cafe.id]=mk
     })
-  },[mapReady,cafes,checkedIn])
+  },[mapReady,cafes,checkedIn,mapDisplay.markerMode,mapDisplay.dotColor,mapDisplay.dotSize])
+
+  // بازسازی گروه خوشه‌بندی وقتی شدت cluster یا حالت فیلتر منطقه عوض شه
+  useEffect(()=>{
+    if(!mapReady||!window.L||!window.L.markerClusterGroup||!mapInst.current) return
+    const L=window.L
+    // در حالت فیلتر منطقه از regionCluster، وگرنه از cluster استفاده کن
+    const level = filterApplied
+      ? (mapDisplay.regionCluster==='auto'?'off':mapDisplay.regionCluster)
+      : (mapDisplay.cluster==='auto'?'medium':mapDisplay.cluster)
+    const radius=clusterRadiusOf(level)
+    const old=clusterRef.current
+    const next=makeClusterGroup(L,radius)
+    // مارکرهای فعلی رو به گروه جدید منتقل کن
+    const current=Object.values(mksRef.current).filter(mk=>{
+      try{ return old?old.hasLayer(mk):mapInst.current.hasLayer(mk) }catch(e){ return false }
+    })
+    if(old){ try{ mapInst.current.removeLayer(old) }catch(e){} }
+    current.forEach(mk=>next.addLayer(mk))
+    mapInst.current.addLayer(next)
+    clusterRef.current=next
+  },[mapDisplay.cluster,mapDisplay.regionCluster,filterApplied,mapReady])
 
   const filtered=cafes.filter(c=>{
     const zOk=zone==='all'||c.zone===zone||(zone==='top'&&c.is_top)
@@ -789,7 +845,7 @@ function TwinLand({ session, onLogout }) {
         {streak>=2&&<div style={{position:'absolute',top:10,left:10,zIndex:18,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
 
         {/* nav controls — بیرون از لایه‌ی نقشه. هنگام باز بودن هر پاپ‌آپ مخفی می‌شه */}
-        {!(showRegionFilter||showRegionResults||showXP||showMenu||showCity||showMode||showBoundary||showPalette||panelOpen) && (
+        {!(showRegionFilter||showRegionResults||showXP||showMenu||showCity||showMode||showBoundary||showPalette||showMapSettings||panelOpen) && (
         <div style={{position:'absolute',bottom:14,left:8,zIndex:18,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8}}>
           <div style={{overflow:'hidden',opacity:navOpen?0.7:0,maxHeight:navOpen?180:0,transform:navOpen?'translateY(0) scale(1)':'translateY(14px) scale(.85)',transformOrigin:'bottom left',pointerEvents:navOpen?'auto':'none',transition:'opacity .3s ease, max-height .34s ease, transform .34s cubic-bezier(.34,1.45,.5,1)',display:'flex',flexDirection:'column',gap:5}}>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,32px)',gap:3}}>
@@ -886,7 +942,7 @@ function TwinLand({ session, onLogout }) {
                   <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
                 </a>
               }
-              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
                 {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.label}
               </button>
             })}
@@ -944,6 +1000,9 @@ function TwinLand({ session, onLogout }) {
         </div>
       )}
 
+      {showMapSettings&&(
+        <MapSettingsPopup C={C} value={mapDisplay} setValue={setMapDisplay} onClose={()=>setShowMapSettings(false)} />
+      )}
       {showBoundary&&(
         <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowBoundary(false)}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
@@ -1148,6 +1207,54 @@ function RegionResultsPanel({ C, pages, onClose }) {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── تنظیمات نمایش نقشه ─────────────────────────────────────────────────────
+function MapSettingsPopup({ C, value, setValue, onClose }) {
+  const set=(k,v)=>setValue(prev=>({...prev,[k]:v}))
+  const Seg=({label,options,val,onPick})=>(
+    <div style={{marginBottom:18}}>
+      <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:8}}>{label}</div>
+      <div style={{display:'flex',gap:6}}>
+        {options.map(o=>(
+          <button key={o.k} onClick={()=>onPick(o.k)} style={{flex:1,padding:'9px 4px',borderRadius:11,border:'2px solid '+(val===o.k?C.accent:C.border),background:val===o.k?C.accent:C.card,color:val===o.k?'#fff':C.text,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>{o.l}</button>
+        ))}
+      </div>
+    </div>
+  )
+  const dotColors=['#3b82f6','#ef4444','#10b981','#f97316','#8b5cf6','#ec4899','#eab308']
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:3100,background:'rgba(0,0,0,.4)',backdropFilter:'blur(3px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:480,background:C.bg,borderRadius:'24px 24px 0 0',padding:'20px 18px 28px',maxHeight:'85%',overflowY:'auto',direction:'rtl'}}>
+        <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 16px'}}/>
+        <div style={{fontSize:18,fontWeight:800,color:C.text,marginBottom:16}}>نمایش نقشه</div>
+
+        <Seg label="حالت نمایش SME" val={value.markerMode} onPick={v=>set('markerMode',v)}
+          options={[{k:'pin',l:'پین'},{k:'dot',l:'نقطه'},{k:'auto',l:'خودکار'}]} />
+
+        <Seg label="خوشه‌بندی (نمای کل شهر)" val={value.cluster} onPick={v=>set('cluster',v)}
+          options={[{k:'off',l:'خاموش'},{k:'low',l:'کم'},{k:'medium',l:'متوسط'},{k:'high',l:'زیاد'}]} />
+
+        <Seg label="خوشه‌بندی هنگام فیلتر منطقه" val={value.regionCluster} onPick={v=>set('regionCluster',v)}
+          options={[{k:'off',l:'خاموش'},{k:'low',l:'کم'},{k:'medium',l:'متوسط'},{k:'high',l:'زیاد'}]} />
+
+        {value.markerMode==='dot'&&(
+          <>
+            <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:8}}>رنگ نقطه</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:18}}>
+              {dotColors.map(c=>(
+                <button key={c} onClick={()=>set('dotColor',c)} style={{width:34,height:34,borderRadius:'50%',background:c,border:value.dotColor===c?'3px solid '+C.text:'3px solid transparent',cursor:'pointer'}}/>
+              ))}
+            </div>
+            <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:8}}>اندازه نقطه: {value.dotSize.toLocaleString('fa')}</div>
+            <input type="range" min={4} max={16} value={value.dotSize} onChange={e=>set('dotSize',Number(e.target.value))} style={{width:'100%',marginBottom:18,accentColor:C.accent}}/>
+          </>
+        )}
+
+        <button onClick={onClose} style={{width:'100%',padding:14,borderRadius:14,border:'none',background:C.accent,color:'#fff',fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>تمام</button>
       </div>
     </div>
   )
