@@ -1313,70 +1313,99 @@ function MapSettingsPopup({ C, value, setValue, onClose }) {
   )
 }
 
-// ── نوار LED تبلیغاتی سبک استادیوم (افکت پیکسل RGB روی همه‌ی تبلیغات) ─────────
-// تبلیغات: هر اسلاید {type:'text'|'anim', ...}. بعداً کافه‌ها انیمیشن آپلود می‌کنن.
+// ── نوار LED تبلیغاتی سبک تابلوی LED واقعی (هر پیکسل یک نقطه‌ی نورانی) ─────────
 const LED_ADS = [
-  { type:'anim', bg:['#1a1a2e','#c1121f'], title:'کافه روستا فرشته', sub:'قهوه‌ی امروز نصف‌قیمت ☕', accent:'#ffd60a' },
-  { type:'anim', bg:['#0d1b2a','#1b998b'], title:'چالش این هفته', sub:'۵ کافه‌ی جدید = ۳۰۰ XP 🔥', accent:'#ffffff' },
-  { type:'anim', bg:['#231942','#e0aaff'], title:'جای تبلیغ شما', sub:'twinland.ir 🎁', accent:'#ffffff' },
-  { type:'anim', bg:['#03071e','#0a84ff'], title:'رقابت کلن‌های تهران', sub:'کلنت رو بساز 🏆', accent:'#ffd60a' },
+  { title:'کافه روستا فرشته', sub:'قهوه امروز نصف‌قیمت', accent:'#ffd60a' },
+  { title:'چالش این هفته', sub:'۵ کافه جدید = ۳۰۰XP', accent:'#00e5ff' },
+  { title:'جای تبلیغ شما', sub:'twinland.ir', accent:'#39ff14' },
+  { title:'رقابت کلن‌های تهران', sub:'کلنت رو بساز', accent:'#ff2d95' },
 ]
 function LedAdBar({ C }) {
   const canvasRef=useRef(null)
+  const srcRef=useRef(null)   // canvas پنهان برای رسم محتوا
   const [idx,setIdx]=useState(0)
   const idxRef=useRef(0)
-  const progRef=useRef(0)   // پیشرفت انیمیشن اسلاید فعلی (0..1)
 
-  // چرخش اسلایدها
   useEffect(()=>{
-    const t=setInterval(()=>{ idxRef.current=(idxRef.current+1)%LED_ADS.length; setIdx(idxRef.current); progRef.current=0 },4500)
+    const t=setInterval(()=>{ idxRef.current=(idxRef.current+1)%LED_ADS.length; setIdx(idxRef.current) },4500)
     return ()=>clearInterval(t)
   },[])
 
-  // رندر canvas با افکت پیکسل RGB
   useEffect(()=>{
     const cv=canvasRef.current; if(!cv) return
-    const ctx=cv.getContext('2d'); let raf
+    const ctx=cv.getContext('2d')
+    if(!srcRef.current) srcRef.current=document.createElement('canvas')
+    const src=srcRef.current; const sctx=src.getContext('2d',{willReadFrequently:true})
+    let raf, t0=performance.now(), curIdx=-1
     const dpr=Math.min(window.devicePixelRatio||1,2)
+
+    const PIX=3.2          // فاصله‌ی مرکز تا مرکز پیکسل‌ها (ریز = باکیفیت)
+    const DOT=2.3          // قطر نقطه‌ی روشن
+
     function resize(){
       const w=cv.clientWidth, h=cv.clientHeight
       cv.width=w*dpr; cv.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0)
+      // canvas منبع با رزولوشن پایین (به تعداد پیکسل‌های LED)
+      src.width=Math.ceil(w/PIX); src.height=Math.ceil(h/PIX)
     }
     resize(); window.addEventListener('resize',resize)
 
-    let t0=performance.now()
+    // رسم محتوای یک اسلاید روی canvas منبع (کوچک)
+    function renderSource(ad){
+      const sw=src.width, sh=src.height
+      sctx.clearRect(0,0,sw,sh)
+      sctx.fillStyle='#000'; sctx.fillRect(0,0,sw,sh)
+      sctx.textBaseline='middle'; sctx.direction='rtl'; sctx.textAlign='right'
+      // عنوان (بزرگ‌تر) + زیرنویس، متناسب با ارتفاع کم نوار
+      const titleSize=Math.round(sh*0.5)
+      sctx.font='800 '+titleSize+'px Estedad, sans-serif'
+      sctx.fillStyle=ad.accent
+      sctx.fillText(ad.title, sw-3, sh*0.34)
+      const subSize=Math.round(sh*0.42)
+      sctx.font='700 '+subSize+'px Estedad, sans-serif'
+      sctx.fillStyle='#ffffff'
+      sctx.fillText(ad.sub, sw-3, sh*0.74)
+    }
+
     function draw(now){
       const w=cv.clientWidth, h=cv.clientHeight
-      const ad=LED_ADS[idxRef.current]
-      const p=Math.min(1,(now-t0)/700)  // fade-in سریع
-      progRef.current=Math.min(1,progRef.current+0.004)
+      if(curIdx!==idxRef.current){ curIdx=idxRef.current; renderSource(LED_ADS[curIdx]); t0=now }
+      const fade=Math.min(1,(now-t0)/500)
 
-      // پس‌زمینه‌ی گرادیان متحرک
-      const g=ctx.createLinearGradient(0,0,w,0)
-      const shift=(Math.sin(now/1400)+1)/2
-      g.addColorStop(0,ad.bg[0]); g.addColorStop(Math.max(.35,shift),ad.bg[1]); g.addColorStop(1,ad.bg[0])
-      ctx.globalAlpha=1; ctx.fillStyle=g; ctx.fillRect(0,0,w,h)
+      // پس‌زمینه‌ی تابلو (مشکی با ته‌رنگ)
+      ctx.fillStyle='#050507'; ctx.fillRect(0,0,w,h)
 
-      // متن اسلاید — از راست وارد می‌شه (RTL)
-      const slideX=(1-easeOut(p))* 40
-      ctx.globalAlpha=p
-      ctx.textBaseline='middle'; ctx.direction='rtl'; ctx.textAlign='right'
-      ctx.font='800 13px Estedad, sans-serif'
-      ctx.fillStyle=ad.accent
-      ctx.fillText(ad.title, w-14+slideX, h/2-1)
-      const tw=ctx.measureText(ad.title).width
-      ctx.font='600 12px Estedad, sans-serif'; ctx.fillStyle='rgba(255,255,255,.92)'
-      ctx.fillText(ad.sub, w-20-tw+slideX, h/2)
+      // خواندن پیکسل‌های منبع و رسم هر کدوم به‌صورت یک LED گرد
+      const sw=src.width, sh=src.height
+      const data=sctx.getImageData(0,0,sw,sh).data
+      const scan=(now/9)%(w+80)-40   // موج نور اسکن‌کننده
 
-      // نقطه‌ی نور متحرک (مثل اسکن LED)
-      const scan=(now/12)%(w+120)-60
-      const lg=ctx.createRadialGradient(scan,h/2,0,scan,h/2,70)
-      lg.addColorStop(0,'rgba(255,255,255,.18)'); lg.addColorStop(1,'rgba(255,255,255,0)')
-      ctx.globalAlpha=1; ctx.fillStyle=lg; ctx.fillRect(0,0,w,h)
-
-      // ── افکت پیکسل RGB روی کل نوار (لایه‌ی مشبک) ──
-      drawRGBGrid(ctx,w,h)
-
+      for(let y=0;y<sh;y++){
+        for(let x=0;x<sw;x++){
+          const i=(y*sw+x)*4
+          const r=data[i], g=data[i+1], b=data[i+2]
+          const lit=(r+g+b)>40
+          const cx=x*PIX+PIX/2, cy=y*PIX+PIX/2
+          // نقطه‌ی خاموش (زمینه‌ی تابلو) — خیلی کم‌رنگ
+          if(!lit){
+            ctx.fillStyle='rgba(255,255,255,0.028)'
+            ctx.beginPath(); ctx.arc(cx,cy,DOT/2*0.7,0,6.283); ctx.fill()
+            continue
+          }
+          // درخشش اسکن روی پیکسل‌های روشن
+          const dist=Math.abs(cx-scan)
+          const glow=dist<45?(1-dist/45)*0.5:0
+          const br=Math.min(1,fade+glow*0.3)
+          ctx.globalAlpha=br
+          // هاله‌ی نور
+          ctx.fillStyle='rgba('+r+','+g+','+b+',0.28)'
+          ctx.beginPath(); ctx.arc(cx,cy,DOT*0.95,0,6.283); ctx.fill()
+          // خود LED
+          ctx.fillStyle='rgb('+Math.min(255,r+glow*90)+','+Math.min(255,g+glow*90)+','+Math.min(255,b+glow*90)+')'
+          ctx.beginPath(); ctx.arc(cx,cy,DOT/2,0,6.283); ctx.fill()
+          ctx.globalAlpha=1
+        }
+      }
       raf=requestAnimationFrame(draw)
     }
     raf=requestAnimationFrame(draw)
@@ -1384,31 +1413,15 @@ function LedAdBar({ C }) {
   },[])
 
   return (
-    <div style={{height:30,flexShrink:0,position:'relative',borderTop:'1px solid '+C.border,overflow:'hidden',background:'#000'}}>
+    <div style={{height:34,flexShrink:0,position:'relative',borderTop:'1px solid #1a1a22',overflow:'hidden',background:'#050507'}}>
       <canvas ref={canvasRef} style={{width:'100%',height:'100%',display:'block'}}/>
-      {/* نقطه‌های اندیکاتور اسلاید */}
       <div style={{position:'absolute',bottom:2,left:8,display:'flex',gap:3}}>
         {LED_ADS.map((_,i)=>(
-          <span key={i} style={{width:i===idx?10:4,height:2.5,borderRadius:2,background:i===idx?'#fff':'rgba(255,255,255,.35)',transition:'.3s'}}/>
+          <span key={i} style={{width:i===idx?10:4,height:2.5,borderRadius:2,background:i===idx?'#fff':'rgba(255,255,255,.3)',transition:'.3s'}}/>
         ))}
       </div>
     </div>
   )
-}
-function easeOut(t){ return 1-Math.pow(1-t,3) }
-// شبکه‌ی پیکسل RGB که ظاهر LED استادیوم می‌ده — روی هر محتوایی می‌شینه
-function drawRGBGrid(ctx,w,h){
-  const cell=4                    // اندازه‌ی هر پیکسل LED
-  ctx.globalAlpha=0.20
-  for(let y=0;y<h;y+=cell){
-    // خطوط افقی تیره بین ردیف‌ها
-    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,y+cell-1,w,1)
-  }
-  ctx.globalAlpha=0.13
-  for(let x=0;x<w;x+=cell){
-    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(x+cell-1,0,1,h)
-  }
-  ctx.globalAlpha=1
 }
 
 function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,checkedIn,xp,levelInfo,streak,setShowXP}) {
