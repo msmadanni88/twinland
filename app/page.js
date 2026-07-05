@@ -1313,100 +1313,113 @@ function MapSettingsPopup({ C, value, setValue, onClose }) {
   )
 }
 
-// ── نوار LED تبلیغاتی سبک تابلوی LED واقعی (هر پیکسل یک نقطه‌ی نورانی) ─────────
+// ── نوار LED سبک تابلوی واقعی: پیکسل‌های مربعی sharp + grid (بدون glow) ────────
+// ورودی هر اسلاید می‌تونه متن یا ویدیو باشه. ویدیو خودکار پیکسلی می‌شه.
 const LED_ADS = [
-  { title:'کافه روستا فرشته', sub:'قهوه امروز نصف‌قیمت', accent:'#ffd60a' },
-  { title:'چالش این هفته', sub:'۵ کافه جدید = ۳۰۰XP', accent:'#00e5ff' },
-  { title:'جای تبلیغ شما', sub:'twinland.ir', accent:'#39ff14' },
-  { title:'رقابت کلن‌های تهران', sub:'کلنت رو بساز', accent:'#ff2d95' },
+  { type:'video', src:'/ads/led-demo.mp4' },
+  { type:'text', title:'کافه روستا فرشته', sub:'قهوه امروز نصف‌قیمت', accent:'#ffd60a' },
+  { type:'text', title:'چالش این هفته', sub:'۵ کافه جدید = ۳۰۰XP', accent:'#00e5ff' },
+  { type:'text', title:'جای تبلیغ شما', sub:'twinland.ir', accent:'#39ff14' },
+  { type:'text', title:'رقابت کلن‌های تهران', sub:'کلنت رو بساز', accent:'#ff2d95' },
 ]
 function LedAdBar({ C }) {
   const canvasRef=useRef(null)
-  const srcRef=useRef(null)   // canvas پنهان برای رسم محتوا
+  const srcRef=useRef(null)
+  const videoRef=useRef(null)
   const [idx,setIdx]=useState(0)
   const idxRef=useRef(0)
 
   useEffect(()=>{
-    const t=setInterval(()=>{ idxRef.current=(idxRef.current+1)%LED_ADS.length; setIdx(idxRef.current) },4500)
-    return ()=>clearInterval(t)
+    let t
+    const schedule=()=>{
+      const cur=LED_ADS[idxRef.current]
+      const dur=cur&&cur.type==='video'?9000:4500  // ویدیو مدت بیشتر
+      t=setTimeout(()=>{ idxRef.current=(idxRef.current+1)%LED_ADS.length; setIdx(idxRef.current); schedule() },dur)
+    }
+    schedule()
+    return ()=>clearTimeout(t)
   },[])
 
   useEffect(()=>{
     const cv=canvasRef.current; if(!cv) return
     const ctx=cv.getContext('2d')
+    ctx.imageSmoothingEnabled=false            // پیکسل‌ها sharp بمونن
     if(!srcRef.current) srcRef.current=document.createElement('canvas')
     const src=srcRef.current; const sctx=src.getContext('2d',{willReadFrequently:true})
+    sctx.imageSmoothingEnabled=true
     let raf, t0=performance.now(), curIdx=-1, lastFrame=0
     const dpr=Math.min(window.devicePixelRatio||1,2)
 
-    const PIX=2.0          // فاصله‌ی مرکز پیکسل‌ها — خیلی ریز = کیفیت بالا
-    const DOT=1.5          // قطر نقطه‌ی روشن
+    const CELL=3.4        // اندازه‌ی هر خانه‌ی LED روی صفحه (px)
+    const GAP=0.7         // فاصله‌ی تیره بین خانه‌ها (خط grid)
 
     function resize(){
       const w=cv.clientWidth, h=cv.clientHeight
-      cv.width=w*dpr; cv.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0)
-      // canvas منبع با رزولوشن بالاتر برای وضوح متن
-      src.width=Math.ceil(w/PIX); src.height=Math.ceil(h/PIX)
+      cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); ctx.setTransform(dpr,0,0,dpr,0,0)
+      ctx.imageSmoothingEnabled=false
+      src.width=Math.max(1,Math.floor(w/CELL)); src.height=Math.max(1,Math.floor(h/CELL))
     }
     resize(); window.addEventListener('resize',resize)
 
-    // رسم محتوای یک اسلاید روی canvas منبع
-    function renderSource(ad){
+    function renderTextSource(ad){
       const sw=src.width, sh=src.height
-      sctx.clearRect(0,0,sw,sh)
-      sctx.fillStyle='#000'; sctx.fillRect(0,0,sw,sh)
+      sctx.clearRect(0,0,sw,sh); sctx.fillStyle='#000'; sctx.fillRect(0,0,sw,sh)
       sctx.textBaseline='middle'; sctx.direction='rtl'; sctx.textAlign='right'
-      // یک خط، بزرگ و واضح — عنوان + جداکننده + زیرنویس کنار هم
-      const fs=Math.round(sh*0.62)
+      const fs=Math.round(sh*0.6)
       sctx.font='800 '+fs+'px Estedad, sans-serif'
       sctx.fillStyle=ad.accent
-      sctx.fillText(ad.title, sw-4, sh*0.5)
+      sctx.fillText(ad.title, sw-3, sh*0.5)
       const tw=sctx.measureText(ad.title).width
       sctx.font='700 '+Math.round(sh*0.5)+'px Estedad, sans-serif'
-      sctx.fillStyle='#ffffff'
-      sctx.fillText('•  '+ad.sub, sw-tw-14, sh*0.5)
+      sctx.fillStyle='#fff'
+      sctx.fillText('· '+ad.sub, sw-tw-10, sh*0.5)
     }
 
     function draw(now){
       raf=requestAnimationFrame(draw)
-      if(now-lastFrame<33) return   // ~۳۰fps برای روانی روی موبایل
+      if(now-lastFrame<40) return   // ۲۵fps
       lastFrame=now
       const w=cv.clientWidth, h=cv.clientHeight
-      if(curIdx!==idxRef.current){ curIdx=idxRef.current; renderSource(LED_ADS[curIdx]); t0=now }
-      const fade=Math.min(1,(now-t0)/500)
+      const ad=LED_ADS[idxRef.current]
 
-      // پس‌زمینه‌ی تابلو (مشکی با ته‌رنگ)
-      ctx.fillStyle='#050507'; ctx.fillRect(0,0,w,h)
+      // آماده‌سازی منبع
+      if(ad.type==='video'){
+        const v=videoRef.current
+        if(v&&v.readyState>=2){
+          const sw=src.width, sh=src.height
+          sctx.fillStyle='#000'; sctx.fillRect(0,0,sw,sh)
+          // ویدیو رو با حفظ نسبت، وسط‌چین توی منبع بکش
+          const vr=v.videoWidth/v.videoHeight, sr=sw/sh
+          let dw=sw, dh=sh, dx=0, dy=0
+          if(vr>sr){ dh=sh; dw=sh*vr; dx=(sw-dw)/2 } else { dw=sw; dh=sw/vr; dy=(sh-dh)/2 }
+          try{ sctx.drawImage(v,dx,dy,dw,dh) }catch(e){}
+        }
+      } else {
+        if(curIdx!==idxRef.current){ renderTextSource(ad) }
+      }
+      curIdx=idxRef.current
 
-      // خواندن پیکسل‌های منبع و رسم هر کدوم به‌صورت یک LED گرد
+      // پس‌زمینه‌ی تابلو
+      ctx.fillStyle='#050506'; ctx.fillRect(0,0,w,h)
+
+      // خواندن منبع و رسم هر پیکسل به‌صورت مربع sharp با grid
       const sw=src.width, sh=src.height
-      const data=sctx.getImageData(0,0,sw,sh).data
-      const scan=(now/9)%(w+80)-40   // موج نور اسکن‌کننده
+      let data
+      try{ data=sctx.getImageData(0,0,sw,sh).data }catch(e){ return }
+      const q=CELL-GAP   // اندازه‌ی مربع روشن (کمی کوچک‌تر از خانه = خط grid تیره)
 
       for(let y=0;y<sh;y++){
         for(let x=0;x<sw;x++){
           const i=(y*sw+x)*4
           const r=data[i], g=data[i+1], b=data[i+2]
-          const lit=(r+g+b)>40
-          const cx=x*PIX+PIX/2, cy=y*PIX+PIX/2
-          // نقطه‌ی خاموش (زمینه‌ی تابلو) — خیلی کم‌رنگ
-          if(!lit){
-            ctx.fillStyle='rgba(255,255,255,0.022)'
-            ctx.fillRect(cx-DOT/2*0.6,cy-DOT/2*0.6,DOT*0.6,DOT*0.6)
-            continue
+          const on=(r+g+b)>36
+          const px=x*CELL, py=y*CELL
+          if(on){
+            ctx.fillStyle='rgb('+r+','+g+','+b+')'
+          }else{
+            ctx.fillStyle='#111114'   // خانه‌ی خاموش تیره (بافت تابلو)
           }
-          // درخشش اسکن روی پیکسل‌های روشن
-          const dist=Math.abs(cx-scan)
-          const glow=dist<45?(1-dist/45)*0.5:0
-          const br=Math.min(1,fade+glow*0.3)
-          ctx.globalAlpha=br
-          // هاله‌ی نور
-          ctx.fillStyle='rgba('+r+','+g+','+b+',0.32)'
-          ctx.beginPath(); ctx.arc(cx,cy,DOT*1.1,0,6.283); ctx.fill()
-          // خود LED
-          ctx.fillStyle='rgb('+Math.min(255,r+glow*90)+','+Math.min(255,g+glow*90)+','+Math.min(255,b+glow*90)+')'
-          ctx.beginPath(); ctx.arc(cx,cy,DOT/2,0,6.283); ctx.fill()
-          ctx.globalAlpha=1
+          ctx.fillRect(px,py,q,q)     // مربع sharp، بدون هاله
         }
       }
     }
@@ -1414,9 +1427,15 @@ function LedAdBar({ C }) {
     return ()=>{ cancelAnimationFrame(raf); window.removeEventListener('resize',resize) }
   },[])
 
+  const cur=LED_ADS[idx]
   return (
-    <div style={{height:40,flexShrink:0,position:'relative',borderTop:'1px solid #1a1a22',overflow:'hidden',background:'#050507'}}>
-      <canvas ref={canvasRef} style={{width:'100%',height:'100%',display:'block'}}/>
+    <div style={{height:40,flexShrink:0,position:'relative',borderTop:'1px solid #1a1a22',overflow:'hidden',background:'#050506'}}>
+      {/* ویدیوی پنهان (منبع افکت) — فقط وقتی اسلاید ویدیویی فعاله */}
+      {cur&&cur.type==='video'&&(
+        <video ref={videoRef} src={cur.src} autoPlay loop muted playsInline
+          style={{position:'absolute',width:1,height:1,opacity:0,pointerEvents:'none'}}/>
+      )}
+      <canvas ref={canvasRef} style={{width:'100%',height:'100%',display:'block',imageRendering:'pixelated'}}/>
       <div style={{position:'absolute',bottom:2,left:8,display:'flex',gap:3}}>
         {LED_ADS.map((_,i)=>(
           <span key={i} style={{width:i===idx?10:4,height:2.5,borderRadius:2,background:i===idx?'#fff':'rgba(255,255,255,.3)',transition:'.3s'}}/>
