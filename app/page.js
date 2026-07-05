@@ -1350,14 +1350,17 @@ function LedAdBar({ C }) {
     let raf, t0=performance.now(), curIdx=-1, lastFrame=0
     const dpr=Math.min(window.devicePixelRatio||1,2)
 
-    const CELL=1.5        // اندازه‌ی هر خانه‌ی LED — کوچک‌ترین حالتی که هنوز grid دیده می‌شه
-    const GAP=0.35        // فاصله‌ی تیره بین خانه‌ها (خط grid)
+    // اندازه‌ی خانه در پیکسل فیزیکی (عدد صحیح) تا moiré پیش نیاد
+    let CELLP=Math.max(2,Math.round(1.5*dpr))   // اندازه‌ی خانه در device px (صحیح)
+    let GAPP=Math.max(1,Math.round(CELLP*0.22)) // فاصله‌ی grid در device px (صحیح)
 
     function resize(){
       const w=cv.clientWidth, h=cv.clientHeight
-      cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); ctx.setTransform(dpr,0,0,dpr,0,0)
+      // بوم را در پیکسل فیزیکی می‌سازیم و بدون transform مستقیم می‌کشیم (هم‌ترازی صحیح)
+      cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr)
+      ctx.setTransform(1,0,0,1,0,0)   // بدون مقیاس — همه‌چیز در device px
       ctx.imageSmoothingEnabled=false
-      src.width=Math.max(1,Math.floor(w/CELL)); src.height=Math.max(1,Math.floor(h/CELL))
+      src.width=Math.max(1,Math.floor(cv.width/CELLP)); src.height=Math.max(1,Math.floor(cv.height/CELLP))
     }
     resize(); window.addEventListener('resize',resize)
 
@@ -1379,7 +1382,7 @@ function LedAdBar({ C }) {
       raf=requestAnimationFrame(draw)
       if(now-lastFrame<40) return   // ۲۵fps
       lastFrame=now
-      const w=cv.clientWidth, h=cv.clientHeight
+      const W=cv.width, H=cv.height   // ابعاد در پیکسل فیزیکی
       const ad=LED_ADS[idxRef.current]
 
       // آماده‌سازی منبع
@@ -1400,26 +1403,26 @@ function LedAdBar({ C }) {
       curIdx=idxRef.current
 
       // پس‌زمینه‌ی تابلو
-      ctx.fillStyle='#050506'; ctx.fillRect(0,0,w,h)
+      ctx.fillStyle='#050506'; ctx.fillRect(0,0,W,H)
 
-      // خواندن منبع و رسم هر پیکسل به‌صورت مربع sharp با grid
+      // خواندن منبع و رسم هر پیکسل به‌صورت مربع sharp با grid (مختصات صحیح فیزیکی)
       const sw=src.width, sh=src.height
       let data
       try{ data=sctx.getImageData(0,0,sw,sh).data }catch(e){ return }
-      const q=CELL-GAP   // اندازه‌ی مربع روشن (کمی کوچک‌تر از خانه = خط grid تیره)
+      const q=CELLP-GAPP   // اندازه‌ی مربع روشن (کمی کوچک‌تر از خانه = خط grid)
 
       for(let y=0;y<sh;y++){
         for(let x=0;x<sw;x++){
           const i=(y*sw+x)*4
           const r=data[i], g=data[i+1], b=data[i+2]
           const on=(r+g+b)>36
-          const px=x*CELL, py=y*CELL
+          const px=x*CELLP, py=y*CELLP   // مضرب صحیح پیکسل فیزیکی → بدون moiré
           if(on){
             ctx.fillStyle='rgb('+r+','+g+','+b+')'
           }else{
-            ctx.fillStyle='#111114'   // خانه‌ی خاموش تیره (بافت تابلو)
+            ctx.fillStyle='#111114'
           }
-          ctx.fillRect(px,py,q,q)     // مربع sharp، بدون هاله
+          ctx.fillRect(px,py,q,q)
         }
       }
     }
