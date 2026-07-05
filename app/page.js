@@ -562,6 +562,47 @@ function TwinLand({ session, onLogout }) {
 
   function panMap(x,y){ mapInst.current?.panBy([x,y],{animate:true}) }
 
+  // ── ادمین: پرکردن district همه‌ی کافه‌های بدون منطقه (point-in-polygon) ──────
+  const [backfilling,setBackfilling]=useState(false)
+  async function backfillDistricts(){
+    if(backfilling) return
+    // مرزهای مناطق باید لود باشن
+    const layers=regionLayersRef.current
+    if(!layers || Object.keys(layers).length===0){
+      showToast('اول لایه‌ی مناطق تهران رو روشن کن')
+      return
+    }
+    setBackfilling(true)
+    try{
+      const s=getSession(); const token=(s&&s.access_token)||SB_KEY
+      const h={'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'}
+      // کافه‌های بدون district که مختصات دارن
+      const rows=await fetch(SB_URL+'/rest/v1/cafes?district=is.null&select=id,lat,lng&limit=5000',{headers:h}).then(r=>r.json())
+      if(!Array.isArray(rows)||rows.length===0){ showToast('همه‌ی کافه‌ها منطقه دارن ✅'); setBackfilling(false); return }
+      let done=0, skipped=0
+      for(const c of rows){
+        const lat=Number(c.lat), lng=Number(c.lng)
+        if(isNaN(lat)||isNaN(lng)){ skipped++; continue }
+        // پیدا کردن منطقه‌ای که این نقطه داخلشه
+        let regionName=null
+        for(const [name,lyr] of Object.entries(layers)){
+          if(cafeInLayer(lat,lng,lyr)){ regionName=name; break }
+        }
+        if(!regionName){ skipped++; continue }
+        // ذخیره: فرمت «منطقه X» (با عدد نرمال) تا با region_num لیدربورد سازگار باشه
+        const num=digitsOnly(regionName)
+        const district='منطقه '+num
+        await fetch(SB_URL+'/rest/v1/cafes?id=eq.'+c.id,{
+          method:'PATCH',headers:{...h,'Prefer':'return=minimal'},
+          body:JSON.stringify({district})
+        })
+        done++
+      }
+      showToast('✅ '+done.toLocaleString('fa')+' کافه منطقه گرفت'+(skipped?('، '+skipped.toLocaleString('fa')+' رد شد'):''))
+    }catch(e){ showToast('خطا در پردازش') }
+    setBackfilling(false)
+  }
+
   // تپ روی لوگو: ۱ بار = صفحه اصلی، ۳ بار = XP مخفی (فقط یک‌بار برای هر کاربر)
   async function onLogoTap(){
     const t=logoTapRef.current
@@ -986,6 +1027,7 @@ function TwinLand({ session, onLogout }) {
               {key:'xp',icon:'⭐',img:'/xp_coin@256-1.png',label:'سیستم XP',href:null},
               {key:'settings',icon:'⚙️',img:'/settings@256.png',label:'تنظیمات',href:null},
               {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
+              {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
               {key:'logout',icon:'🚪',label:'خروج',href:null},
             ].filter(item=>!item.adminOnly||isAdmin).map((item,i,arr)=>{
               const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
@@ -995,8 +1037,8 @@ function TwinLand({ session, onLogout }) {
                   <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
                 </a>
               }
-              return <button key={item.key} onClick={()=>{setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
-                {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.label}
+              return <button key={item.key} onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+                {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.key==='backfill'&&backfilling?'در حال پردازش…':item.label}
               </button>
             })}
           </div>
@@ -1352,16 +1394,16 @@ function LedAdBar({ C }) {
     let COLS=0, ROWS=0, CELL=0   // تعداد ستون/ردیف و اندازه‌ی خانه (device px صحیح)
 
     function resize(){
-      const w=cv.clientWidth, h=cv.clientHeight
+      const w=cv.clientWidth||cv.parentElement.clientWidth, h=cv.clientHeight||cv.parentElement.clientHeight
       ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=false
-      // اندازه‌ی خانه = عدد صحیح device px
-      CELL=Math.max(2,Math.round(2*dpr))               // خانه‌ی ریزتر
-      // عرض/ارتفاع بوم را دقیقاً مضرب CELL کن تا همه‌ی خانه‌ها یک‌اندازه باشن (grid یکنواخت)
-      COLS=Math.max(1,Math.round((w*dpr)/CELL))
-      ROWS=Math.max(1,Math.round((h*dpr)/CELL))
+      CELL=Math.max(2,Math.round(2*dpr))
+      // عرض/ارتفاع بوم را دقیقاً مضرب CELL کن تا همه خانه‌ها یک‌اندازه باشن
+      COLS=Math.ceil((w*dpr)/CELL)   // ceil تا کل عرض پوشش داده شه (چند px آخر پشت لبه)
+      ROWS=Math.round((h*dpr)/CELL)
       cv.width=COLS*CELL; cv.height=ROWS*CELL
-      // بوم را کمی کش بده تا کل عرض CSS را پر کنه (تفاوت زیر یک خانه، نامحسوس)
-      cv.style.width='100%'; cv.style.height='100%'
+      // اندازه‌ی CSS دقیقاً برابر device px تقسیم بر dpr → بدون کش‌دادن (grid یکنواخت)
+      cv.style.width=(cv.width/dpr)+'px'
+      cv.style.height='100%'
       src.width=COLS; src.height=ROWS
     }
     resize(); window.addEventListener('resize',resize)
@@ -1413,7 +1455,7 @@ function LedAdBar({ C }) {
 
   const cur=LED_ADS[idx]
   return (
-    <div style={{height:40,flexShrink:0,position:'relative',borderTop:'1px solid #1a1a22',overflow:'hidden',background:'#050506'}}>
+    <div style={{height:36,flexShrink:0,position:'relative',borderTop:'1px solid #1a1a22',overflow:'hidden',background:'#050506'}}>
       {/* ویدیوی پنهان (منبع افکت) — فقط وقتی اسلاید ویدیویی فعاله */}
       {cur&&cur.type==='video'&&(
         <video key={idx} ref={videoRef} src={cur.src} autoPlay loop muted playsInline
