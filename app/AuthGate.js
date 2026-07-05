@@ -62,6 +62,7 @@ export default function AuthGate({ onAuthed }){
   const [mode,setMode] = useState('login')   // login | signup | forgot
   const [email,setEmail] = useState('')
   const [pass,setPass]   = useState('')
+  const [showPass,setShowPass] = useState(false)
   const [name,setName]   = useState('')
   const [busy,setBusy]   = useState(false)
   const [msg,setMsg]     = useState(null)    // {type:'err'|'ok', text}
@@ -170,7 +171,13 @@ export default function AuthGate({ onAuthed }){
 
               {mode!=='forgot' && (<>
                 <div style={S.label}>رمز عبور</div>
-                <input className="tl-inp" style={S.inp} type="password" dir="ltr" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')submit()}} placeholder="••••••••"/>
+                <div style={{position:'relative'}}>
+                  <input className="tl-inp" style={{...S.inp, paddingLeft:44}} type={showPass?'text':'password'} dir="ltr" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')submit()}} placeholder="••••••••"/>
+                  <button type="button" onClick={()=>setShowPass(v=>!v)} aria-label={showPass?'مخفی کردن رمز':'نمایش رمز'}
+                    style={{position:'absolute',left:8,top:24,transform:'translateY(-50%)',background:'transparent',border:'none',cursor:'pointer',fontSize:17,padding:6,lineHeight:1,opacity:0.75}}>
+                    {showPass?'🙈':'👁️'}
+                  </button>
+                </div>
               </>)}
 
               {msg && (
