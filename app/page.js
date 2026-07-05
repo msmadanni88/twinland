@@ -1353,12 +1353,15 @@ function LedAdBar({ C }) {
 
     function resize(){
       const w=cv.clientWidth, h=cv.clientHeight
-      cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr)
       ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=false
-      // اندازه‌ی خانه = عدد صحیح device px. تعداد ردیف را از ارتفاع حساب کن، ستون‌ها را متناسب
-      CELL=Math.max(3,Math.round(3*dpr))               // خانه‌ی صحیح (بدون moiré)
-      ROWS=Math.max(1,Math.round(cv.height/CELL))
-      COLS=Math.max(1,Math.round(cv.width/CELL))
+      // اندازه‌ی خانه = عدد صحیح device px
+      CELL=Math.max(2,Math.round(2*dpr))               // خانه‌ی ریزتر
+      // عرض/ارتفاع بوم را دقیقاً مضرب CELL کن تا همه‌ی خانه‌ها یک‌اندازه باشن (grid یکنواخت)
+      COLS=Math.max(1,Math.round((w*dpr)/CELL))
+      ROWS=Math.max(1,Math.round((h*dpr)/CELL))
+      cv.width=COLS*CELL; cv.height=ROWS*CELL
+      // بوم را کمی کش بده تا کل عرض CSS را پر کنه (تفاوت زیر یک خانه، نامحسوس)
+      cv.style.width='100%'; cv.style.height='100%'
       src.width=COLS; src.height=ROWS
     }
     resize(); window.addEventListener('resize',resize)
