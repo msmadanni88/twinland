@@ -1336,38 +1336,41 @@ function LedAdBar({ C }) {
     const ctx=cv.getContext('2d')
     if(!srcRef.current) srcRef.current=document.createElement('canvas')
     const src=srcRef.current; const sctx=src.getContext('2d',{willReadFrequently:true})
-    let raf, t0=performance.now(), curIdx=-1
+    let raf, t0=performance.now(), curIdx=-1, lastFrame=0
     const dpr=Math.min(window.devicePixelRatio||1,2)
 
-    const PIX=3.2          // فاصله‌ی مرکز تا مرکز پیکسل‌ها (ریز = باکیفیت)
-    const DOT=2.3          // قطر نقطه‌ی روشن
+    const PIX=2.0          // فاصله‌ی مرکز پیکسل‌ها — خیلی ریز = کیفیت بالا
+    const DOT=1.5          // قطر نقطه‌ی روشن
 
     function resize(){
       const w=cv.clientWidth, h=cv.clientHeight
       cv.width=w*dpr; cv.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0)
-      // canvas منبع با رزولوشن پایین (به تعداد پیکسل‌های LED)
+      // canvas منبع با رزولوشن بالاتر برای وضوح متن
       src.width=Math.ceil(w/PIX); src.height=Math.ceil(h/PIX)
     }
     resize(); window.addEventListener('resize',resize)
 
-    // رسم محتوای یک اسلاید روی canvas منبع (کوچک)
+    // رسم محتوای یک اسلاید روی canvas منبع
     function renderSource(ad){
       const sw=src.width, sh=src.height
       sctx.clearRect(0,0,sw,sh)
       sctx.fillStyle='#000'; sctx.fillRect(0,0,sw,sh)
       sctx.textBaseline='middle'; sctx.direction='rtl'; sctx.textAlign='right'
-      // عنوان (بزرگ‌تر) + زیرنویس، متناسب با ارتفاع کم نوار
-      const titleSize=Math.round(sh*0.5)
-      sctx.font='800 '+titleSize+'px Estedad, sans-serif'
+      // یک خط، بزرگ و واضح — عنوان + جداکننده + زیرنویس کنار هم
+      const fs=Math.round(sh*0.62)
+      sctx.font='800 '+fs+'px Estedad, sans-serif'
       sctx.fillStyle=ad.accent
-      sctx.fillText(ad.title, sw-3, sh*0.34)
-      const subSize=Math.round(sh*0.42)
-      sctx.font='700 '+subSize+'px Estedad, sans-serif'
+      sctx.fillText(ad.title, sw-4, sh*0.5)
+      const tw=sctx.measureText(ad.title).width
+      sctx.font='700 '+Math.round(sh*0.5)+'px Estedad, sans-serif'
       sctx.fillStyle='#ffffff'
-      sctx.fillText(ad.sub, sw-3, sh*0.74)
+      sctx.fillText('•  '+ad.sub, sw-tw-14, sh*0.5)
     }
 
     function draw(now){
+      raf=requestAnimationFrame(draw)
+      if(now-lastFrame<33) return   // ~۳۰fps برای روانی روی موبایل
+      lastFrame=now
       const w=cv.clientWidth, h=cv.clientHeight
       if(curIdx!==idxRef.current){ curIdx=idxRef.current; renderSource(LED_ADS[curIdx]); t0=now }
       const fade=Math.min(1,(now-t0)/500)
@@ -1388,8 +1391,8 @@ function LedAdBar({ C }) {
           const cx=x*PIX+PIX/2, cy=y*PIX+PIX/2
           // نقطه‌ی خاموش (زمینه‌ی تابلو) — خیلی کم‌رنگ
           if(!lit){
-            ctx.fillStyle='rgba(255,255,255,0.028)'
-            ctx.beginPath(); ctx.arc(cx,cy,DOT/2*0.7,0,6.283); ctx.fill()
+            ctx.fillStyle='rgba(255,255,255,0.022)'
+            ctx.fillRect(cx-DOT/2*0.6,cy-DOT/2*0.6,DOT*0.6,DOT*0.6)
             continue
           }
           // درخشش اسکن روی پیکسل‌های روشن
@@ -1398,22 +1401,21 @@ function LedAdBar({ C }) {
           const br=Math.min(1,fade+glow*0.3)
           ctx.globalAlpha=br
           // هاله‌ی نور
-          ctx.fillStyle='rgba('+r+','+g+','+b+',0.28)'
-          ctx.beginPath(); ctx.arc(cx,cy,DOT*0.95,0,6.283); ctx.fill()
+          ctx.fillStyle='rgba('+r+','+g+','+b+',0.32)'
+          ctx.beginPath(); ctx.arc(cx,cy,DOT*1.1,0,6.283); ctx.fill()
           // خود LED
           ctx.fillStyle='rgb('+Math.min(255,r+glow*90)+','+Math.min(255,g+glow*90)+','+Math.min(255,b+glow*90)+')'
           ctx.beginPath(); ctx.arc(cx,cy,DOT/2,0,6.283); ctx.fill()
           ctx.globalAlpha=1
         }
       }
-      raf=requestAnimationFrame(draw)
     }
     raf=requestAnimationFrame(draw)
     return ()=>{ cancelAnimationFrame(raf); window.removeEventListener('resize',resize) }
   },[])
 
   return (
-    <div style={{height:34,flexShrink:0,position:'relative',borderTop:'1px solid #1a1a22',overflow:'hidden',background:'#050507'}}>
+    <div style={{height:40,flexShrink:0,position:'relative',borderTop:'1px solid #1a1a22',overflow:'hidden',background:'#050507'}}>
       <canvas ref={canvasRef} style={{width:'100%',height:'100%',display:'block'}}/>
       <div style={{position:'absolute',bottom:2,left:8,display:'flex',gap:3}}>
         {LED_ADS.map((_,i)=>(
