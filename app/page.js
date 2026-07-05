@@ -1350,8 +1350,8 @@ function LedAdBar({ C }) {
     let raf, t0=performance.now(), curIdx=-1, lastFrame=0
     const dpr=Math.min(window.devicePixelRatio||1,2)
 
-    const CELL=2.2        // اندازه‌ی هر خانه‌ی LED روی صفحه (px) — ریزتر = باکیفیت‌تر
-    const GAP=0.5         // فاصله‌ی تیره بین خانه‌ها (خط grid)
+    const CELL=1.5        // اندازه‌ی هر خانه‌ی LED — کوچک‌ترین حالتی که هنوز grid دیده می‌شه
+    const GAP=0.35        // فاصله‌ی تیره بین خانه‌ها (خط grid)
 
     function resize(){
       const w=cv.clientWidth, h=cv.clientHeight
