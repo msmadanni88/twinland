@@ -1343,24 +1343,23 @@ function LedAdBar({ C }) {
   useEffect(()=>{
     const cv=canvasRef.current; if(!cv) return
     const ctx=cv.getContext('2d')
-    ctx.imageSmoothingEnabled=false            // پیکسل‌ها sharp بمونن
     if(!srcRef.current) srcRef.current=document.createElement('canvas')
-    const src=srcRef.current; const sctx=src.getContext('2d',{willReadFrequently:true})
-    sctx.imageSmoothingEnabled=true
-    let raf, t0=performance.now(), curIdx=-1, lastFrame=0
+    const src=srcRef.current; const sctx=src.getContext('2d')
+    sctx.imageSmoothingEnabled=true          // منبع صاف (تا رنگ‌ها خوب نمونه‌برداری شن)
+    let raf, curIdx=-1, lastFrame=0
     const dpr=Math.min(window.devicePixelRatio||1,2)
 
-    // اندازه‌ی خانه در پیکسل فیزیکی (عدد صحیح) تا moiré پیش نیاد
-    let CELLP=Math.max(2,Math.round(1.5*dpr))   // اندازه‌ی خانه در device px (صحیح)
-    let GAPP=Math.max(1,Math.round(CELLP*0.22)) // فاصله‌ی grid در device px (صحیح)
+    let COLS=0, ROWS=0, CELL=0   // تعداد ستون/ردیف و اندازه‌ی خانه (device px صحیح)
 
     function resize(){
       const w=cv.clientWidth, h=cv.clientHeight
-      // بوم را در پیکسل فیزیکی می‌سازیم و بدون transform مستقیم می‌کشیم (هم‌ترازی صحیح)
       cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr)
-      ctx.setTransform(1,0,0,1,0,0)   // بدون مقیاس — همه‌چیز در device px
-      ctx.imageSmoothingEnabled=false
-      src.width=Math.max(1,Math.floor(cv.width/CELLP)); src.height=Math.max(1,Math.floor(cv.height/CELLP))
+      ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=false
+      // اندازه‌ی خانه = عدد صحیح device px. تعداد ردیف را از ارتفاع حساب کن، ستون‌ها را متناسب
+      CELL=Math.max(3,Math.round(3*dpr))               // خانه‌ی صحیح (بدون moiré)
+      ROWS=Math.max(1,Math.round(cv.height/CELL))
+      COLS=Math.max(1,Math.round(cv.width/CELL))
+      src.width=COLS; src.height=ROWS
     }
     resize(); window.addEventListener('resize',resize)
 
@@ -1368,63 +1367,42 @@ function LedAdBar({ C }) {
       const sw=src.width, sh=src.height
       sctx.clearRect(0,0,sw,sh); sctx.fillStyle='#000'; sctx.fillRect(0,0,sw,sh)
       sctx.textBaseline='middle'; sctx.direction='rtl'; sctx.textAlign='right'
-      const fs=Math.round(sh*0.6)
-      sctx.font='800 '+fs+'px Estedad, sans-serif'
-      sctx.fillStyle=ad.accent
-      sctx.fillText(ad.title, sw-3, sh*0.5)
+      sctx.font='800 '+Math.round(sh*0.62)+'px Estedad, sans-serif'
+      sctx.fillStyle=ad.accent; sctx.fillText(ad.title, sw-2, sh*0.5)
       const tw=sctx.measureText(ad.title).width
       sctx.font='700 '+Math.round(sh*0.5)+'px Estedad, sans-serif'
-      sctx.fillStyle='#fff'
-      sctx.fillText('· '+ad.sub, sw-tw-10, sh*0.5)
+      sctx.fillStyle='#fff'; sctx.fillText('· '+ad.sub, sw-tw-8, sh*0.5)
     }
 
     function draw(now){
       raf=requestAnimationFrame(draw)
-      if(now-lastFrame<40) return   // ۲۵fps
+      if(now-lastFrame<40) return
       lastFrame=now
-      const W=cv.width, H=cv.height   // ابعاد در پیکسل فیزیکی
       const ad=LED_ADS[idxRef.current]
 
-      // آماده‌سازی منبع
+      // ۱) محتوا را روی منبع کوچک (COLS×ROWS) بکش
       if(ad.type==='video'){
         const v=videoRef.current
         if(v&&v.readyState>=2){
           const sw=src.width, sh=src.height
           sctx.fillStyle='#000'; sctx.fillRect(0,0,sw,sh)
-          // ویدیو رو با حفظ نسبت، وسط‌چین توی منبع بکش
           const vr=v.videoWidth/v.videoHeight, sr=sw/sh
-          let dw=sw, dh=sh, dx=0, dy=0
+          let dw=sw,dh=sh,dx=0,dy=0
           if(vr>sr){ dh=sh; dw=sh*vr; dx=(sw-dw)/2 } else { dw=sw; dh=sw/vr; dy=(sh-dh)/2 }
           try{ sctx.drawImage(v,dx,dy,dw,dh) }catch(e){}
         }
-      } else {
-        if(curIdx!==idxRef.current){ renderTextSource(ad) }
-      }
+      } else if(curIdx!==idxRef.current){ renderTextSource(ad) }
       curIdx=idxRef.current
 
-      // پس‌زمینه‌ی تابلو
-      ctx.fillStyle='#050506'; ctx.fillRect(0,0,W,H)
+      // ۲) منبع کوچک را با nearest-neighbor بزرگ کن (پیکسل‌های تیز، بدون moiré)
+      ctx.fillStyle='#050506'; ctx.fillRect(0,0,cv.width,cv.height)
+      ctx.imageSmoothingEnabled=false
+      try{ ctx.drawImage(src,0,0,COLS,ROWS,0,0,COLS*CELL,ROWS*CELL) }catch(e){ return }
 
-      // خواندن منبع و رسم هر پیکسل به‌صورت مربع sharp با grid (مختصات صحیح فیزیکی)
-      const sw=src.width, sh=src.height
-      let data
-      try{ data=sctx.getImageData(0,0,sw,sh).data }catch(e){ return }
-      const q=CELLP-GAPP   // اندازه‌ی مربع روشن (کمی کوچک‌تر از خانه = خط grid)
-
-      for(let y=0;y<sh;y++){
-        for(let x=0;x<sw;x++){
-          const i=(y*sw+x)*4
-          const r=data[i], g=data[i+1], b=data[i+2]
-          const on=(r+g+b)>36
-          const px=x*CELLP, py=y*CELLP   // مضرب صحیح پیکسل فیزیکی → بدون moiré
-          if(on){
-            ctx.fillStyle='rgb('+r+','+g+','+b+')'
-          }else{
-            ctx.fillStyle='#111114'
-          }
-          ctx.fillRect(px,py,q,q)
-        }
-      }
+      // ۳) شبکه‌ی grid تیره را با خطوط دقیق ۱px روی خانه‌ها بکش (یکنواخت)
+      ctx.fillStyle='rgba(0,0,0,0.55)'
+      for(let x=0;x<=COLS;x++){ ctx.fillRect(x*CELL,0,1,ROWS*CELL) }
+      for(let y=0;y<=ROWS;y++){ ctx.fillRect(0,y*CELL,COLS*CELL,1) }
     }
     raf=requestAnimationFrame(draw)
     return ()=>{ cancelAnimationFrame(raf); window.removeEventListener('resize',resize) }
