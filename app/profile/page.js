@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 import {
   SB_URL, SB_KEY, getLevelInfo, getSession,
-  fetchMyProfile, fetchXpHistory, fetchAwards, subscribeToProfile, REASON_LABELS,
+  fetchMyProfile, fetchXpHistory, fetchAwards, subscribeToTables, REASON_LABELS,
 } from '../gameSystem'
 
 // مدال‌های محاسبه‌شده از آمار واقعی (fallback وقتی جدول awards هنوز پر نشده)
@@ -57,11 +57,20 @@ export default function ProfilePage() {
     fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) })
     fetchAwards(sess).then(rows => { if (alive) setAwards(rows) })
 
-    // realtime: XP خودم لحظه‌ای آپدیت شه
-    const unsub = subscribeToProfile(uid, (rec) => {
-      if (!alive) return
-      setProfile(prev => ({ ...(prev || {}), ...rec }))
-      fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) })
+    // realtime: پروفایل، بج‌ها، تاریخچه و چک‌این‌ها لحظه‌ای آپدیت شن
+    const reloadCheckins=()=>fetch(SB_URL + '/rest/v1/checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone)&order=created_at.desc&limit=50', { headers: h })
+      .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setCheckins(rows) }).catch(() => {})
+    const unsub = subscribeToTables([
+      { table:'profiles',   event:'UPDATE', filter:'id=eq.'+uid },
+      { table:'awards',     event:'*',      filter:'user_id=eq.'+uid },
+      { table:'xp_history', event:'INSERT', filter:'user_id=eq.'+uid },
+      { table:'checkins',   event:'INSERT', filter:'user_id=eq.'+uid },
+    ],(p)=>{
+      if(!alive) return
+      if(p.table==='profiles' && p.record) setProfile(prev => ({ ...(prev || {}), ...p.record }))
+      if(p.table==='xp_history') fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) })
+      if(p.table==='awards') fetchAwards(sess).then(rows => { if (alive) setAwards(rows) })
+      if(p.table==='checkins') reloadCheckins()
     })
     return () => { alive = false; unsub() }
   }, [])
