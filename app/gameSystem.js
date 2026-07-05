@@ -230,6 +230,74 @@ export function subscribeToProfile(uid, cb) {
   }
 }
 
+// ── اشتراک عمومی realtime روی چند جدول ────────────────────────────────────────
+// specs: آرایه‌ای از { table, event?, filter? }  (event پیش‌فرض '*')
+// cb(payload) با هر تغییر صدا زده می‌شه: { table, eventType, record, old }
+// یک اتصال WebSocket برای همه‌ی جدول‌ها → سبک و مقیاس‌پذیر.
+export function subscribeToTables(specs, cb) {
+  if (typeof window === 'undefined' || !specs || !specs.length) return () => {}
+  let ws = null, closed = false, ref = 0, heartbeat = null, retry = null
+
+  function connect() {
+    if (closed) return
+    try {
+      const wsUrl = SB_URL.replace('https://', 'wss://') +
+        '/realtime/v1/websocket?apikey=' + SB_KEY + '&vsn=1.0.0'
+      ws = new WebSocket(wsUrl)
+
+      ws.onopen = () => {
+        if (closed) return
+        ws.send(JSON.stringify({
+          topic: 'realtime:public',
+          event: 'phx_join',
+          payload: {
+            config: {
+              postgres_changes: specs.map(s => ({
+                event: s.event || '*', schema: 'public', table: s.table,
+                ...(s.filter ? { filter: s.filter } : {}),
+              })),
+            },
+          },
+          ref: String(++ref),
+        }))
+        heartbeat = setInterval(() => {
+          if (ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) }))
+          }
+        }, 30000)
+      }
+
+      ws.onmessage = (msg) => {
+        try {
+          const data = JSON.parse(msg.data)
+          if (data.event === 'postgres_changes') {
+            const d = data.payload && data.payload.data
+            if (d) cb({ table: d.table, eventType: d.type, record: d.record, old: d.old_record })
+          }
+        } catch (e) {}
+      }
+
+      ws.onclose = () => {
+        if (closed) return
+        if (heartbeat) clearInterval(heartbeat)
+        // اتصال مجدد بعد از ۳ ثانیه
+        retry = setTimeout(connect, 3000)
+      }
+      ws.onerror = () => { try { ws.close() } catch (e) {} }
+    } catch (e) {
+      if (!closed) retry = setTimeout(connect, 3000)
+    }
+  }
+  connect()
+
+  return () => {
+    closed = true
+    if (heartbeat) clearInterval(heartbeat)
+    if (retry) clearTimeout(retry)
+    try { ws && ws.close() } catch (e) {}
+  }
+}
+
 // ============================================================================
 // ── سیستم کلن ────────────────────────────────────────────────────────────────
 // ============================================================================
