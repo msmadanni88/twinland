@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 import {
   getSession, getLevelInfo, clanLevel,
-  fetchMyClans, fetchClanStandings, fetchClanMembers, fetchClanMissions,
+  fetchMyClans, fetchClanStandings, fetchClanMembers, fetchClanMissions, subscribeToTables,
   clanCreate, clanJoin, clanLeave, clanSetActive,
 } from '../gameSystem'
 
@@ -48,6 +48,16 @@ export default function ClanPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // realtime: تغییر عضویت کلن، کلن‌ها، یا XP اعضا → لحظه‌ای آپدیت
+  useEffect(() => {
+    const unsub = subscribeToTables([
+      { table:'clan_members', event:'*' },
+      { table:'clans',        event:'*' },
+      { table:'profiles',     event:'UPDATE' },
+    ], () => load())
+    return () => unsub()
+  }, [load])
 
   const C = buildC(pal.palette, pal.mode)
   const S = mkS(C)
