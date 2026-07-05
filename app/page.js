@@ -1316,11 +1316,11 @@ function MapSettingsPopup({ C, value, setValue, onClose }) {
 // ── نوار LED سبک تابلوی واقعی: پیکسل‌های مربعی sharp + grid (بدون glow) ────────
 // ورودی هر اسلاید می‌تونه متن یا ویدیو باشه. ویدیو خودکار پیکسلی می‌شه.
 const LED_ADS = [
-  { type:'video', src:'/ads/led-demo.mp4' },
-  { type:'text', title:'کافه روستا فرشته', sub:'قهوه امروز نصف‌قیمت', accent:'#ffd60a' },
-  { type:'text', title:'چالش این هفته', sub:'۵ کافه جدید = ۳۰۰XP', accent:'#00e5ff' },
-  { type:'text', title:'جای تبلیغ شما', sub:'twinland.ir', accent:'#39ff14' },
-  { type:'text', title:'رقابت کلن‌های تهران', sub:'کلنت رو بساز', accent:'#ff2d95' },
+  { type:'video', src:'/ads/led-1.mp4' },
+  { type:'video', src:'/ads/led-2.mp4' },
+  { type:'video', src:'/ads/led-3.mp4' },
+  { type:'video', src:'/ads/led-4.mp4' },
+  { type:'video', src:'/ads/led-5.mp4' },
 ]
 function LedAdBar({ C }) {
   const canvasRef=useRef(null)
@@ -1333,7 +1333,7 @@ function LedAdBar({ C }) {
     let t
     const schedule=()=>{
       const cur=LED_ADS[idxRef.current]
-      const dur=cur&&cur.type==='video'?9000:4500  // ویدیو مدت بیشتر
+      const dur=15000  // ۱۵ ثانیه برای هر اسلاید
       t=setTimeout(()=>{ idxRef.current=(idxRef.current+1)%LED_ADS.length; setIdx(idxRef.current); schedule() },dur)
     }
     schedule()
@@ -1350,8 +1350,8 @@ function LedAdBar({ C }) {
     let raf, t0=performance.now(), curIdx=-1, lastFrame=0
     const dpr=Math.min(window.devicePixelRatio||1,2)
 
-    const CELL=3.4        // اندازه‌ی هر خانه‌ی LED روی صفحه (px)
-    const GAP=0.7         // فاصله‌ی تیره بین خانه‌ها (خط grid)
+    const CELL=2.2        // اندازه‌ی هر خانه‌ی LED روی صفحه (px) — ریزتر = باکیفیت‌تر
+    const GAP=0.5         // فاصله‌ی تیره بین خانه‌ها (خط grid)
 
     function resize(){
       const w=cv.clientWidth, h=cv.clientHeight
@@ -1432,7 +1432,7 @@ function LedAdBar({ C }) {
     <div style={{height:40,flexShrink:0,position:'relative',borderTop:'1px solid #1a1a22',overflow:'hidden',background:'#050506'}}>
       {/* ویدیوی پنهان (منبع افکت) — فقط وقتی اسلاید ویدیویی فعاله */}
       {cur&&cur.type==='video'&&(
-        <video ref={videoRef} src={cur.src} autoPlay loop muted playsInline
+        <video key={idx} ref={videoRef} src={cur.src} autoPlay loop muted playsInline
           style={{position:'absolute',width:1,height:1,opacity:0,pointerEvents:'none'}}/>
       )}
       <canvas ref={canvasRef} style={{width:'100%',height:'100%',display:'block',imageRendering:'pixelated'}}/>
