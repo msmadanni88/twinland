@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { PALETTES, PALETTE_ORDER, DEFAULT_PALETTE, DEFAULT_MODE, buildC, loadPrefs, savePalette, saveMode } from './palettes'
 import AuthGate from './AuthGate'
-import { LEVELS, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile, fetchMyClans, fetchClanStandings, fetchClanMembers, clanLevel, fetchRegionLeaderboard, fetchRegionClans } from './gameSystem'
+import { LEVELS, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile, subscribeToTables, fetchMyClans, fetchClanStandings, fetchClanMembers, clanLevel, fetchRegionLeaderboard, fetchRegionClans } from './gameSystem'
 
 const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
 const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
@@ -181,6 +181,7 @@ function TwinLand({ session, onLogout }) {
   const [coins,      setCoins]      = useState(0)
   const [userName,   setUserName]   = useState('')
   const [isAdmin,    setIsAdmin]    = useState(false)
+  const [accountType, setAccountType] = useState('user')
   const [navOpen,    setNavOpen]    = useState(false)
   const [xpAnim,     setXpAnim]     = useState(null)
   const [vw,         setVw]         = useState(800)
@@ -265,18 +266,28 @@ function TwinLand({ session, onLogout }) {
     const uid=session.user.id
     const h={'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token}
     fetch(SB_URL+'/rest/v1/profiles?id=eq.'+uid+'&select=*',{headers:h})
-      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin) } }).catch(()=>{})
+      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin); setAccountType(p.account_type||'user') } }).catch(()=>{})
     fetch(SB_URL+'/rest/v1/checkins?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
       .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setCheckedIn(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
   },[session])
 
-  // realtime: با هر تغییر XP در دیتابیس، مقادیر محلی فوراً سینک شن (بدون رفرش)
+  // realtime: تغییرات لحظه‌ای پروفایل خودم + چک‌این‌های خودم (بدون رفرش)
   useEffect(()=>{
     if(!session||!session.user||!session.user.id) return
-    const unsub = subscribeToProfile(session.user.id,(rec)=>{
-      if(rec.xp!=null) setXp(rec.xp)
-      if(rec.streak!=null) setStreak(rec.streak)
-      if(rec.coins!=null) setCoins(rec.coins)
+    const uid=session.user.id
+    const unsub = subscribeToTables([
+      { table:'profiles', event:'UPDATE', filter:'id=eq.'+uid },
+      { table:'checkins', event:'INSERT', filter:'user_id=eq.'+uid },
+    ],(p)=>{
+      if(p.table==='profiles' && p.record){
+        const r=p.record
+        if(r.xp!=null) setXp(r.xp)
+        if(r.streak!=null) setStreak(r.streak)
+        if(r.coins!=null) setCoins(r.coins)
+      }
+      if(p.table==='checkins' && p.record && p.record.cafe_id){
+        setCheckedIn(prev=>{ const s=new Set(prev); s.add(p.record.cafe_id); return s })
+      }
     })
     return ()=>unsub()
   },[session])
@@ -1024,12 +1035,14 @@ function TwinLand({ session, onLogout }) {
               {key:'profile',icon:'👤',img:'/icon_profile_active@2x.png',label:'پروفایل',href:'/profile'},
               {key:'rank',icon:'🏆',img:'/icon_rank_active@2x.png',label:'رتبه‌بندی',href:'/leaderboard'},
               {key:'clans',icon:'🛡',img:'/icon_clan_active@2x.png',label:'کلن‌ها',href:'/clan'},
+              {key:'business',icon:'🏪',label:'پنل کافه‌دار',href:'/business',smeOnly:true},
+              {key:'admin',icon:'🛡️',label:'پنل ادمین',href:'/admin',adminOnly:true},
               {key:'xp',icon:'⭐',img:'/xp_coin@256-1.png',label:'سیستم XP',href:null},
               {key:'settings',icon:'⚙️',img:'/settings@256.png',label:'تنظیمات',href:null},
               {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
               {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
               {key:'logout',icon:'🚪',label:'خروج',href:null},
-            ].filter(item=>!item.adminOnly||isAdmin).map((item,i,arr)=>{
+            ].filter(item=>(!item.adminOnly||isAdmin)&&(!item.smeOnly||accountType==='sme')).map((item,i,arr)=>{
               const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
               if(item.href){
                 return <a key={item.key} href={item.href} style={style}>
@@ -1478,7 +1491,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
     let alive=true
     const load=()=>fetchLeaderboard(sess).then(list=>{ if(alive) setTopPlayers(list.slice(0,3)) })
     load()
-    const unsub=subscribeToProfile(sess?.user?.id,()=>load())
+    const unsub=subscribeToTables([{table:'profiles',event:'UPDATE'}],()=>load())
     return ()=>{ alive=false; unsub() }
   },[])
   const medals={1:'🥇',2:'🥈',3:'🥉'}
@@ -1602,7 +1615,8 @@ function RankTab({C}) {
     let alive=true
     const load=()=>fetchLeaderboard(sess).then(list=>{ if(alive) setRows(list.slice(0,5)) })
     load()
-    const unsub=subscribeToProfile(sess?.user?.id,()=>load())
+    // با هر تغییر XP هر کاربری، لیدربورد لحظه‌ای به‌روز شه
+    const unsub=subscribeToTables([{table:'profiles',event:'UPDATE'}],()=>load())
     return ()=>{ alive=false; unsub() }
   },[])
   return <div style={{padding:'12px 12px 32px'}}>
@@ -1711,6 +1725,27 @@ function ProfileTab({C,xp,levelInfo,streak,checkedIn,userName,coins}) {
 }
 
 // ── CAFE POPUP ────────────────────────────────────────────────────────────────
+// ── claim کردن کافه توسط صاحب احتمالی ────────────────────────────────────────
+async function claimCafe(cafe, showToast){
+  const note=typeof window!=='undefined'?window.prompt('برای تأیید مالکیت، یه توضیح کوتاه بنویس (مثلاً نام روی پروانه کسب، شماره تماس کافه):'):''
+  if(note===null) return  // لغو
+  const s=getSession(); const token=(s&&s.access_token)||SB_KEY; const uid=s&&s.user&&s.user.id
+  if(!uid){ showToast('اول وارد شو'); return }
+  try{
+    const res=await fetch(SB_URL+'/rest/v1/rpc/claim_cafe',{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({p_cafe_id:cafe.id,p_note:note||null})
+    }).then(r=>r.json())
+    const row=Array.isArray(res)?res[0]:res
+    if(row&&row.ok){ showToast('✅ درخواست ثبت شد. بعد از تأیید ادمین فعال می‌شه.') }
+    else if(row&&row.error==='already_owned'){ showToast('این کافه قبلاً صاحب تأییدشده داره') }
+    else if(row&&row.error==='already_claimed_by_you'){ showToast('قبلاً درخواست دادی، منتظر تأییده') }
+    else if(row&&row.error==='claim_pending_other'){ showToast('یه نفر دیگه هم درخواست داده، در حال بررسیه') }
+    else { showToast('خطا در ثبت درخواست') }
+  }catch(e){ showToast('خطا در ارتباط') }
+}
+
 function CafePopup({C,cafe,live,favs,setFavs,checkedIn,onClose,onCheckin,showToast}) {
   const color=getColor(cafe.name); const isChecked=checkedIn.has(cafe.id); const isFav=favs.has(cafe.id)
   const xpAmount=cafe.is_top?XP_CONFIG.checkin_top:XP_CONFIG.checkin
@@ -1751,6 +1786,9 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,onClose,onCheckin,showToa
         </div>
         <button onClick={onCheckin} disabled={isChecked} style={{width:'100%',background:isChecked?C.green:C.accent,color:'white',border:'none',borderRadius:14,padding:15,fontSize:15,fontWeight:700,fontFamily:'inherit',boxShadow:'0 4px 18px '+(isChecked?C.green:C.accent)+'44',opacity:isChecked?.85:1,transition:'all .3s'}}>
           {isChecked?'✅ چک‌این شد!':'📍 چک‌این — +'+xpAmount+' XP'}
+        </button>
+        <button onClick={()=>claimCafe(cafe,showToast)} style={{width:'100%',marginTop:10,background:'transparent',color:C.sub,border:'1.5px dashed '+C.border,borderRadius:14,padding:12,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
+          🏪 صاحب این کافه هستید؟
         </button>
       </div>
     </div>
