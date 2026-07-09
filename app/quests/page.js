@@ -1,4 +1,6 @@
 'use client'
+// ⚠️ این فایل مخصوص مسیر: app/quests/page.js  (عنوان صفحه: «کمپین‌ها»)
+// اگه این کامنت رو زیر gallery/page.js می‌بینی یعنی فایل اشتباه آپلود شده!
 
 import { useState, useEffect, useCallback } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
