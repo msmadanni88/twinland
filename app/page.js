@@ -776,6 +776,32 @@ function TwinLand({ session, onLogout }) {
     setCheckedIn(prev=>new Set([...prev,cafe.id]))
     if(res.level>prevLevel) setTimeout(()=>showToast(`🎉 لول آپ! ${getLevelInfo(res.xp).current.name}`,'level'),400)
     else showToast(res.is_new_cafe?`🎉 کافه‌ی جدید! +${res.awarded} XP`:`✅ چک‌این! +${res.awarded} XP`,'xp')
+
+    // Quest دوطرفه + نگارخانه: پیشرفت/جایزه (silent روی خطا، تجربه‌ی چک‌این رو کند نمی‌کنه)
+    try{
+      const uid=session.user && session.user.id
+      if(uid){
+        fetch(SB_URL+'/rest/v1/rpc/quest_progress_checkin',{
+          method:'POST',
+          headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+          body:JSON.stringify({p_user:uid,p_cafe:cafe.id})
+        }).then(r=>r.json()).then(qr=>{
+          if(qr&&qr.ok&&Array.isArray(qr.completed)&&qr.completed.length>0){
+            qr.completed.forEach((c,i)=>{
+              setTimeout(()=>{
+                const giftTxt=c.collectible?(' + '+(c.collectible.icon||'🎁')+' '+c.collectible.title):''
+                showToast('🎯 Quest تمام شد: '+c.title+' — کد: '+c.code+giftTxt,'xp')
+              },900+i*1400)
+            })
+          }
+        }).catch(()=>{})
+        fetch(SB_URL+'/rest/v1/rpc/sync_platform_collectibles',{
+          method:'POST',
+          headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+          body:JSON.stringify({p_user:uid})
+        }).catch(()=>{})
+      }
+    }catch(e){}
   }
 
   const TH=isMobile?52:56, BH=isMobile?58:62
@@ -1035,6 +1061,8 @@ function TwinLand({ session, onLogout }) {
               {key:'profile',icon:'👤',img:'/icon_profile_active@2x.png',label:'پروفایل',href:'/profile'},
               {key:'rank',icon:'🏆',img:'/icon_rank_active@2x.png',label:'رتبه‌بندی',href:'/leaderboard'},
               {key:'clans',icon:'🛡',img:'/icon_clan_active@2x.png',label:'کلن‌ها',href:'/clan'},
+              {key:'quests',icon:'🎯',label:'کمپین‌ها',href:'/quests'},
+              {key:'gallery',icon:'💎',label:'نگارخانه',href:'/gallery'},
               {key:'business',icon:'🏪',label:'پنل کافه‌دار',href:'/business',smeOnly:true},
               {key:'admin',icon:'🛡️',label:'پنل ادمین',href:'/admin',adminOnly:true},
               {key:'xp',icon:'⭐',img:'/xp_coin@256-1.png',label:'سیستم XP',href:null},
