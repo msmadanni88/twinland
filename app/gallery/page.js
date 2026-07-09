@@ -5,16 +5,17 @@ import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 import { SB_URL, SB_KEY, getSession, subscribeToTables } from '../gameSystem'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
-const RARITY_LABEL = { common: 'معمولی', rare: 'کمیاب', epic: 'حماسی', legendary: 'افسانه‌ای' }
-const RARITY_COLOR = { common: '#94a3b8', rare: '#3b82f6', epic: '#8b5cf6', legendary: '#f59e0b' }
+const CATEGORY_LABEL = { general: 'عمومی', drink: 'نوشیدنی', food: 'غذا', discount: 'تخفیف', event: 'رویداد', collectible: 'کالکشن' }
+const CATEGORY_ICON = { general: '🎯', drink: '☕', food: '🍰', discount: '🏷️', event: '🎉', collectible: '💎' }
 
-export default function GalleryPage() {
+export default function QuestsPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
-  const [defs, setDefs] = useState([])       // کاتالوگ کامل
-  const [owned, setOwned] = useState({})     // code -> earned_at
+  const [quests, setQuests] = useState([])
+  const [progress, setProgress] = useState({})   // quest_id -> row
+  const [redemptions, setRedemptions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all') // all | owned | locked | platform | business
-  const [selected, setSelected] = useState(null)
+  const [tab, setTab] = useState('active')
+  const [catFilter, setCatFilter] = useState('all')
 
   useEffect(() => { setPal(loadPrefs()) }, [])
 
@@ -25,13 +26,16 @@ export default function GalleryPage() {
     const s = getSession()
     if (!s || !s.user) { if (typeof window !== 'undefined') window.location.href = '/'; return }
     const h = H(s)
-    const [allDefs, myAwards] = await Promise.all([
-      get('collectible_defs?select=*&order=rarity.asc,created_at.asc', h),
-      get('awards?user_id=eq.' + s.user.id + '&select=code,earned_at', h),
+    const now = new Date().toISOString()
+    const [qs, prog, red] = await Promise.all([
+      get('quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.' + now + ')&select=*,cafes(name,district)&order=created_at.desc&limit=100', h),
+      get('quest_progress?user_id=eq.' + s.user.id + '&select=*', h),
+      get('redemptions?user_id=eq.' + s.user.id + '&select=*&order=issued_at.desc', h),
     ])
-    setDefs(Array.isArray(allDefs) ? allDefs : [])
-    const om = {}; (Array.isArray(myAwards) ? myAwards : []).forEach(a => { om[a.code] = a.earned_at })
-    setOwned(om)
+    setQuests(Array.isArray(qs) ? qs.filter(q => q.cafe_id) : [])
+    const pm = {}; (Array.isArray(prog) ? prog : []).forEach(p => { pm[p.quest_id] = p })
+    setProgress(pm)
+    setRedemptions(Array.isArray(red) ? red : [])
     setLoading(false)
   }, [])
 
@@ -40,8 +44,9 @@ export default function GalleryPage() {
     const s = getSession()
     if (!s || !s.user) return
     const unsub = subscribeToTables([
-      { table: 'awards', event: '*', filter: 'user_id=eq.' + s.user.id },
-      { table: 'collectible_defs', event: '*' },
+      { table: 'quests', event: '*' },
+      { table: 'quest_progress', event: '*', filter: 'user_id=eq.' + s.user.id },
+      { table: 'redemptions', event: '*', filter: 'user_id=eq.' + s.user.id },
     ], () => load())
     return () => unsub()
   }, [load])
@@ -49,71 +54,99 @@ export default function GalleryPage() {
   const C = buildC(pal.palette, pal.mode)
   const S = mkS(C)
 
-  const visible = defs.filter(d => {
-    if (filter === 'owned') return !!owned[d.code]
-    if (filter === 'locked') return !owned[d.code]
-    if (filter === 'platform') return d.source === 'platform'
-    if (filter === 'business') return d.source === 'business'
-    return true
-  })
-  const ownedCount = defs.filter(d => owned[d.code]).length
+  const activeQuests = quests.filter(q => !(progress[q.id] && progress[q.id].completed))
+    .filter(q => catFilter === 'all' || q.category === catFilter)
+  const completedRewards = redemptions
 
   return (
     <div style={S.page}>
       <div style={S.topbar}>
         <a href="/" style={S.backBtn}>‹ نقشه</a>
-        <div style={S.brand}>نگارخانه</div>
+        <div style={S.brand}>کمپین‌ها</div>
         <div style={{ width: 64 }} />
       </div>
 
       <div style={S.container}>
-        <div style={S.heroCard}>
-          <div style={{ fontSize: 13, color: C.sub }}>کلکسیون تو</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: C.text, marginTop: 2 }}>{fa(ownedCount)} <span style={{ fontSize: 14, color: C.sub, fontWeight: 500 }}>از {fa(defs.length)}</span></div>
+        <div style={S.tabs}>
+          <button style={tab === 'active' ? S.tabActive : S.tab} onClick={() => setTab('active')}>فعال ({fa(activeQuests.length)})</button>
+          <button style={tab === 'rewards' ? S.tabActive : S.tab} onClick={() => setTab('rewards')}>جایزه‌های من ({fa(completedRewards.length)})</button>
         </div>
 
-        <div style={S.filterRow}>
-          {[['all', 'همه'], ['owned', 'کسب‌شده'], ['locked', 'قفل'], ['platform', 'اکتشافی'], ['business', 'کمپینی']].map(([k, label]) => (
-            <button key={k} onClick={() => setFilter(k)} style={filter === k ? S.filterActive : S.filter}>{label}</button>
-          ))}
-        </div>
-
-        {loading ? <div style={{ textAlign: 'center', color: C.sub, padding: '50px 0' }}>در حال بارگذاری…</div> : (
-          visible.length === 0
-            ? <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '40px 0' }}>چیزی اینجا نیست.</div>
-            : <div style={S.grid}>
-                {visible.map(d => {
-                  const isOwned = !!owned[d.code]
-                  return (
-                    <button key={d.code} onClick={() => setSelected({ ...d, earned_at: owned[d.code] })} style={{ ...S.cell, opacity: isOwned ? 1 : 0.45 }}>
-                      <div style={{ fontSize: 30 }}>{isOwned ? d.icon : '🔒'}</div>
-                      <div style={{ ...S.cellRarity, background: RARITY_COLOR[d.rarity] || '#94a3b8' }} />
-                    </button>
-                  )
-                })}
-              </div>
-        )}
-      </div>
-
-      {selected && (
-        <div onClick={() => setSelected(null)} style={S.overlay}>
-          <div onClick={e => e.stopPropagation()} style={S.sheet}>
-            <div style={{ fontSize: 52, textAlign: 'center', marginBottom: 8 }}>{owned[selected.code] ? selected.icon : '🔒'}</div>
-            <div style={{ fontSize: 17, fontWeight: 800, textAlign: 'center', color: C.text }}>{owned[selected.code] ? selected.title : '؟؟؟'}</div>
-            <div style={{ textAlign: 'center', marginTop: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: RARITY_COLOR[selected.rarity], borderRadius: 99, padding: '3px 10px' }}>{RARITY_LABEL[selected.rarity] || selected.rarity}</span>
-              <span style={{ fontSize: 11, color: C.sub, marginRight: 8 }}>{selected.source === 'business' ? 'جایزه‌ی کمپین' : 'اکتشاف پلتفرم'}</span>
-            </div>
-            {owned[selected.code]
-              ? <>
-                  {selected.description && <div style={{ fontSize: 13, color: C.sub, textAlign: 'center', marginTop: 12, lineHeight: 1.8 }}>{selected.description}</div>}
-                  <div style={{ fontSize: 11, color: C.sub, textAlign: 'center', marginTop: 8 }}>کسب‌شده در {new Date(selected.earned_at).toLocaleDateString('fa-IR')}</div>
-                </>
-              : <div style={{ fontSize: 13, color: C.sub, textAlign: 'center', marginTop: 12, lineHeight: 1.8 }}>هنوز این آیتم رو نگرفتی. با چک‌این و شرکت در کمپین‌های کافه‌ها کشفش کن.</div>}
-            <button onClick={() => setSelected(null)} style={S.closeBtn}>بستن</button>
+        {tab === 'active' && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
+            {[['all', '🎯', 'همه'], ...Object.keys(CATEGORY_LABEL).map(k => [k, CATEGORY_ICON[k], CATEGORY_LABEL[k]])].map(([k, icon, label]) => (
+              <button key={k} onClick={() => setCatFilter(k)} style={{ flexShrink: 0, padding: '7px 12px', borderRadius: 10, border: 'none', background: catFilter === k ? C.accent : C.chip, color: catFilter === k ? '#fff' : C.sub, fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>{icon} {label}</button>
+            ))}
           </div>
+        )}
+
+        {loading ? <div style={{ textAlign: 'center', color: C.sub, padding: '50px 0' }}>در حال بارگذاری…</div> : <>
+
+          {tab === 'active' && (
+            activeQuests.length === 0
+              ? <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '40px 0' }}>الان کمپین فعالی نیست. سر بزن یه وقت دیگه ☕</div>
+              : activeQuests.map(q => <QuestCard key={q.id} C={C} q={q} prog={progress[q.id]} />)
+          )}
+
+          {tab === 'rewards' && (
+            completedRewards.length === 0
+              ? <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '40px 0' }}>هنوز جایزه‌ای نگرفتی. یه Quest رو کامل کن!</div>
+              : completedRewards.map(r => <RewardCard key={r.id} C={C} r={r} />)
+          )}
+        </>}
+      </div>
+    </div>
+  )
+}
+
+function QuestCard({ C, q, prog }) {
+  const cur = prog ? prog.progress : 0
+  const pctv = Math.min(100, Math.round((cur / (q.target_count || 1)) * 100))
+  const cafeName = q.cafes ? q.cafes.name : 'کافه'
+  const district = q.cafes ? q.cafes.district : ''
+  return (
+    <div style={{ background: C.card, border: '1px solid ' + C.border, borderRadius: 18, padding: 16, marginBottom: 12, boxShadow: '0 4px 16px rgba(0,0,0,.05)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, background: C.accent + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{q.icon || '🎯'}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 800, color: C.text }}>{q.title}</div>
+          <div style={{ fontSize: 11, color: C.sub }}>{cafeName}{district ? ' · ' + district : ''}</div>
+        </div>
+      </div>
+      {q.description && <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.7 }}>{q.description}</div>}
+
+      {q.target_count > 1 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ height: 8, background: C.chip, borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: pctv + '%', background: C.accent, borderRadius: 99, transition: 'width .5s' }} />
+          </div>
+          <div style={{ fontSize: 10.5, color: C.sub, marginTop: 4 }}>{fa(cur)} از {fa(q.target_count)}</div>
         </div>
       )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.accent }}>🎁 {q.reward_label}{q.reward_xp > 0 ? ' + ' + fa(q.reward_xp) + ' XP' : ''}</div>
+        {q.reward_collectible_code && <span style={{ fontSize: 10, background: C.chip, borderRadius: 99, padding: '3px 9px', color: C.sub }}>+ آیتم کلکسیونی</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 10, background: C.chip, borderRadius: 99, padding: '3px 9px', color: C.sub }}>{CATEGORY_ICON[q.category] || '🎯'} {CATEGORY_LABEL[q.category] || 'عمومی'}</span>
+        {q.discount_pct > 0 && <span style={{ fontSize: 10, background: '#10b98122', borderRadius: 99, padding: '3px 9px', color: '#10b981', fontWeight: 700 }}>🏷️ {fa(q.discount_pct)}٪ تخفیف</span>}
+      </div>
+    </div>
+  )
+}
+
+function RewardCard({ C, r }) {
+  const statusMap = { issued: ['در انتظار ارائه', '#f59e0b'], redeemed: ['استفاده شد', '#10b981'], expired: ['منقضی شده', '#94a3b8'] }
+  const [label, color] = statusMap[r.status] || statusMap.issued
+  return (
+    <div style={{ background: C.card, border: '1px solid ' + C.border, borderRadius: 16, padding: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ fontSize: 22 }}>🎟️</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{r.reward_label}</div>
+        <div style={{ fontSize: 11, color: C.sub, marginTop: 2 }}>کد: <span style={{ fontFamily: 'monospace', letterSpacing: 1 }}>{r.code}</span></div>
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 700, color, background: color + '18', borderRadius: 99, padding: '4px 10px' }}>{label}</span>
     </div>
   )
 }
@@ -124,14 +157,7 @@ const mkS = (C) => ({
   backBtn: { width: 64, fontSize: 15, color: C.accent, textDecoration: 'none', fontWeight: 700 },
   brand: { fontWeight: 800, fontSize: 17, color: C.text },
   container: { maxWidth: 480, margin: '0 auto', padding: '16px' },
-  heroCard: { background: C.card, border: '1px solid ' + C.border, borderRadius: 18, padding: 16, marginBottom: 14, textAlign: 'center' },
-  filterRow: { display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' },
-  filter: { flexShrink: 0, padding: '8px 13px', borderRadius: 10, border: 'none', background: C.chip, color: C.sub, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' },
-  filterActive: { flexShrink: 0, padding: '8px 13px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 },
-  cell: { position: 'relative', aspectRatio: '1', background: C.card, border: '1px solid ' + C.border, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 16px rgba(0,0,0,.05)' },
-  cellRarity: { position: 'absolute', bottom: 6, width: 18, height: 4, borderRadius: 99 },
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'flex-end', zIndex: 50 },
-  sheet: { width: '100%', maxWidth: 480, margin: '0 auto', background: C.card, borderRadius: '22px 22px 0 0', padding: '22px 20px 28px' },
-  closeBtn: { width: '100%', marginTop: 18, padding: '12px', borderRadius: 12, border: 'none', background: C.chip, color: C.text, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
+  tabs: { display: 'flex', gap: 8, marginBottom: 14 },
+  tab: { flex: 1, padding: '10px', borderRadius: 12, border: 'none', background: C.chip, color: C.sub, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
+  tabActive: { flex: 1, padding: '10px', borderRadius: 12, border: 'none', background: C.accent, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
 })
