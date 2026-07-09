@@ -55,16 +55,7 @@ function cafeInLayer(lat,lng,lyr){
   return false
 }
 
-const MISSIONS = [
-  { id:'m1',icon:'☕',title:'اولین قدم',     desc:'اولین چک‌این خود را ثبت کن',          xp:50,  total:1, done:0, type:'daily'  },
-  { id:'m2',icon:'🔥',title:'استریک ۳ روزه', desc:'۳ روز پشت‌هم چک‌این کن',              xp:80,  total:3, done:2, type:'streak' },
-  { id:'m3',icon:'⭐',title:'کافه‌های برتر',  desc:'۵ کافه طلایی را کشف کن',              xp:120, total:5, done:1, type:'weekly' },
-  { id:'m4',icon:'🗺',title:'کاشف شمال',     desc:'تمام کافه‌های شمال تهران را ببین',     xp:150, total:8, done:3, type:'weekly' },
-  { id:'m5',icon:'👥',title:'اجتماعی',       desc:'با ۳ نفر هم‌زمان چک‌این کن',          xp:100, total:3, done:0, type:'social' },
-  { id:'m6',icon:'⚔️',title:'رویداد گریفیندور',desc:'در رویداد ویژه شرکت کن',           xp:200, total:1, done:0, type:'event'  },
-  { id:'m7',icon:'🌙',title:'شب‌گرد',        desc:'۳ بار بعد از ۱۰ شب چک‌این کن',       xp:90,  total:3, done:1, type:'daily'  },
-  { id:'m8',icon:'📚',title:'کتاب‌خوان',     desc:'۲ بار در کافه کتاب چک‌این کن',        xp:70,  total:2, done:2, type:'weekly' },
-]
+// (آرایه‌ی mockup قدیمی MISSIONS حذف شد — تب ماموریت‌ها حالا از quests واقعی می‌خونه)
 
 // رنگ‌ها (C) حالا داخل کامپوننت از پالت فعال ساخته می‌شوند — به palettes.js نگاه کن
 
@@ -925,8 +916,6 @@ function TwinLand({ session, onLogout }) {
         </div>
       </div>
 
-      <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe}/>
-
       {/* BODY */}
       <div style={{flex:1,position:'relative',overflow:'hidden'}}>
 
@@ -1012,7 +1001,8 @@ function TwinLand({ session, onLogout }) {
           <span><span style={{color:C.green,fontSize:8}}>●</span> {totalLive}</span>
           {checkedIn.size>0&&<><span style={{color:C.border}}>|</span><span style={{color:C.green,fontWeight:700}}>✓ {checkedIn.size}</span></>}
         </div>
-        {streak>=2&&<div style={{position:'absolute',top:10,left:10,zIndex:18,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
+        <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe}/>
+        {streak>=2&&<div style={{position:'absolute',top:52,left:10,zIndex:18,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
 
         {/* nav controls — بیرون از لایه‌ی نقشه. هنگام باز بودن هر پاپ‌آپ مخفی می‌شه */}
         {!(showRegionFilter||showRegionResults||showXP||showMenu||showCity||showMode||showBoundary||showPalette||showMapSettings||panelOpen) && (
@@ -1057,7 +1047,7 @@ function TwinLand({ session, onLogout }) {
               </div>
               <div style={{flex:1,overflowY:'auto',scrollbarWidth:'none'}}>
                 {panelTab==='dashboard'&&<DashboardTab C={C} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP}/>}
-                {panelTab==='missions'&&<MissionsTab C={C} checkedIn={checkedIn} showToast={showToast}/>}
+                {panelTab==='missions'&&<MissionsTab C={C} cafes={cafes} setSelCafe={setSelCafe} showToast={showToast}/>}
                 {panelTab==='rank'&&<RankTab C={C}/>}
                 {panelTab==='clan'&&<ClanTab C={C}/>}
                 {panelTab==='profile'&&<ProfileTab C={C} xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn} userName={userName} coins={coins}/>}
@@ -1450,6 +1440,18 @@ const LED_ADS = [
   { type:'video', src:'/ads/led-5.mp4' },
 ]
 function LedAdBar({ C }) {
+  const [visible, setVisible] = useState(false)
+  useEffect(()=>{
+    let hideTimer
+    function trigger(){ setVisible(true); hideTimer=setTimeout(()=>setVisible(false),15000) }
+    const firstTimer=setTimeout(trigger,8000)          // اولین نمایش کمی بعد از باز شدن اپ
+    const hourTimer=setInterval(trigger,3600000)         // بعدش هر ۱ ساعت یک‌بار
+    return ()=>{ clearTimeout(firstTimer); clearTimeout(hideTimer); clearInterval(hourTimer) }
+  },[])
+  if(!visible) return null
+  return <LedAdBarInner C={C}/>
+}
+function LedAdBarInner({ C }) {
   const canvasRef=useRef(null)
   const srcRef=useRef(null)
   const videoRef=useRef(null)
@@ -1540,17 +1542,19 @@ function LedAdBar({ C }) {
 
   const cur=LED_ADS[idx]
   return (
-    <div style={{height:36,flexShrink:0,position:'relative',borderTop:'1px solid #1a1a22',overflow:'hidden',background:'#050506'}}>
-      {/* ویدیوی پنهان (منبع افکت) — فقط وقتی اسلاید ویدیویی فعاله */}
-      {cur&&cur.type==='video'&&(
-        <video key={idx} ref={videoRef} src={cur.src} autoPlay loop muted playsInline
-          style={{position:'absolute',width:1,height:1,opacity:0,pointerEvents:'none'}}/>
-      )}
-      <canvas ref={canvasRef} style={{width:'100%',height:'100%',display:'block',imageRendering:'pixelated'}}/>
-      <div style={{position:'absolute',bottom:2,left:8,display:'flex',gap:3}}>
-        {LED_ADS.map((_,i)=>(
-          <span key={i} style={{width:i===idx?10:4,height:2.5,borderRadius:2,background:i===idx?'#fff':'rgba(255,255,255,.3)',transition:'.3s'}}/>
-        ))}
+    <div style={{padding:'0 14px 8px',flexShrink:0}}>
+      <div style={{height:32,position:'relative',borderRadius:14,overflow:'hidden',background:'#050506',boxShadow:'0 4px 16px rgba(0,0,0,.18)'}}>
+        {/* ویدیوی پنهان (منبع افکت) — فقط وقتی اسلاید ویدیویی فعاله */}
+        {cur&&cur.type==='video'&&(
+          <video key={idx} ref={videoRef} src={cur.src} autoPlay loop muted playsInline
+            style={{position:'absolute',width:1,height:1,opacity:0,pointerEvents:'none'}}/>
+        )}
+        <canvas ref={canvasRef} style={{width:'100%',height:'100%',display:'block',imageRendering:'pixelated'}}/>
+        <div style={{position:'absolute',bottom:2,left:8,display:'flex',gap:3}}>
+          {LED_ADS.map((_,i)=>(
+            <span key={i} style={{width:i===idx?10:4,height:2.5,borderRadius:2,background:i===idx?'#fff':'rgba(255,255,255,.3)',transition:'.3s'}}/>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -1641,6 +1645,19 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
               <div style={{fontSize:11,color:'#E65100',fontWeight:700,marginTop:6}}>🎁 {ev.reward_label}{ev.reward_xp>0?' · +'+ev.reward_xp+' XP':''}</div>
             </a>
           })}
+      <div style={{display:'flex',gap:8,overflowX:'auto',scrollbarWidth:'none',marginTop:4,paddingBottom:2}}>
+        {[
+          {icon:'💎',label:'نگارخانه',href:'/gallery',color:'#8b5cf6'},
+          {icon:'🏆',label:'رتبه‌بندی',href:'/leaderboard',color:'#f59e0b'},
+          {icon:'🛡️',label:'کلن‌ها',href:'/clan',color:'#3b82f6'},
+        ].map(s=>(
+          <a key={s.href} href={s.href} style={{flexShrink:0,textDecoration:'none',background:s.color+'14',border:'1px solid '+s.color+'33',borderRadius:14,padding:'10px 12px',minWidth:110,display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
+            <span style={{fontSize:20}}>{s.icon}</span>
+            <span style={{fontSize:11,fontWeight:800,color:C.text}}>{s.label}</span>
+            <span style={{fontSize:9,color:s.color,fontWeight:700}}>مشاهده کامل ›</span>
+          </a>
+        ))}
+      </div>
     </div>
     <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)',paddingBottom:24}}>
       <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>برترین‌ها</div>
@@ -1655,47 +1672,87 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
   </div>
 }
 
-// ── MISSIONS TAB ──────────────────────────────────────────────────────────────
-function MissionsTab({C,checkedIn,showToast}) {
-  const TYPE_LABELS = {daily:'روزانه',weekly:'هفتگی',streak:'استریک',social:'اجتماعی',event:'رویداد'}
-  const TYPE_COLORS = {daily:C.blue,weekly:C.purple,streak:C.accent,social:C.green,event:'#FF9500'}
+// ── MISSIONS TAB — حالا کاملاً واقعی: از quests واقعی می‌خونه، claim تکراری امکان نداره ──
+function MissionsTab({C, cafes, setSelCafe, showToast}) {
+  const [quests, setQuests] = useState([])
+  const [progress, setProgress] = useState({})
+  const [redemptions, setRedemptions] = useState({})
+  const sess = getSession()
+  const uid = sess && sess.user && sess.user.id
+
+  const load = useCallback(()=>{
+    const h={apikey:SB_KEY,Authorization:'Bearer '+((sess&&sess.access_token)||SB_KEY)}
+    fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=*,cafes(name,district)&order=created_at.desc&limit=30',{headers:h})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setQuests(rows) }).catch(()=>{})
+    if(uid){
+      fetch(SB_URL+'/rest/v1/quest_progress?user_id=eq.'+uid+'&select=*',{headers:h})
+        .then(r=>r.json()).then(rows=>{ const m={}; (Array.isArray(rows)?rows:[]).forEach(p=>{m[p.quest_id]=p}); setProgress(m) }).catch(()=>{})
+      fetch(SB_URL+'/rest/v1/redemptions?user_id=eq.'+uid+'&select=*',{headers:h})
+        .then(r=>r.json()).then(rows=>{ const m={}; (Array.isArray(rows)?rows:[]).forEach(r=>{m[r.quest_id]=r}); setRedemptions(m) }).catch(()=>{})
+    }
+  },[uid])
+
+  useEffect(()=>{ load() },[load])
+  useEffect(()=>{
+    const subs=[{table:'quests',event:'*'}]
+    if(uid){ subs.push({table:'quest_progress',event:'*',filter:'user_id=eq.'+uid}); subs.push({table:'redemptions',event:'*',filter:'user_id=eq.'+uid}) }
+    const unsub=subscribeToTables(subs,()=>load())
+    return ()=>unsub()
+  },[load,uid])
+
+  function openCafe(q){
+    const cafe=cafes.find(c=>c.id===q.cafe_id)
+    if(cafe) setSelCafe(cafe)
+    else showToast && showToast('این کافه الان روی نقشه لود نشده، از /quests امتحان کن','warn')
+  }
+
+  if(quests.length===0){
+    return <div style={{padding:'50px 16px',textAlign:'center'}}>
+      <div style={{fontSize:40,marginBottom:10}}>🎯</div>
+      <div style={{fontWeight:800,color:C.text,marginBottom:4}}>الان ماموریت/رویداد فعالی نیست</div>
+      <div style={{fontSize:12,color:C.sub}}>کافه‌دارها به‌زودی چیزی منتشر می‌کنن — همین‌جا لحظه‌ای میاد.</div>
+    </div>
+  }
 
   return <div style={{padding:'12px 12px 32px'}}>
-    <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>ماموریت‌های فعال</div>
-    <div style={{fontSize:11,color:C.sub,marginBottom:14}}>ماموریت‌ها رو انجام بده و XP بگیر</div>
-    {['daily','streak','weekly','social','event'].map(type=>{
-      const items=MISSIONS.filter(m=>m.type===type); if(!items.length) return null
-      return <div key={type} style={{marginBottom:18}}>
-        <div style={{display:'inline-flex',alignItems:'center',gap:5,background:TYPE_COLORS[type]+'18',border:'1px solid '+TYPE_COLORS[type]+'44',borderRadius:99,padding:'3px 10px',fontSize:10,fontWeight:700,color:TYPE_COLORS[type],marginBottom:8}}>{TYPE_LABELS[type]}</div>
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {items.map(m=>{
-            const pct=Math.round((m.done/m.total)*100); const isDone=m.done>=m.total
-            return <div key={m.id} style={{background:isDone?C.green+'22':C.card,border:'1px solid '+(isDone?C.green+'66':C.border),borderRadius:14,padding:'12px',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}}>
-              <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-                <div style={{width:40,height:40,borderRadius:12,flexShrink:0,background:isDone?C.green+'20':TYPE_COLORS[type]+'15',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{isDone?'✅':m.icon}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                    <div style={{fontSize:13,fontWeight:700,color:C.text}}>{m.title}</div>
-                    <div style={{fontSize:11,fontWeight:800,color:C.accent,flexShrink:0}}>+{m.xp} XP</div>
-                  </div>
-                  <div style={{fontSize:11,color:C.sub,marginTop:2,lineHeight:1.4}}>{m.desc}</div>
-                  <div style={{marginTop:8}}>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                      <span style={{fontSize:10,color:isDone?C.green:C.sub,fontWeight:isDone?700:400}}>{isDone?'تکمیل شد! ✓':`${m.done} از ${m.total}`}</span>
-                      <span style={{fontSize:10,color:C.sub}}>{pct}%</span>
-                    </div>
-                    <div style={{height:5,background:C.chip,borderRadius:99,overflow:'hidden'}}>
-                      <div className="mission-bar" style={{height:'100%',width:pct+'%',background:isDone?'linear-gradient(90deg,'+C.green+',#5AC96C)':'linear-gradient(90deg,'+TYPE_COLORS[type]+','+TYPE_COLORS[type]+'aa)',borderRadius:99}}/>
-                    </div>
-                  </div>
-                </div>
+    <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>ماموریت‌ها و رویدادهای فعال</div>
+    <div style={{fontSize:11,color:C.sub,marginBottom:14}}>واقعی و لحظه‌ای — همین الان کافه‌دارها منتشرشون کردن</div>
+    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+      {quests.map(q=>{
+        const prog=progress[q.id]
+        const cur=prog?prog.progress:0
+        const isDone=!!(prog&&prog.completed)
+        const pct=Math.min(100,Math.round((cur/(q.target_count||1))*100))
+        const red=redemptions[q.id]
+        const cafeName=q.cafes?q.cafes.name:'کافه'
+        return <div key={q.id} style={{background:isDone?C.green+'18':C.card,border:'1px solid '+(isDone?C.green+'55':C.border),borderRadius:14,padding:12}}>
+          <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+            <div style={{width:40,height:40,borderRadius:12,flexShrink:0,background:isDone?C.green+'20':C.accent+'15',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{isDone?'✅':(q.icon||'🎯')}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.text}}>{q.title}</div>
+                {q.reward_xp>0 && <div style={{fontSize:11,fontWeight:800,color:C.accent,flexShrink:0}}>+{q.reward_xp} XP</div>}
               </div>
-              {isDone&&<button onClick={()=>showToast('🎁 +'+m.xp+' XP دریافت شد!','xp')} style={{marginTop:10,width:'100%',background:'linear-gradient(90deg,'+C.green+',#5AC96C)',border:'none',borderRadius:10,padding:'8px',fontSize:12,color:'white',fontWeight:700,fontFamily:'inherit',boxShadow:'0 3px 12px '+C.green+'44'}}>🎁 دریافت جایزه</button>}
+              <div style={{fontSize:11,color:C.sub,marginTop:2}}>{cafeName}{q.cafes&&q.cafes.district?' · '+q.cafes.district:''}</div>
+              {q.target_count>1 && <div style={{marginTop:8}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                  <span style={{fontSize:10,color:isDone?C.green:C.sub,fontWeight:isDone?700:400}}>{isDone?'تکمیل شد! ✓':(cur+' از '+q.target_count)}</span>
+                  <span style={{fontSize:10,color:C.sub}}>{pct}%</span>
+                </div>
+                <div style={{height:5,background:C.chip,borderRadius:99,overflow:'hidden'}}>
+                  <div className="mission-bar" style={{height:'100%',width:pct+'%',background:isDone?'linear-gradient(90deg,'+C.green+',#5AC96C)':'linear-gradient(90deg,'+C.accent+','+C.accent+'aa)',borderRadius:99}}/>
+                </div>
+              </div>}
             </div>
-          })}
+          </div>
+          {isDone
+            ? <div style={{marginTop:10,background:C.green+'15',border:'1px dashed '+C.green,borderRadius:10,padding:'8px 10px',textAlign:'center'}}>
+                <span style={{fontSize:11.5,color:C.green,fontWeight:800}}>🎁 {q.reward_label}{red?' — کد: '+red.code:''}</span>
+              </div>
+            : <button onClick={()=>openCafe(q)} style={{marginTop:10,width:'100%',background:C.accent,border:'none',borderRadius:10,padding:'8px',fontSize:12,color:'white',fontWeight:700,fontFamily:'inherit'}}>📍 برو به {cafeName} و چک‌این کن</button>}
         </div>
-      </div>
-    })}
+      })}
+    </div>
   </div>
 }
 
@@ -1817,7 +1874,7 @@ function ProfileTab({C,xp,levelInfo,streak,checkedIn,userName,coins}) {
   </div>
 }
 
-// ── نوار اسلایدشوی رویدادها (بالای نقشه، لحظه‌ای) ───────────────────────────
+// ── پیل شیشه‌ای رویدادها روی نقشه (هم‌استایل پیل آمار زنده، بدون بک‌گراند مجزا) ──
 function EventBanner({C, cafes, setSelCafe}) {
   const [events, setEvents] = useState([])
   const [idx, setIdx] = useState(0)
@@ -1843,8 +1900,6 @@ function EventBanner({C, cafes, setSelCafe}) {
     return ()=>clearInterval(timerRef.current)
   },[events.length])
 
-  useEffect(()=>{ if(idx>=events.length) setIdx(0) },[events.length]) // eslint-disable-line
-
   if(events.length===0) return null
   const safeIdx = idx % events.length
   const ev = events[safeIdx]
@@ -1868,32 +1923,21 @@ function EventBanner({C, cafes, setSelCafe}) {
   }
 
   return (
-    <div style={{padding:'8px 12px 0',flexShrink:0}}>
-      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
-        style={{position:'relative',height:56,background:'linear-gradient(90deg,'+C.accent+'16,'+C.accent+'06)',border:'1px solid '+C.accent+'38',borderRadius:16,overflow:'hidden',display:'flex',alignItems:'stretch'}}>
-
-        <button onClick={()=>go(1)} style={{flexShrink:0,width:28,background:'transparent',border:'none',color:C.sub,fontSize:16,fontFamily:'inherit'}}>‹</button>
-
-        <div key={ev.id} onClick={onClickBanner} style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:9,cursor:'pointer',animation:'evSlide .35s ease',padding:'0 2px'}}>
-          <span style={{fontSize:22,flexShrink:0}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-              {ev.cafes?ev.cafes.name:'یه کافه'} <span style={{fontWeight:500,color:C.sub}}>رویداد تازه گذاشت</span>
-            </div>
-            <div style={{fontSize:11,color:C.accent,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-              {ev.title} · 🎁 {ev.reward_label}{ev.discount_pct>0?' · 🏷️'+ev.discount_pct+'٪':''}
-            </div>
-          </div>
-        </div>
-
-        <button onClick={()=>go(-1)} style={{flexShrink:0,width:28,background:'transparent',border:'none',color:C.sub,fontSize:16,fontFamily:'inherit'}}>›</button>
+    <div style={{position:'absolute',top:10,left:10,zIndex:18,display:'flex',flexDirection:'column',gap:5,alignItems:'flex-start',maxWidth:230}}>
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={onClickBanner}
+        style={{background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'5px 8px',display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)',cursor:'pointer',minWidth:0}}>
+        <button onClick={(e)=>{e.stopPropagation();go(1)}} style={{background:'none',border:'none',color:C.sub,fontSize:13,padding:'0 1px',flexShrink:0,fontFamily:'inherit'}}>‹</button>
+        <span key={ev.id} style={{display:'flex',alignItems:'center',gap:5,minWidth:0,animation:'evSlide .3s ease'}}>
+          <span style={{fontSize:13,flexShrink:0}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
+          <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',fontWeight:700,color:C.text}}>{ev.cafes?ev.cafes.name:'کافه'}: {ev.title}</span>
+        </span>
+        <button onClick={(e)=>{e.stopPropagation();go(-1)}} style={{background:'none',border:'none',color:C.sub,fontSize:13,padding:'0 1px',flexShrink:0,fontFamily:'inherit'}}>›</button>
       </div>
-
       {events.length>1 && (
-        <div style={{display:'flex',gap:5,justifyContent:'center',marginTop:6,overflowX:'auto',scrollbarWidth:'none',padding:'0 4px'}}>
+        <div style={{display:'flex',gap:3,paddingRight:8}}>
           {events.map((e,i)=>(
             <button key={e.id} onClick={()=>{ clearInterval(timerRef.current); setIdx(i) }}
-              style={{flexShrink:0,width:i===safeIdx?16:6,height:6,borderRadius:99,border:'none',background:i===safeIdx?C.accent:C.border,transition:'all .3s'}}/>
+              style={{flexShrink:0,width:i===safeIdx?12:4,height:4,borderRadius:99,border:'none',background:i===safeIdx?C.accent:C.border,transition:'all .3s',padding:0}}/>
           ))}
         </div>
       )}
@@ -2024,12 +2068,14 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
   const [evLoading,setEvLoading]=useState(true)
   useEffect(()=>{
     let alive=true
-    setEvLoading(true)
-    fetch(SB_URL+'/rest/v1/quests?cafe_id=eq.'+cafe.id+'&active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,collectible_defs(icon,title,rarity)&order=created_at.desc&limit=6',
+    const loadEvents=()=>fetch(SB_URL+'/rest/v1/quests?cafe_id=eq.'+cafe.id+'&active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,discount_pct,collectible_defs(icon,title,rarity)&order=created_at.desc&limit=6',
       {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}})
       .then(r=>r.json()).then(rows=>{ if(alive) setCafeEvents(Array.isArray(rows)?rows:[]) }).catch(()=>{})
       .finally(()=>{ if(alive) setEvLoading(false) })
-    return ()=>{ alive=false }
+    setEvLoading(true)
+    loadEvents()
+    const unsub=subscribeToTables([{table:'quests',event:'*',filter:'cafe_id=eq.'+cafe.id}],()=>loadEvents())
+    return ()=>{ alive=false; unsub() }
   },[cafe.id])
   return <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)'}} onClick={onClose}>
     <div onClick={(e)=>e.stopPropagation()} style={{position:'absolute',bottom:0,left:0,right:0,maxHeight:'88dvh',overflowY:'auto',background:C.card,borderRadius:'24px 24px 0 0',border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
