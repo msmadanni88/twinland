@@ -18,6 +18,7 @@ export default function BusinessPage() {
   useEffect(() => { setPal(loadPrefs()) }, [])
   const H = (s) => ({ apikey: SB_KEY, Authorization: 'Bearer ' + ((s && s.access_token) || SB_KEY) })
   const get = (url, h) => fetch(SB_URL + '/rest/v1/' + url, { headers: h }).then(r => r.json()).catch(() => [])
+  const post = (url, h, body) => fetch(SB_URL + '/rest/v1/' + url, { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(r => r.json()).catch(() => null)
   const one = (arr) => (Array.isArray(arr) && arr[0]) ? arr[0] : null
 
   const load = useCallback(async () => {
@@ -33,7 +34,7 @@ export default function BusinessPage() {
     const map = {}
     for (const b of bizArr.filter(x => x.status === 'verified')) {
       const cid = b.cafe_id
-      const [daily, hourly, weekday, retention, periods, clv, cohort, rank, clans, covisit] = await Promise.all([
+      const [daily, hourly, weekday, retention, periods, clv, cohort, rank, clans, covisit, quests, qstats] = await Promise.all([
         get('business_daily?cafe_id=eq.' + cid + '&select=day,checkins&order=day.asc', h),
         get('business_hourly?cafe_id=eq.' + cid + '&select=hour,checkins&order=hour.asc', h),
         get('business_weekday?cafe_id=eq.' + cid + '&select=weekday,checkins&order=weekday.asc', h),
@@ -44,6 +45,8 @@ export default function BusinessPage() {
         get('business_rank?cafe_id=eq.' + cid + '&select=*', h),
         get('business_clans?cafe_id=eq.' + cid + '&select=*&order=members_visited.desc&limit=5', h),
         get('business_covisit?cafe_id=eq.' + cid + '&select=*&order=shared_customers.desc&limit=6', h),
+        get('quests?business_id=eq.' + b.id + '&select=*&order=created_at.desc', h),
+        get('quest_stats?business_id=eq.' + b.id + '&select=*', h),
       ])
       map[cid] = {
         stat: statMap[cid] || {},
@@ -51,6 +54,7 @@ export default function BusinessPage() {
         retention: one(retention), periods: one(periods), clv: one(clv),
         cohort: one(cohort), rank: one(rank),
         clans: Array.isArray(clans) ? clans : [], covisit: Array.isArray(covisit) ? covisit : [],
+        quests: Array.isArray(quests) ? quests : [], qstats: Array.isArray(qstats) ? qstats : [],
       }
     }
     setData(map)
@@ -59,7 +63,10 @@ export default function BusinessPage() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
-    const unsub = subscribeToTables([{ table: 'checkins', event: 'INSERT' }, { table: 'businesses', event: '*' }], () => load())
+    const unsub = subscribeToTables([
+      { table: 'checkins', event: 'INSERT' }, { table: 'businesses', event: '*' },
+      { table: 'quests', event: '*' }, { table: 'quest_progress', event: '*' }, { table: 'redemptions', event: '*' },
+    ], () => load())
     return () => unsub()
   }, [load])
 
@@ -81,7 +88,7 @@ export default function BusinessPage() {
         {loading ? <div style={{ textAlign: 'center', color: C.sub, padding: '60px 0' }}>در حال بارگذاری…</div>
           : businesses.length === 0 ? <EmptyState C={C} />
           : <>
-            {verified.map(b => <BusinessCard key={b.id} C={C} biz={b} d={data[b.cafe_id]} tab={tab} setTab={setTab} />)}
+            {verified.map(b => <BusinessCard key={b.id} C={C} biz={b} d={data[b.cafe_id]} tab={tab} setTab={setTab} onReload={load} />)}
             {pending.map(b => (
               <div key={b.id} style={{ background: C.card, border: '1px solid #f59e0b44', borderRadius: 18, padding: 16, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 42, height: 42, borderRadius: 12, background: '#f59e0b18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⏳</div>
@@ -105,9 +112,9 @@ function EmptyState({ C }) {
   )
 }
 
-function BusinessCard({ C, biz, d, tab, setTab }) {
+function BusinessCard({ C, biz, d, tab, setTab, onReload }) {
   if (!d) return null
-  const TABS = [['overview', 'نمای کلی'], ['customers', 'مشتری‌ها'], ['timing', 'زمان‌بندی'], ['market', 'بازار']]
+  const TABS = [['overview', 'نمای کلی'], ['customers', 'مشتری‌ها'], ['timing', 'زمان‌بندی'], ['market', 'بازار'], ['campaigns', 'کمپین‌ها']]
   return (
     <div style={{ background: C.card, border: '1px solid ' + C.border, borderRadius: 20, padding: 18, marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -130,6 +137,7 @@ function BusinessCard({ C, biz, d, tab, setTab }) {
       {tab === 'customers' && <TabCustomers C={C} d={d} />}
       {tab === 'timing' && <TabTiming C={C} d={d} />}
       {tab === 'market' && <TabMarket C={C} d={d} />}
+      {tab === 'campaigns' && <TabCampaigns C={C} d={d} biz={biz} onReload={onReload} />}
     </div>
   )
 }
@@ -293,6 +301,180 @@ function TabMarket({ C, d }) {
     )}
     {(!d.clans || !d.clans.length) && (!d.covisit || !d.covisit.length) && <NoData C={C} />}
   </>
+}
+
+// ── تب کمپین‌ها: Quest دوطرفه + نگارخانه ─────────────────────────────────────
+const RARITY_LABEL = { common: 'معمولی', rare: 'کمیاب', epic: 'حماسی', legendary: 'افسانه‌ای' }
+const RARITY_COLOR = { common: '#94a3b8', rare: '#3b82f6', epic: '#8b5cf6', legendary: '#f59e0b' }
+const COLLECTIBLE_ICONS = ['💎', '🏆', '🥇', '⚔️', '📖', '👑', '🔮', '🎖️', '🪙', '🍵']
+
+function TabCampaigns({ C, d, biz, onReload }) {
+  const [showForm, setShowForm] = useState(false)
+  const [redeemInput, setRedeemInput] = useState('')
+  const [redeemMsg, setRedeemMsg] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const statsMap = {}
+  ;(d.qstats || []).forEach(s => { statsMap[s.quest_id] = s })
+
+  async function toggleActive(q) {
+    const s = getSession()
+    if (!s || !s.access_token) return
+    setBusy(true)
+    await fetch(SB_URL + '/rest/v1/rpc/set_quest_active', {
+      method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_quest_id: q.id, p_active: !q.active }),
+    }).then(r => r.json()).catch(() => null)
+    setBusy(false)
+    onReload && onReload()
+  }
+
+  async function doRedeem() {
+    if (!redeemInput.trim()) return
+    const s = getSession()
+    if (!s || !s.access_token) return
+    setBusy(true)
+    const res = await fetch(SB_URL + '/rest/v1/rpc/redeem_code', {
+      method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_code: redeemInput.trim() }),
+    }).then(r => r.json()).catch(() => null)
+    setBusy(false)
+    if (res && res.ok) { setRedeemMsg({ ok: true, text: 'تأیید شد ✅ ' + res.reward }); setRedeemInput('') }
+    else {
+      const errMap = { not_found: 'کد پیدا نشد', already_used: 'قبلاً مصرف شده', expired: 'منقضی شده', not_authorized: 'این کد مال کافه‌ی تو نیست' }
+      setRedeemMsg({ ok: false, text: errMap[res && res.error] || 'خطا' })
+    }
+  }
+
+  return <>
+    {/* جعبه‌ی تأیید کد مشتری */}
+    <div style={{ background: C.chip, borderRadius: 14, padding: 14, marginBottom: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🎟️ تأیید کد جایزه‌ی مشتری</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input value={redeemInput} onChange={e => setRedeemInput(e.target.value.toUpperCase())} placeholder="مثلاً A1B2C3D4"
+          style={{ flex: 1, background: C.card, border: '1px solid ' + C.border, borderRadius: 10, padding: '10px 12px', fontSize: 13, color: C.text, fontFamily: 'inherit' }} />
+        <button disabled={busy} onClick={doRedeem} style={{ background: C.accent, color: '#fff', border: 'none', borderRadius: 10, padding: '0 16px', fontWeight: 700, fontSize: 13 }}>تأیید</button>
+      </div>
+      {redeemMsg && <div style={{ fontSize: 12, marginTop: 8, color: redeemMsg.ok ? '#10b981' : '#ef4444', fontWeight: 700 }}>{redeemMsg.text}</div>}
+    </div>
+
+    {/* لیست کمپین‌ها */}
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>کمپین‌های تو</div>
+      <button onClick={() => setShowForm(v => !v)} style={{ background: showForm ? C.chip : C.accent, color: showForm ? C.text : '#fff', border: 'none', borderRadius: 10, padding: '7px 14px', fontSize: 12, fontWeight: 700 }}>{showForm ? 'بستن' : '+ کمپین جدید'}</button>
+    </div>
+
+    {showForm && <NewQuestForm C={C} biz={biz} onDone={() => { setShowForm(false); onReload && onReload() }} />}
+
+    {(!d.quests || d.quests.length === 0) && !showForm && (
+      <div style={{ textAlign: 'center', color: C.sub, fontSize: 12, padding: '24px 0' }}>هنوز کمپینی نساختی. با «+ کمپین جدید» شروع کن.</div>
+    )}
+
+    {(d.quests || []).map(q => {
+      const st = statsMap[q.id] || {}
+      return (
+        <div key={q.id} style={{ background: C.chip, borderRadius: 14, padding: 14, marginBottom: 10, opacity: q.active ? 1 : 0.55 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ fontSize: 22 }}>{q.icon || '🎯'}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800 }}>{q.title}</div>
+              <div style={{ fontSize: 11, color: C.sub }}>{q.reward_label}{q.reward_xp > 0 ? ' · +' + fa(q.reward_xp) + ' XP' : ''}</div>
+            </div>
+            <button disabled={busy} onClick={() => toggleActive(q)} style={{ fontSize: 10, fontWeight: 700, border: 'none', borderRadius: 8, padding: '6px 10px', background: q.active ? '#10b98122' : C.border, color: q.active ? '#10b981' : C.sub }}>{q.active ? 'فعال' : 'غیرفعال'}</button>
+          </div>
+          {q.reward_collectible_code && (
+            <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>🎁 جایزه‌ی کلکسیونی متصل به این کمپینه</div>
+          )}
+          <div style={{ display: 'flex', gap: 14, fontSize: 11, color: C.sub }}>
+            <span>✅ {fa(st.completions || 0)} تکمیل</span>
+            <span>🎟️ {fa(st.codes_issued || 0)} کد صادرشده</span>
+            <span>🏁 {fa(st.redemptions_used || 0)} مصرف‌شده</span>
+          </div>
+        </div>
+      )
+    })}
+  </>
+}
+
+function NewQuestForm({ C, biz, onDone }) {
+  const [f, setF] = useState({
+    title: '', description: '', icon: '🎯', condition_type: 'checkin', target_count: 1,
+    reward_label: '', reward_xp: 0, collectible_title: '', collectible_icon: '💎', collectible_rarity: 'common',
+  })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }))
+
+  async function submit() {
+    if (!f.title.trim() || !f.reward_label.trim()) { setErr('عنوان و جایزه رو پر کن'); return }
+    const s = getSession()
+    if (!s || !s.access_token) return
+    setBusy(true); setErr(null)
+    const res = await fetch(SB_URL + '/rest/v1/rpc/create_quest', {
+      method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        p_business_id: biz.id, p_cafe_id: biz.cafe_id, p_title: f.title.trim(), p_description: f.description.trim() || null,
+        p_icon: f.icon, p_condition_type: f.condition_type, p_target_count: Number(f.target_count) || 1,
+        p_reward_type: 'discount', p_reward_label: f.reward_label.trim(), p_reward_xp: Number(f.reward_xp) || 0,
+        p_collectible_title: f.collectible_title.trim() || null, p_collectible_icon: f.collectible_icon, p_collectible_rarity: f.collectible_rarity,
+      }),
+    }).then(r => r.json()).catch(() => null)
+    setBusy(false)
+    if (res && res.ok) onDone && onDone()
+    else setErr('ساخت کمپین شکست خورد')
+  }
+
+  const inputStyle = { width: '100%', background: C.card, border: '1px solid ' + C.border, borderRadius: 10, padding: '10px 12px', fontSize: 13, color: C.text, fontFamily: 'inherit', marginBottom: 10 }
+  const labelStyle = { fontSize: 11, color: C.sub, marginBottom: 4, display: 'block' }
+
+  return (
+    <div style={{ background: C.card, border: '1px solid ' + C.border, borderRadius: 14, padding: 14, marginBottom: 14 }}>
+      <label style={labelStyle}>عنوان کمپین</label>
+      <input style={inputStyle} value={f.title} onChange={e => set('title', e.target.value)} placeholder="مثلاً: قهوه پنج‌شنبه‌ها" />
+
+      <label style={labelStyle}>توضیح (اختیاری)</label>
+      <input style={inputStyle} value={f.description} onChange={e => set('description', e.target.value)} placeholder="جزئیات بیشتر برای مشتری" />
+
+      <label style={labelStyle}>شرط انجام</label>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <button onClick={() => set('condition_type', 'checkin')} style={{ flex: 1, padding: '9px', borderRadius: 10, border: 'none', background: f.condition_type === 'checkin' ? C.accent : C.chip, color: f.condition_type === 'checkin' ? '#fff' : C.sub, fontSize: 12, fontWeight: 700 }}>یک چک‌این</button>
+        <button onClick={() => set('condition_type', 'loyalty')} style={{ flex: 1, padding: '9px', borderRadius: 10, border: 'none', background: f.condition_type === 'loyalty' ? C.accent : C.chip, color: f.condition_type === 'loyalty' ? '#fff' : C.sub, fontSize: 12, fontWeight: 700 }}>چند بار (وفاداری)</button>
+      </div>
+
+      {f.condition_type === 'loyalty' && <>
+        <label style={labelStyle}>چند بار چک‌این لازمه؟</label>
+        <input style={inputStyle} type="number" min={2} value={f.target_count} onChange={e => set('target_count', e.target.value)} />
+      </>}
+
+      <label style={labelStyle}>متن جایزه (چیزی که مشتری می‌گیره)</label>
+      <input style={inputStyle} value={f.reward_label} onChange={e => set('reward_label', e.target.value)} placeholder="مثلاً: یک قهوه رایگان" />
+
+      <label style={labelStyle}>XP اضافه (اختیاری)</label>
+      <input style={inputStyle} type="number" min={0} value={f.reward_xp} onChange={e => set('reward_xp', e.target.value)} />
+
+      <div style={{ borderTop: '1px dashed ' + C.border, margin: '4px 0 12px', paddingTop: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🎁 آیتم کلکسیونی (اختیاری — برای نگارخانه)</div>
+        <label style={labelStyle}>اسم آیتم (خالی بذار = بدون آیتم)</label>
+        <input style={inputStyle} value={f.collectible_title} onChange={e => set('collectible_title', e.target.value)} placeholder="مثلاً: الماس پنج‌شنبه" />
+        {f.collectible_title.trim() && <>
+          <label style={labelStyle}>آیکون</label>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            {COLLECTIBLE_ICONS.map(ic => (
+              <button key={ic} onClick={() => set('collectible_icon', ic)} style={{ width: 36, height: 36, borderRadius: 10, border: f.collectible_icon === ic ? '2px solid ' + C.accent : '1px solid ' + C.border, background: C.chip, fontSize: 17 }}>{ic}</button>
+            ))}
+          </div>
+          <label style={labelStyle}>کمیابی</label>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {Object.keys(RARITY_LABEL).map(r => (
+              <button key={r} onClick={() => set('collectible_rarity', r)} style={{ flex: 1, padding: '8px', borderRadius: 9, border: 'none', background: f.collectible_rarity === r ? RARITY_COLOR[r] : C.chip, color: f.collectible_rarity === r ? '#fff' : C.sub, fontSize: 11, fontWeight: 700 }}>{RARITY_LABEL[r]}</button>
+            ))}
+          </div>
+        </>}
+      </div>
+
+      {err && <div style={{ color: '#ef4444', fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      <button disabled={busy} onClick={submit} style={{ width: '100%', background: C.accent, color: '#fff', border: 'none', borderRadius: 12, padding: '12px', fontWeight: 700, fontSize: 13.5 }}>{busy ? '...' : 'ساخت کمپین'}</button>
+    </div>
+  )
 }
 
 // بینش‌های عملی («اگه این، پس آن») — قلب حرفه‌ای‌بودن
