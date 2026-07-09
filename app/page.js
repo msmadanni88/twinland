@@ -1023,7 +1023,7 @@ function TwinLand({ session, onLogout }) {
         })}
       </div>
 
-      {selCafe&&<CafePopup C={C} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
+      {selCafe&&<CafePopup C={C} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={isAdmin} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
       {showXP&&<XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={()=>setShowXP(false)}/>}
 
       {showMenu&&(
@@ -1725,6 +1725,23 @@ function ProfileTab({C,xp,levelInfo,streak,checkedIn,userName,coins}) {
 }
 
 // ── CAFE POPUP ────────────────────────────────────────────────────────────────
+// ── مدیریت مستقیم توسط صاحب اپ (بدون تأیید) ──────────────────────────────────
+async function ownerClaimDirect(cafe, showToast){
+  const s=getSession(); const token=(s&&s.access_token)||SB_KEY; const uid=s&&s.user&&s.user.id
+  if(!uid){ showToast('اول وارد شو'); return }
+  try{
+    const res=await fetch(SB_URL+'/rest/v1/rpc/owner_claim_direct',{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({p_cafe_id:cafe.id})
+    }).then(r=>r.json())
+    const row=Array.isArray(res)?res[0]:res
+    if(row&&row.ok){ showToast('✅ این کافه به پنل کافه‌دارت اضافه شد! برو /business'); }
+    else if(row&&row.error==='not_owner'){ showToast('این قابلیت فقط برای صاحب اپه') }
+    else { showToast('خطا: '+((row&&row.error)||'نامشخص')) }
+  }catch(e){ showToast('خطا در ارتباط') }
+}
+
 // ── claim کردن کافه توسط صاحب احتمالی ────────────────────────────────────────
 async function claimCafe(cafe, showToast){
   const note=typeof window!=='undefined'?window.prompt('برای تأیید مالکیت، یه توضیح کوتاه بنویس (مثلاً نام روی پروانه کسب، شماره تماس کافه):'):''
@@ -1746,7 +1763,7 @@ async function claimCafe(cafe, showToast){
   }catch(e){ showToast('خطا در ارتباط') }
 }
 
-function CafePopup({C,cafe,live,favs,setFavs,checkedIn,onClose,onCheckin,showToast}) {
+function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin,showToast}) {
   const color=getColor(cafe.name); const isChecked=checkedIn.has(cafe.id); const isFav=favs.has(cafe.id)
   const xpAmount=cafe.is_top?XP_CONFIG.checkin_top:XP_CONFIG.checkin
   return <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)'}} onClick={onClose}>
@@ -1787,8 +1804,8 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,onClose,onCheckin,showToa
         <button onClick={onCheckin} disabled={isChecked} style={{width:'100%',background:isChecked?C.green:C.accent,color:'white',border:'none',borderRadius:14,padding:15,fontSize:15,fontWeight:700,fontFamily:'inherit',boxShadow:'0 4px 18px '+(isChecked?C.green:C.accent)+'44',opacity:isChecked?.85:1,transition:'all .3s'}}>
           {isChecked?'✅ چک‌این شد!':'📍 چک‌این — +'+xpAmount+' XP'}
         </button>
-        <button onClick={()=>claimCafe(cafe,showToast)} style={{width:'100%',marginTop:10,background:'transparent',color:C.sub,border:'1.5px dashed '+C.border,borderRadius:14,padding:12,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
-          🏪 صاحب این کافه هستید؟
+        <button onClick={()=>isAdmin?ownerClaimDirect(cafe,showToast):claimCafe(cafe,showToast)} style={{width:'100%',marginTop:10,background:'transparent',color:C.sub,border:'1.5px dashed '+C.border,borderRadius:14,padding:12,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
+          {isAdmin?'🏪 مدیریت مستقیم این کافه (صاحب اپ)':'🏪 صاحب این کافه هستید؟'}
         </button>
       </div>
     </div>
