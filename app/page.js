@@ -1061,7 +1061,7 @@ function TwinLand({ session, onLogout }) {
               {key:'profile',icon:'👤',img:'/icon_profile_active@2x.png',label:'پروفایل',href:'/profile'},
               {key:'rank',icon:'🏆',img:'/icon_rank_active@2x.png',label:'رتبه‌بندی',href:'/leaderboard'},
               {key:'clans',icon:'🛡',img:'/icon_clan_active@2x.png',label:'کلن‌ها',href:'/clan'},
-              {key:'quests',icon:'🎯',label:'کمپین‌ها',href:'/quests'},
+              {key:'quests',icon:'🎯',label:'رویدادها',href:'/quests'},
               {key:'gallery',icon:'💎',label:'نگارخانه',href:'/gallery'},
               {key:'business',icon:'🏪',label:'پنل کافه‌دار',href:'/business',smeOnly:true},
               {key:'admin',icon:'🛡️',label:'پنل ادمین',href:'/admin',adminOnly:true},
@@ -1514,12 +1514,21 @@ function LedAdBar({ C }) {
 
 function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,checkedIn,xp,levelInfo,streak,setShowXP}) {
   const [topPlayers,setTopPlayers]=useState([])
+  const [hotEvents,setHotEvents]=useState([])
   useEffect(()=>{
     const sess=getSession()
     let alive=true
     const load=()=>fetchLeaderboard(sess).then(list=>{ if(alive) setTopPlayers(list.slice(0,3)) })
     load()
     const unsub=subscribeToTables([{table:'profiles',event:'UPDATE'}],()=>load())
+    return ()=>{ alive=false; unsub() }
+  },[])
+  useEffect(()=>{
+    let alive=true
+    const loadEvents=()=>fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,cafes(name,district),collectible_defs(icon,rarity)&order=created_at.desc&limit=5',
+      {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}}).then(r=>r.json()).then(rows=>{ if(alive) setHotEvents(Array.isArray(rows)?rows:[]) }).catch(()=>{})
+    loadEvents()
+    const unsub=subscribeToTables([{table:'quests',event:'*'}],()=>loadEvents())
     return ()=>{ alive=false; unsub() }
   },[])
   const medals={1:'🥇',2:'🥈',3:'🥉'}
@@ -1568,14 +1577,26 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
       ))}
     </div>
     <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)'}}>
-      <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>رویداد فعال</div>
-      <div style={{background:'#FFF9F0',border:'1px solid #FFE0B2',borderRadius:14,padding:'12px'}}>
-        <div style={{fontSize:22,marginBottom:5}}>⚔️</div>
-        <div style={{fontSize:13,fontWeight:800,color:C.text}}>شمشیر گریفیندور</div>
-        <div style={{fontSize:11,color:C.sub,marginTop:3,lineHeight:1.5}}>کافه‌های غرب تهران • امروز</div>
-        <div style={{fontSize:11,color:C.accent,fontWeight:700,marginTop:4}}>+{XP_CONFIG.event_bonus} XP بونوس</div>
-        <button onClick={()=>showToast('🎮 ورود به رویداد...')} style={{marginTop:10,width:'100%',background:C.accent,border:'none',borderRadius:10,padding:'8px',fontSize:12,color:'white',fontWeight:700,fontFamily:'inherit'}}>شرکت در رویداد</button>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+        <div style={{fontSize:10,color:C.sub,letterSpacing:.7,fontWeight:600}}>🎉 رویدادهای داغ<span style={{color:C.green}}> ●</span></div>
+        <a href="/quests" style={{fontSize:10,color:C.accent,fontWeight:700,textDecoration:'none'}}>همه ›</a>
       </div>
+      {hotEvents.length===0
+        ? <div style={{fontSize:11,color:C.sub,padding:'8px 2px'}}>الان رویداد فعالی نیست. کافه‌دارها به‌زودی چیزی منتشر می‌کنن.</div>
+        : hotEvents.map(ev=>{
+            const cd=ev.collectible_defs
+            const cafeName=ev.cafes?ev.cafes.name:''
+            return <a key={ev.id} href="/quests" style={{display:'block',textDecoration:'none',background:'#FFF9F0',border:'1px solid #FFE0B2',borderRadius:14,padding:'11px 12px',marginBottom:8}}>
+              <div style={{display:'flex',alignItems:'center',gap:9}}>
+                <span style={{fontSize:20}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{ev.title}</div>
+                  <div style={{fontSize:10,color:C.sub,marginTop:2}}>{cafeName}{ev.cafes&&ev.cafes.district?' · '+ev.cafes.district:''}</div>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:'#E65100',fontWeight:700,marginTop:6}}>🎁 {ev.reward_label}{ev.reward_xp>0?' · +'+ev.reward_xp+' XP':''}</div>
+            </a>
+          })}
     </div>
     <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)',paddingBottom:24}}>
       <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>برترین‌ها</div>
@@ -1794,6 +1815,17 @@ async function claimCafe(cafe, showToast){
 function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin,showToast}) {
   const color=getColor(cafe.name); const isChecked=checkedIn.has(cafe.id); const isFav=favs.has(cafe.id)
   const xpAmount=cafe.is_top?XP_CONFIG.checkin_top:XP_CONFIG.checkin
+  const [cafeEvents,setCafeEvents]=useState([])
+  const [evLoading,setEvLoading]=useState(true)
+  useEffect(()=>{
+    let alive=true
+    setEvLoading(true)
+    fetch(SB_URL+'/rest/v1/quests?cafe_id=eq.'+cafe.id+'&active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,collectible_defs(icon,title,rarity)&order=created_at.desc&limit=6',
+      {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}})
+      .then(r=>r.json()).then(rows=>{ if(alive) setCafeEvents(Array.isArray(rows)?rows:[]) }).catch(()=>{})
+      .finally(()=>{ if(alive) setEvLoading(false) })
+    return ()=>{ alive=false }
+  },[cafe.id])
   return <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)'}} onClick={onClose}>
     <div onClick={(e)=>e.stopPropagation()} style={{position:'absolute',bottom:0,left:0,right:0,maxHeight:'88dvh',overflowY:'auto',background:C.card,borderRadius:'24px 24px 0 0',border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
       <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'14px auto'}}/>
@@ -1811,7 +1843,24 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
       </div>
       <div style={{padding:'16px 18px'}}>
         {cafe.tags?.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:14}}>{cafe.tags.map((t)=><span key={t} style={{background:C.chip,borderRadius:99,fontSize:11,color:C.text,padding:'3px 11px',fontWeight:500}}>{t}</span>)}</div>}
-        {cafe.is_top&&<div style={{background:'#FFF9F0',border:'1px solid #FFE0B2',borderRadius:14,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,marginBottom:14}}><span style={{fontSize:24}}>⚔️</span><div><div style={{fontSize:12,fontWeight:700,color:'#E65100'}}>آیتم فعال: شمشیر گریفیندور</div><div style={{fontSize:11,color:C.sub,marginTop:2}}>با سفارش ۱۰۰,۰۰۰ تومان شانس دریافت داری</div></div></div>}
+
+        {/* رویدادها/آیتم‌های فعال این کافه — واقعی و لحظه‌ای */}
+        {!evLoading&&cafeEvents.length>0&&(
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11.5,fontWeight:700,color:C.sub,marginBottom:8}}>🎉 رویدادهای فعال این کافه</div>
+            {cafeEvents.map(ev=>{
+              const cd=ev.collectible_defs
+              return <div key={ev.id} style={{background:'#FFF9F0',border:'1px solid #FFE0B2',borderRadius:14,padding:'11px 13px',display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+                <span style={{fontSize:22}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'#E65100'}}>{ev.title}{cd?' — '+cd.title:''}</div>
+                  <div style={{fontSize:11,color:C.sub,marginTop:2}}>🎁 {ev.reward_label}{ev.reward_xp>0?' · +'+ev.reward_xp+' XP':''}</div>
+                </div>
+              </div>
+            })}
+          </div>
+        )}
+
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14}}>
           {[['☕',isChecked?'رفتی!':'+'+xpAmount+' XP','چک‌این'],['⏰','۸ص–۱۰ش','ساعات'],['🏅',cafe.is_top?'طلایی':'نقره','رتبه']].map(([icon,val,lbl])=>(
             <div key={lbl} style={{background:C.chip,borderRadius:12,padding:'10px 6px',textAlign:'center'}}>
