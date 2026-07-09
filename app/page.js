@@ -170,6 +170,9 @@ function TwinLand({ session, onLogout }) {
   const [showCity,   setShowCity]   = useState(false)
   const [showMode,   setShowMode]   = useState(false)
   const [showXP,     setShowXP]     = useState(false)
+  const [showNotif,  setShowNotif]  = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [tutorialSeen, setTutorialSeen] = useState({})
   const [toast,      setToast]      = useState(null)
   const [mapReady,   setMapReady]   = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
@@ -266,9 +269,11 @@ function TwinLand({ session, onLogout }) {
     const uid=session.user.id
     const h={'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token}
     fetch(SB_URL+'/rest/v1/profiles?id=eq.'+uid+'&select=*',{headers:h})
-      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin); setAccountType(p.account_type||'user') } }).catch(()=>{})
+      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin); setAccountType(p.account_type||'user'); setTutorialSeen(p.tutorial_seen||{}) } }).catch(()=>{})
     fetch(SB_URL+'/rest/v1/checkins?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
       .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setCheckedIn(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
+    fetch(SB_URL+'/rest/v1/notifications?user_id=eq.'+uid+'&select=*&order=created_at.desc&limit=40',{headers:h})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setNotifications(rows) }).catch(()=>{})
   },[session])
 
   // realtime: تغییرات لحظه‌ای پروفایل خودم + چک‌این‌های خودم (بدون رفرش)
@@ -278,6 +283,7 @@ function TwinLand({ session, onLogout }) {
     const unsub = subscribeToTables([
       { table:'profiles', event:'UPDATE', filter:'id=eq.'+uid },
       { table:'checkins', event:'INSERT', filter:'user_id=eq.'+uid },
+      { table:'notifications', event:'INSERT', filter:'user_id=eq.'+uid },
     ],(p)=>{
       if(p.table==='profiles' && p.record){
         const r=p.record
@@ -287,6 +293,9 @@ function TwinLand({ session, onLogout }) {
       }
       if(p.table==='checkins' && p.record && p.record.cafe_id){
         setCheckedIn(prev=>{ const s=new Set(prev); s.add(p.record.cafe_id); return s })
+      }
+      if(p.table==='notifications' && p.record){
+        setNotifications(prev=>[p.record, ...prev].slice(0,60))
       }
     })
     return ()=>unsub()
@@ -740,6 +749,28 @@ function TwinLand({ session, onLogout }) {
     return refreshingRef.current
   }
 
+  async function markNotifRead(id){
+    setNotifications(prev=>prev.map(n=>n.id===id?{...n,read:true}:n))
+    const token=await freshToken()
+    fetch(SB_URL+'/rest/v1/notifications?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({read:true})
+    }).catch(()=>{})
+  }
+
+  async function markAllNotifRead(){
+    const unreadIds=notifications.filter(n=>!n.read).map(n=>n.id)
+    if(unreadIds.length===0) return
+    setNotifications(prev=>prev.map(n=>({...n,read:true})))
+    const token=await freshToken()
+    fetch(SB_URL+'/rest/v1/notifications?user_id=eq.'+(session&&session.user&&session.user.id),{
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({read:true})
+    }).catch(()=>{})
+  }
+
   async function resetMe(){
     if(!session||!session.access_token) return
     const token=await freshToken()
@@ -828,6 +859,8 @@ function TwinLand({ session, onLogout }) {
         @keyframes xpFloat{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1;transform:translateY(-44px) scale(1.2)}100%{opacity:0;transform:translateY(-70px) scale(.9)}}
         @keyframes shimmer{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
         @keyframes ledScroll{from{transform:translateX(-50%)}to{transform:translateX(0)}}
+        @keyframes evSlide{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes coachPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
         .xp-float{animation:xpFloat 1.8s ease forwards}
         .mission-bar{transition:width .8s ease}
         .boundary-tip{background:rgba(28,28,30,.88)!important;color:#fff!important;border:none!important;border-radius:8px!important;font-family:'Vazirmatn',sans-serif!important;font-size:11px!important;font-weight:600!important;padding:4px 9px!important;box-shadow:0 2px 10px rgba(0,0,0,.25)!important}
@@ -851,6 +884,13 @@ function TwinLand({ session, onLogout }) {
           </button>
         )}
         {isMobile&&<div style={{flex:1}}/>}
+
+        <button onClick={()=>setShowNotif(v=>!v)} style={{position:'relative',background:showNotif?C.accent:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:showNotif?'#fff':C.text}}>
+          🔔
+          {notifications.some(n=>!n.read) && (
+            <span style={{position:'absolute',top:4,left:4,width:8,height:8,borderRadius:'50%',background:'#ef4444',border:'1.5px solid '+C.bg}}/>
+          )}
+        </button>
 
         <button onClick={()=>setPanelOpen(v=>!v)} style={{background:panelOpen?C.accent:C.chip,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:panelOpen?'white':C.sub,fontFamily:'inherit',fontWeight:700,flexShrink:0,display:'flex',alignItems:'center',gap:5}}>
           {panelOpen?<span style={{fontSize:15,fontWeight:800}}>✕</span>:<img src="/dashboard@256.png" alt="داشبورد" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>}{!isMobile&&<span>{panelOpen?'بستن':'پنل'}</span>}
@@ -884,6 +924,8 @@ function TwinLand({ session, onLogout }) {
           )}
         </div>
       </div>
+
+      <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe}/>
 
       {/* BODY */}
       <div style={{flex:1,position:'relative',overflow:'hidden'}}>
@@ -1051,6 +1093,8 @@ function TwinLand({ session, onLogout }) {
 
       {selCafe&&<CafePopup C={C} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={isAdmin} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
       {showXP&&<XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={()=>setShowXP(false)}/>}
+      {showNotif&&<NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={()=>setShowNotif(false)}/>}
+      <TutorialCoach C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} isMobile={isMobile}/>
 
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
@@ -1771,6 +1815,167 @@ function ProfileTab({C,xp,levelInfo,streak,checkedIn,userName,coins}) {
     </div>
     <a href="/profile" style={{display:'block',textAlign:'center',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده پروفایل کامل ›</a>
   </div>
+}
+
+// ── نوار اسلایدشوی رویدادها (بالای نقشه، لحظه‌ای) ───────────────────────────
+function EventBanner({C, cafes, setSelCafe}) {
+  const [events, setEvents] = useState([])
+  const [idx, setIdx] = useState(0)
+  const timerRef = useRef(null)
+  const touchXRef = useRef(null)
+
+  const load = useCallback(()=>{
+    fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,discount_pct,cafe_id,cafes(name,district),collectible_defs(icon,rarity)&order=created_at.desc&limit=20',
+      {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setEvents(rows) }).catch(()=>{})
+  },[])
+
+  useEffect(()=>{ load() },[load])
+  useEffect(()=>{
+    const unsub=subscribeToTables([{table:'quests',event:'INSERT'}],()=>{ load(); setIdx(0) })
+    return ()=>unsub()
+  },[load])
+
+  useEffect(()=>{
+    if(events.length<2) return
+    clearInterval(timerRef.current)
+    timerRef.current=setInterval(()=>setIdx(i=>(i+1)%events.length),4500)
+    return ()=>clearInterval(timerRef.current)
+  },[events.length])
+
+  useEffect(()=>{ if(idx>=events.length) setIdx(0) },[events.length]) // eslint-disable-line
+
+  if(events.length===0) return null
+  const safeIdx = idx % events.length
+  const ev = events[safeIdx]
+  const cd = ev.collectible_defs
+
+  function go(delta){
+    clearInterval(timerRef.current)
+    setIdx(i=>(i+delta+events.length)%events.length)
+  }
+  function onClickBanner(){
+    const cafe = cafes.find(c=>c.id===ev.cafe_id)
+    if(cafe) setSelCafe(cafe)
+    else if(typeof window!=='undefined') window.location.href='/quests'
+  }
+  function onTouchStart(e){ touchXRef.current = e.touches[0].clientX }
+  function onTouchEnd(e){
+    if(touchXRef.current==null) return
+    const dx = e.changedTouches[0].clientX - touchXRef.current
+    if(Math.abs(dx) > 40) go(dx>0 ? -1 : 1)
+    touchXRef.current = null
+  }
+
+  return (
+    <div style={{padding:'8px 12px 0',flexShrink:0}}>
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+        style={{position:'relative',height:56,background:'linear-gradient(90deg,'+C.accent+'16,'+C.accent+'06)',border:'1px solid '+C.accent+'38',borderRadius:16,overflow:'hidden',display:'flex',alignItems:'stretch'}}>
+
+        <button onClick={()=>go(1)} style={{flexShrink:0,width:28,background:'transparent',border:'none',color:C.sub,fontSize:16,fontFamily:'inherit'}}>‹</button>
+
+        <div key={ev.id} onClick={onClickBanner} style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:9,cursor:'pointer',animation:'evSlide .35s ease',padding:'0 2px'}}>
+          <span style={{fontSize:22,flexShrink:0}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+              {ev.cafes?ev.cafes.name:'یه کافه'} <span style={{fontWeight:500,color:C.sub}}>رویداد تازه گذاشت</span>
+            </div>
+            <div style={{fontSize:11,color:C.accent,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+              {ev.title} · 🎁 {ev.reward_label}{ev.discount_pct>0?' · 🏷️'+ev.discount_pct+'٪':''}
+            </div>
+          </div>
+        </div>
+
+        <button onClick={()=>go(-1)} style={{flexShrink:0,width:28,background:'transparent',border:'none',color:C.sub,fontSize:16,fontFamily:'inherit'}}>›</button>
+      </div>
+
+      {events.length>1 && (
+        <div style={{display:'flex',gap:5,justifyContent:'center',marginTop:6,overflowX:'auto',scrollbarWidth:'none',padding:'0 4px'}}>
+          {events.map((e,i)=>(
+            <button key={e.id} onClick={()=>{ clearInterval(timerRef.current); setIdx(i) }}
+              style={{flexShrink:0,width:i===safeIdx?16:6,height:6,borderRadius:99,border:'none',background:i===safeIdx?C.accent:C.border,transition:'all .3s'}}/>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── پنل نوتیفیکیشن‌ها ────────────────────────────────────────────────────────
+function faAgo(iso){
+  const mins=Math.floor((Date.now()-new Date(iso).getTime())/60000)
+  if(mins<1) return 'همین الان'
+  if(mins<60) return mins.toLocaleString('fa')+' دقیقه پیش'
+  const hrs=Math.floor(mins/60)
+  if(hrs<24) return hrs.toLocaleString('fa')+' ساعت پیش'
+  return Math.floor(hrs/24).toLocaleString('fa')+' روز پیش'
+}
+function NotificationPanel({C, notifications, onMark, onMarkAll, onClose}) {
+  return <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.5)',backdropFilter:'blur(12px)'}} onClick={onClose}>
+    <div onClick={e=>e.stopPropagation()} style={{position:'absolute',bottom:0,left:0,right:0,maxHeight:'80dvh',overflowY:'auto',background:C.card,borderRadius:'24px 24px 0 0',border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease',padding:'0 0 30px'}}>
+      <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'14px auto 12px'}}/>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 18px 14px',borderBottom:'1px solid '+C.border}}>
+        <div style={{fontSize:16,fontWeight:800,color:C.text}}>🔔 اعلان‌ها</div>
+        {notifications.some(n=>!n.read) && <button onClick={onMarkAll} style={{background:'none',border:'none',color:C.accent,fontSize:12,fontWeight:700,fontFamily:'inherit'}}>خواندن همه</button>}
+      </div>
+      <div style={{padding:'10px 18px 0'}}>
+        {notifications.length===0
+          ? <div style={{textAlign:'center',color:C.sub,fontSize:13,padding:'40px 0'}}>اعلانی نداری. با چک‌این و شرکت توی رویدادها این‌جا پر می‌شه.</div>
+          : notifications.map(n=>(
+            <a key={n.id} href={n.link||'#'} onClick={()=>onMark(n.id)}
+              style={{display:'flex',alignItems:'center',gap:12,textDecoration:'none',padding:'11px 4px',borderBottom:'1px solid '+C.border,opacity:n.read?0.55:1}}>
+              <div style={{width:38,height:38,borderRadius:'50%',background:C.chip,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{n.icon||'🔔'}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:n.read?600:800,color:C.text}}>{n.title}</div>
+                {n.body && <div style={{fontSize:11.5,color:C.sub,marginTop:2}}>{n.body}</div>}
+                <div style={{fontSize:10,color:C.sub,marginTop:3}}>{faAgo(n.created_at)}</div>
+              </div>
+              {!n.read && <span style={{width:8,height:8,borderRadius:'50%',background:C.accent,flexShrink:0}}/>}
+            </a>
+          ))}
+      </div>
+    </div>
+  </div>
+}
+
+// ── تیوتوریال داینامیک: کارت راهنمای کوچیک context-aware، وضعیت سمت سرور ────
+const TUTORIAL_STEPS = [
+  { key:'welcome_map', forRole:'any', title:'به TwinLand خوش اومدی! ☕', text:'روی هر کافه‌ی نقشه بزن تا چک‌این کنی و XP بگیری.' },
+  { key:'event_banner', forRole:'any', title:'رویدادهای زنده 🎉', text:'این نوار بالای نقشه هر چیزی که کافه‌دارها همین الان منتشر می‌کنن رو نشون می‌ده — روش بزن تا بری به کافه‌ش.' },
+  { key:'gallery_intro', forRole:'any', title:'نگارخانه‌ی کلکسیون 💎', text:'با چک‌این و شرکت در رویدادها، آیتم‌های کمیاب جمع می‌کنی. از منو برو «نگارخانه» تا ببینیشون.' },
+  { key:'business_intro', forRole:'sme', title:'پنل کافه‌دار 🏪', text:'از تب «کمپین‌ها» می‌تونی رویداد/تخفیف/آیتم کلکسیونی منتشر کنی تا همون لحظه رو نقشه‌ی همه بیاد.' },
+]
+function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, isMobile}) {
+  const [dismissing, setDismissing] = useState(false)
+  if(!session || !session.user) return null
+  const step = TUTORIAL_STEPS.find(s => !tutorialSeen[s.key] && (s.forRole==='any' || s.forRole===accountType))
+  if(!step) return null
+
+  async function dismiss(){
+    setDismissing(true)
+    setTutorialSeen(prev=>({...prev,[step.key]:true}))
+    const token=(session&&session.access_token)||SB_KEY
+    fetch(SB_URL+'/rest/v1/rpc/mark_tutorial_seen',{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({p_key:step.key})
+    }).catch(()=>{})
+    setTimeout(()=>setDismissing(false),50)
+  }
+
+  return (
+    <div style={{position:'fixed',left:14,right:14,bottom:isMobile?76:20,zIndex:1500,animation:'coachPop .3s ease'}}>
+      <div style={{background:C.card,border:'1.5px solid '+C.accent+'55',borderRadius:18,padding:'14px 16px',boxShadow:'0 8px 30px rgba(0,0,0,.18)',maxWidth:420,margin:'0 auto',display:'flex',gap:12,alignItems:'flex-start'}}>
+        <div style={{fontSize:24,flexShrink:0}}>💡</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13.5,fontWeight:800,color:C.text,marginBottom:3}}>{step.title}</div>
+          <div style={{fontSize:12,color:C.sub,lineHeight:1.7}}>{step.text}</div>
+          <button onClick={dismiss} style={{marginTop:10,background:C.accent,color:'#fff',border:'none',borderRadius:10,padding:'7px 16px',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>فهمیدم</button>
+        </div>
+        <button onClick={dismiss} style={{background:'none',border:'none',color:C.sub,fontSize:14,flexShrink:0}}>✕</button>
+      </div>
+    </div>
+  )
 }
 
 // ── CAFE POPUP ────────────────────────────────────────────────────────────────
