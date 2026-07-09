@@ -9,6 +9,13 @@ import { SB_URL, SB_KEY, getSession, subscribeToTables } from '../gameSystem'
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 const RARITY_LABEL = { common: 'معمولی', rare: 'کمیاب', epic: 'حماسی', legendary: 'افسانه‌ای' }
 const RARITY_COLOR = { common: '#94a3b8', rare: '#3b82f6', epic: '#8b5cf6', legendary: '#f59e0b' }
+const RARITY_GRADIENT = {
+  common: 'linear-gradient(145deg,#cbd5e1,#94a3b8)',
+  rare: 'linear-gradient(145deg,#60a5fa,#3b82f6)',
+  epic: 'linear-gradient(145deg,#a78bfa,#8b5cf6)',
+  legendary: 'linear-gradient(145deg,#fbbf24,#f59e0b)',
+}
+const LOCKED_GRADIENT = 'linear-gradient(145deg,#e2e8f0,#cbd5e1)'
 
 export default function GalleryPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
@@ -87,9 +94,9 @@ export default function GalleryPage() {
                 {visible.map(d => {
                   const isOwned = !!owned[d.code]
                   return (
-                    <button key={d.code} onClick={() => setSelected({ ...d, earned_at: owned[d.code] })} style={{ ...S.cell, opacity: isOwned ? 1 : 0.45 }}>
-                      <div style={{ fontSize: 30 }}>{isOwned ? d.icon : '🔒'}</div>
-                      <div style={{ ...S.cellRarity, background: RARITY_COLOR[d.rarity] || '#94a3b8' }} />
+                    <button key={d.code} onClick={() => setSelected({ ...d, earned_at: owned[d.code] })} style={{ ...S.cell, background: isOwned ? (RARITY_GRADIENT[d.rarity] || RARITY_GRADIENT.common) : LOCKED_GRADIENT }}>
+                      <div style={{ fontSize: 40, filter: isOwned ? 'none' : 'grayscale(1) opacity(.7)' }}>{isOwned ? d.icon : '🔒'}</div>
+                      {isOwned && <div style={S.cellTitle}>{d.title}</div>}
                     </button>
                   )
                 })}
@@ -100,7 +107,7 @@ export default function GalleryPage() {
       {selected && (
         <div onClick={() => setSelected(null)} style={S.overlay}>
           <div onClick={e => e.stopPropagation()} style={S.sheet}>
-            <div style={{ fontSize: 52, textAlign: 'center', marginBottom: 8 }}>{owned[selected.code] ? selected.icon : '🔒'}</div>
+            <div style={{ width: 84, height: 84, borderRadius: '50%', margin: '0 auto 12px', background: owned[selected.code] ? (RARITY_GRADIENT[selected.rarity] || RARITY_GRADIENT.common) : LOCKED_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 42 }}>{owned[selected.code] ? selected.icon : '🔒'}</div>
             <div style={{ fontSize: 17, fontWeight: 800, textAlign: 'center', color: C.text }}>{owned[selected.code] ? selected.title : '؟؟؟'}</div>
             <div style={{ textAlign: 'center', marginTop: 6 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: RARITY_COLOR[selected.rarity], borderRadius: 99, padding: '3px 10px' }}>{RARITY_LABEL[selected.rarity] || selected.rarity}</span>
@@ -130,9 +137,9 @@ const mkS = (C) => ({
   filterRow: { display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' },
   filter: { flexShrink: 0, padding: '8px 13px', borderRadius: 10, border: 'none', background: C.chip, color: C.sub, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' },
   filterActive: { flexShrink: 0, padding: '8px 13px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 },
-  cell: { position: 'relative', aspectRatio: '1', background: C.card, border: '1px solid ' + C.border, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 16px rgba(0,0,0,.05)' },
-  cellRarity: { position: 'absolute', bottom: 6, width: 18, height: 4, borderRadius: 99 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 3 },
+  cell: { position: 'relative', aspectRatio: '1', border: 'none', borderRadius: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontFamily: 'inherit', overflow: 'hidden', padding: '6px 4px' },
+  cellTitle: { fontSize: 9.5, fontWeight: 700, color: '#fff', textAlign: 'center', textShadow: '0 1px 3px rgba(0,0,0,.4)', lineHeight: 1.3, paddingTop: 2 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'flex-end', zIndex: 50 },
   sheet: { width: '100%', maxWidth: 480, margin: '0 auto', background: C.card, borderRadius: '22px 22px 0 0', padding: '22px 20px 28px' },
   closeBtn: { width: '100%', marginTop: 18, padding: '12px', borderRadius: 12, border: 'none', background: C.chip, color: C.text, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
