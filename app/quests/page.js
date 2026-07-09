@@ -5,6 +5,8 @@ import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 import { SB_URL, SB_KEY, getSession, subscribeToTables } from '../gameSystem'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
+const CATEGORY_LABEL = { general: 'عمومی', drink: 'نوشیدنی', food: 'غذا', discount: 'تخفیف', event: 'رویداد', collectible: 'کالکشن' }
+const CATEGORY_ICON = { general: '🎯', drink: '☕', food: '🍰', discount: '🏷️', event: '🎉', collectible: '💎' }
 
 export default function QuestsPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
@@ -13,6 +15,7 @@ export default function QuestsPage() {
   const [redemptions, setRedemptions] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('active')
+  const [catFilter, setCatFilter] = useState('all')
 
   useEffect(() => { setPal(loadPrefs()) }, [])
 
@@ -52,6 +55,7 @@ export default function QuestsPage() {
   const S = mkS(C)
 
   const activeQuests = quests.filter(q => !(progress[q.id] && progress[q.id].completed))
+    .filter(q => catFilter === 'all' || q.category === catFilter)
   const completedRewards = redemptions
 
   return (
@@ -67,6 +71,14 @@ export default function QuestsPage() {
           <button style={tab === 'active' ? S.tabActive : S.tab} onClick={() => setTab('active')}>فعال ({fa(activeQuests.length)})</button>
           <button style={tab === 'rewards' ? S.tabActive : S.tab} onClick={() => setTab('rewards')}>جایزه‌های من ({fa(completedRewards.length)})</button>
         </div>
+
+        {tab === 'active' && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
+            {[['all', '🎯', 'همه'], ...Object.keys(CATEGORY_LABEL).map(k => [k, CATEGORY_ICON[k], CATEGORY_LABEL[k]])].map(([k, icon, label]) => (
+              <button key={k} onClick={() => setCatFilter(k)} style={{ flexShrink: 0, padding: '7px 12px', borderRadius: 10, border: 'none', background: catFilter === k ? C.accent : C.chip, color: catFilter === k ? '#fff' : C.sub, fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>{icon} {label}</button>
+            ))}
+          </div>
+        )}
 
         {loading ? <div style={{ textAlign: 'center', color: C.sub, padding: '50px 0' }}>در حال بارگذاری…</div> : <>
 
@@ -115,6 +127,10 @@ function QuestCard({ C, q, prog }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: C.accent }}>🎁 {q.reward_label}{q.reward_xp > 0 ? ' + ' + fa(q.reward_xp) + ' XP' : ''}</div>
         {q.reward_collectible_code && <span style={{ fontSize: 10, background: C.chip, borderRadius: 99, padding: '3px 9px', color: C.sub }}>+ آیتم کلکسیونی</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 10, background: C.chip, borderRadius: 99, padding: '3px 9px', color: C.sub }}>{CATEGORY_ICON[q.category] || '🎯'} {CATEGORY_LABEL[q.category] || 'عمومی'}</span>
+        {q.discount_pct > 0 && <span style={{ fontSize: 10, background: '#10b98122', borderRadius: 99, padding: '3px 9px', color: '#10b981', fontWeight: 700 }}>🏷️ {fa(q.discount_pct)}٪ تخفیف</span>}
       </div>
     </div>
   )
