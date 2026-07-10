@@ -466,22 +466,32 @@ function TwinLand({ session, onLogout }) {
     })
   },[mapReady,cafes,checkedIn,mapDisplay.markerMode,mapDisplay.dotColor,mapDisplay.dotSize])
 
-  // هایلایت مارکر کافه‌ای که الان توی اسلایدشوی رویدادها نشون داده می‌شه — دوربین حرکت نمی‌کنه
+  // هایلایت کافه‌ای که الان توی اسلایدشوی رویدادها نشون داده می‌شه — دوربین حرکت نمی‌کنه
   useEffect(()=>{
-    if(!activeEventCafeId) return
+    if(!activeEventCafeId || !mapReady || !window.L || !mapInst.current) return
+    const L=window.L
+    const isDot = mapDisplay.markerMode==='dot'
+
+    if(isDot){
+      // حالت نقطه با preferCanvas رندر می‌شه (یه canvas مشترک، بدون DOM مجزا برای هر مارکر)
+      // برای همین به‌جای کلاس‌گذاری، یه حلقه‌ی پالس شبح (divIcon مجزا) دقیقاً روی همون مختصات اضافه می‌کنیم
+      const cafe = cafes.find(c=>c.id===activeEventCafeId)
+      if(!cafe) return
+      const icon=L.divIcon({html:'<div class="tl-event-pulse-ring"></div>',iconSize:[26,26],iconAnchor:[13,13],className:''})
+      const ghost=L.marker([cafe.lat,cafe.lng],{icon,interactive:false,zIndexOffset:9999})
+      try{ ghost.addTo(mapInst.current) }catch(e){}
+      return ()=>{ try{ mapInst.current.removeLayer(ghost) }catch(e){} }
+    }
+
+    // حالت پین: فرزند داخلی مارکر رو کلاس می‌زنیم (ریشه رو خود Leaflet برای موقعیت‌یابی transform می‌کنه)
     const mk = mksRef.current[activeEventCafeId]
     if(!mk) return
     let el=null
     try{ el = mk.getElement && mk.getElement() }catch(e){}
-    if(!el) return
-    const isDot = mapDisplay.markerMode==='dot'
-    // حالت پین: فرزند داخلی رو هایلایت می‌کنیم (چون ریشه رو خود Leaflet برای موقعیت‌یابی transform می‌کنه)
-    // حالت نقطه: خود المان SVG هدف‌گیری می‌شه (circleMarker از transform برای موقعیت‌یابی استفاده نمی‌کنه)
-    const target = isDot ? el : el.firstElementChild
-    if(!target) return
-    const cls = isDot ? 'tl-event-pulse-dot' : 'tl-event-pulse'
-    target.classList.add(cls)
-    return ()=>{ try{ target.classList.remove(cls) }catch(e){} }
+    const inner = el && el.firstElementChild
+    if(!inner) return
+    inner.classList.add('tl-event-pulse')
+    return ()=>{ try{ inner.classList.remove('tl-event-pulse') }catch(e){} }
   },[activeEventCafeId, mapReady, cafes, mapDisplay.markerMode])
 
   // بازسازی گروه خوشه‌بندی وقتی شدت cluster یا حالت فیلتر منطقه عوض شه
@@ -873,8 +883,8 @@ function TwinLand({ session, onLogout }) {
         @keyframes coachPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
         @keyframes tlMarkerPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 4px 8px rgba(0,0,0,.2))}50%{transform:scale(1.22);filter:drop-shadow(0 0 14px #FF9500)}}
         .tl-event-pulse{animation:tlMarkerPulse 1.1s ease-in-out infinite;transform-origin:bottom center;z-index:9999}
-        @keyframes tlDotPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(255,149,0,0))}50%{transform:scale(1.9);filter:drop-shadow(0 0 8px #FF9500)}}
-        .tl-event-pulse-dot{animation:tlDotPulse 1.1s ease-in-out infinite;transform-box:fill-box;transform-origin:center;z-index:9999}
+        @keyframes tlRingPulse{0%{transform:scale(.5);opacity:1}70%{transform:scale(1.9);opacity:0}100%{transform:scale(1.9);opacity:0}}
+        .tl-event-pulse-ring{width:26px;height:26px;border-radius:50%;border:3px solid #FF9500;box-shadow:0 0 14px #FF9500;animation:tlRingPulse 1.2s ease-out infinite}
         .xp-float{animation:xpFloat 1.8s ease forwards}
         .mission-bar{transition:width .8s ease}
         .boundary-tip{background:rgba(28,28,30,.88)!important;color:#fff!important;border:none!important;border-radius:8px!important;font-family:'Vazirmatn',sans-serif!important;font-size:11px!important;font-weight:600!important;padding:4px 9px!important;box-shadow:0 2px 10px rgba(0,0,0,.25)!important}
@@ -1018,18 +1028,18 @@ function TwinLand({ session, onLogout }) {
         </div>
 
         {/* live pill + streak — بیرون از لایه‌ی نقشه تا همیشه بالای نقشه دیده بشن */}
-        <div style={{position:'absolute',top:10,right:(isDesktop&&panelOpen)?PANEL_W+14:10,zIndex:18,transition:'right .35s ease',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'5px 13px',display:'flex',gap:8,alignItems:'center',fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
+        <div style={{position:'absolute',top:10,right:(isDesktop&&panelOpen)?PANEL_W+14:10,zIndex:18,transition:'right .35s ease',height:25,boxSizing:'border-box',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'0 13px',display:'flex',gap:8,alignItems:'center',fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
           <span style={{color:C.text,fontWeight:700}}>☕ {filtered.length}</span>
           <span style={{color:C.border}}>|</span>
           <span><span style={{color:C.green,fontSize:8}}>●</span> {totalLive}</span>
           {checkedIn.size>0&&<><span style={{color:C.border}}>|</span><span style={{color:C.green,fontWeight:700}}>✓ {checkedIn.size}</span></>}
         </div>
         <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe} onActiveCafeChange={setActiveEventCafeId}/>
-        {streak>=2&&<div style={{position:'absolute',top:52,left:10,zIndex:18,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
+        {streak>=2&&<div style={{position:'absolute',top:52,left:10,zIndex:18,height:25,boxSizing:'border-box',display:'flex',alignItems:'center',background:streak>=5?C.gold:C.accent,borderRadius:99,padding:'0 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
 
         {/* nav controls — بیرون از لایه‌ی نقشه. هنگام باز بودن هر پاپ‌آپ مخفی می‌شه */}
         {!(showRegionFilter||showRegionResults||showXP||showMenu||showCity||showMode||showBoundary||showPalette||showMapSettings||panelOpen) && (
-        <div style={{position:'absolute',bottom:14,left:8,zIndex:18,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8}}>
+        <div style={{position:'absolute',bottom:14,left:0,zIndex:18,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8}}>
           <div style={{overflow:'hidden',opacity:navOpen?0.7:0,maxHeight:navOpen?180:0,transform:navOpen?'translateY(0) scale(1)':'translateY(14px) scale(.85)',transformOrigin:'bottom left',pointerEvents:navOpen?'auto':'none',transition:'opacity .3s ease, max-height .34s ease, transform .34s cubic-bezier(.34,1.45,.5,1)',display:'flex',flexDirection:'column',gap:5}}>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,32px)',gap:3}}>
               {[{e:1},{l:'↑',fn:()=>panMap(0,-80)},{e:1},{l:'←',fn:()=>panMap(80,0)},{l:'⌖',fn:()=>{const c=CITIES[city];mapInst.current?.flyTo([c.lat,c.lng],c.zoom)}},{l:'→',fn:()=>panMap(-80,0)},{e:1},{l:'↓',fn:()=>panMap(0,80)},{e:1}].map((b,i)=>
@@ -1565,8 +1575,8 @@ function LedAdBarInner({ C }) {
 
   const cur=LED_ADS[idx]
   return (
-    <div style={{padding:'0 14px 6px',flexShrink:0,background:'transparent'}}>
-      <div style={{height:32,position:'relative',borderRadius:14,overflow:'hidden',background:'#050506',boxShadow:'0 4px 16px rgba(0,0,0,.18)'}}>
+    <div style={{flexShrink:0}}>
+      <div style={{height:30,position:'relative',borderRadius:'10px 10px 0 0',overflow:'hidden',background:'#050506'}}>
         {/* ویدیوی پنهان (منبع افکت) — فقط وقتی اسلاید ویدیویی فعاله */}
         {cur&&cur.type==='video'&&(
           <video key={idx} ref={videoRef} src={cur.src} autoPlay loop muted playsInline
