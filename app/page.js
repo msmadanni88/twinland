@@ -154,6 +154,7 @@ function TwinLand({ session, onLogout }) {
   const [search,     setSearch]     = useState('')
   const logoTapRef = useRef({count:0,timer:null})
   const [selCafe,    setSelCafe]    = useState(null)
+  const [activeEventCafeId, setActiveEventCafeId] = useState(null)
   const [tab,        setTab]        = useState('map')
   const [panelOpen,  setPanelOpen]  = useState(false)
   const [panelTab,   setPanelTab]   = useState('dashboard')
@@ -464,6 +465,24 @@ function TwinLand({ session, onLogout }) {
       mksRef.current[cafe.id]=mk
     })
   },[mapReady,cafes,checkedIn,mapDisplay.markerMode,mapDisplay.dotColor,mapDisplay.dotSize])
+
+  // هایلایت مارکر کافه‌ای که الان توی اسلایدشوی رویدادها نشون داده می‌شه — دوربین حرکت نمی‌کنه
+  useEffect(()=>{
+    if(!activeEventCafeId) return
+    const mk = mksRef.current[activeEventCafeId]
+    if(!mk) return
+    let el=null
+    try{ el = mk.getElement && mk.getElement() }catch(e){}
+    if(!el) return
+    const isDot = mapDisplay.markerMode==='dot'
+    // حالت پین: فرزند داخلی رو هایلایت می‌کنیم (چون ریشه رو خود Leaflet برای موقعیت‌یابی transform می‌کنه)
+    // حالت نقطه: خود المان SVG هدف‌گیری می‌شه (circleMarker از transform برای موقعیت‌یابی استفاده نمی‌کنه)
+    const target = isDot ? el : el.firstElementChild
+    if(!target) return
+    const cls = isDot ? 'tl-event-pulse-dot' : 'tl-event-pulse'
+    target.classList.add(cls)
+    return ()=>{ try{ target.classList.remove(cls) }catch(e){} }
+  },[activeEventCafeId, mapReady, cafes, mapDisplay.markerMode])
 
   // بازسازی گروه خوشه‌بندی وقتی شدت cluster یا حالت فیلتر منطقه عوض شه
   useEffect(()=>{
@@ -852,6 +871,10 @@ function TwinLand({ session, onLogout }) {
         @keyframes ledScroll{from{transform:translateX(-50%)}to{transform:translateX(0)}}
         @keyframes evSlide{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
         @keyframes coachPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes tlMarkerPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 4px 8px rgba(0,0,0,.2))}50%{transform:scale(1.22);filter:drop-shadow(0 0 14px #FF9500)}}
+        .tl-event-pulse{animation:tlMarkerPulse 1.1s ease-in-out infinite;transform-origin:bottom center;z-index:9999}
+        @keyframes tlDotPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(255,149,0,0))}50%{transform:scale(1.9);filter:drop-shadow(0 0 8px #FF9500)}}
+        .tl-event-pulse-dot{animation:tlDotPulse 1.1s ease-in-out infinite;transform-box:fill-box;transform-origin:center;z-index:9999}
         .xp-float{animation:xpFloat 1.8s ease forwards}
         .mission-bar{transition:width .8s ease}
         .boundary-tip{background:rgba(28,28,30,.88)!important;color:#fff!important;border:none!important;border-radius:8px!important;font-family:'Vazirmatn',sans-serif!important;font-size:11px!important;font-weight:600!important;padding:4px 9px!important;box-shadow:0 2px 10px rgba(0,0,0,.25)!important}
@@ -1001,7 +1024,7 @@ function TwinLand({ session, onLogout }) {
           <span><span style={{color:C.green,fontSize:8}}>●</span> {totalLive}</span>
           {checkedIn.size>0&&<><span style={{color:C.border}}>|</span><span style={{color:C.green,fontWeight:700}}>✓ {checkedIn.size}</span></>}
         </div>
-        <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe}/>
+        <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe} onActiveCafeChange={setActiveEventCafeId}/>
         {streak>=2&&<div style={{position:'absolute',top:52,left:10,zIndex:18,background:streak>=5?C.gold:C.accent,borderRadius:12,padding:'5px 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
 
         {/* nav controls — بیرون از لایه‌ی نقشه. هنگام باز بودن هر پاپ‌آپ مخفی می‌شه */}
@@ -1088,7 +1111,7 @@ function TwinLand({ session, onLogout }) {
 
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:TH+8,right:14,left:14,background:C.glassDark,backdropFilter:'blur(24px)',borderRadius:18,border:'1px solid '+C.border,overflow:'hidden',boxShadow:'0 8px 40px rgba(0,0,0,.15)',animation:'fadeIn .2s ease'}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:TH+8,right:14,left:14,maxHeight:'calc(100dvh - '+(TH+28)+'px)',overflowY:'auto',WebkitOverflowScrolling:'touch',background:C.glassDark,backdropFilter:'blur(24px)',borderRadius:18,border:'1px solid '+C.border,boxShadow:'0 8px 40px rgba(0,0,0,.15)',animation:'fadeIn .2s ease'}}>
             {[
               {key:'map',icon:'🗺',img:'/icon_map_active@2x.png',label:'نقشه',href:null},
               {key:'missions',icon:'📋',img:'/icon_mission_active@2x.png',label:'ماموریت‌ها',href:null},
@@ -1542,7 +1565,7 @@ function LedAdBarInner({ C }) {
 
   const cur=LED_ADS[idx]
   return (
-    <div style={{padding:'0 14px 8px',flexShrink:0}}>
+    <div style={{padding:'0 14px 6px',flexShrink:0,background:'transparent'}}>
       <div style={{height:32,position:'relative',borderRadius:14,overflow:'hidden',background:'#050506',boxShadow:'0 4px 16px rgba(0,0,0,.18)'}}>
         {/* ویدیوی پنهان (منبع افکت) — فقط وقتی اسلاید ویدیویی فعاله */}
         {cur&&cur.type==='video'&&(
@@ -1875,7 +1898,7 @@ function ProfileTab({C,xp,levelInfo,streak,checkedIn,userName,coins}) {
 }
 
 // ── پیل شیشه‌ای رویدادها روی نقشه (هم‌استایل پیل آمار زنده، بدون بک‌گراند مجزا) ──
-function EventBanner({C, cafes, setSelCafe}) {
+function EventBanner({C, cafes, setSelCafe, onActiveCafeChange}) {
   const [events, setEvents] = useState([])
   const [idx, setIdx] = useState(0)
   const timerRef = useRef(null)
@@ -1900,9 +1923,16 @@ function EventBanner({C, cafes, setSelCafe}) {
     return ()=>clearInterval(timerRef.current)
   },[events.length])
 
-  if(events.length===0) return null
-  const safeIdx = idx % events.length
-  const ev = events[safeIdx]
+  const safeIdx = events.length ? (idx % events.length) : 0
+  const ev = events.length ? events[safeIdx] : null
+
+  // به پدر بگو الان کدوم کافه رو باید روی نقشه هایلایت کنه (بدون حرکت دوربین)
+  useEffect(()=>{
+    onActiveCafeChange && onActiveCafeChange(ev ? ev.cafe_id : null)
+    return ()=>{ onActiveCafeChange && onActiveCafeChange(null) }
+  },[ev && ev.id])
+
+  if(!ev) return null
   const cd = ev.collectible_defs
 
   function go(delta){
@@ -1923,15 +1953,15 @@ function EventBanner({C, cafes, setSelCafe}) {
   }
 
   return (
-    <div style={{position:'absolute',top:10,left:10,zIndex:18,display:'flex',flexDirection:'column',gap:5,alignItems:'flex-start',maxWidth:230}}>
+    <div style={{position:'absolute',top:10,left:10,zIndex:18,display:'flex',flexDirection:'column',gap:5,alignItems:'flex-start',maxWidth:280}}>
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={onClickBanner}
-        style={{background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'5px 8px',display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)',cursor:'pointer',minWidth:0}}>
-        <button onClick={(e)=>{e.stopPropagation();go(1)}} style={{background:'none',border:'none',color:C.sub,fontSize:13,padding:'0 1px',flexShrink:0,fontFamily:'inherit'}}>‹</button>
+        style={{height:25,boxSizing:'border-box',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'0 8px',display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)',cursor:'pointer',minWidth:0}}>
+        <button onClick={(e)=>{e.stopPropagation();go(1)}} style={{background:'none',border:'none',color:C.sub,fontSize:12,padding:'0 1px',flexShrink:0,fontFamily:'inherit',lineHeight:1}}>‹</button>
         <span key={ev.id} style={{display:'flex',alignItems:'center',gap:5,minWidth:0,animation:'evSlide .3s ease'}}>
-          <span style={{fontSize:13,flexShrink:0}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
-          <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',fontWeight:700,color:C.text}}>{ev.cafes?ev.cafes.name:'کافه'}: {ev.title}</span>
+          <span style={{fontSize:11,flexShrink:0,lineHeight:1}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
+          <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',fontWeight:700,color:C.text,lineHeight:1}}>{ev.cafes?ev.cafes.name:'کافه'}: {ev.title}</span>
         </span>
-        <button onClick={(e)=>{e.stopPropagation();go(-1)}} style={{background:'none',border:'none',color:C.sub,fontSize:13,padding:'0 1px',flexShrink:0,fontFamily:'inherit'}}>›</button>
+        <button onClick={(e)=>{e.stopPropagation();go(-1)}} style={{background:'none',border:'none',color:C.sub,fontSize:12,padding:'0 1px',flexShrink:0,fontFamily:'inherit',lineHeight:1}}>›</button>
       </div>
       {events.length>1 && (
         <div style={{display:'flex',gap:3,paddingRight:8}}>
