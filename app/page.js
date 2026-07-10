@@ -2095,17 +2095,53 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
   const xpAmount=cafe.is_top?XP_CONFIG.checkin_top:XP_CONFIG.checkin
   const [cafeEvents,setCafeEvents]=useState([])
   const [evLoading,setEvLoading]=useState(true)
+  const [evProgress,setEvProgress]=useState({})   // quest_id -> progress row
+  const [joiningId,setJoiningId]=useState(null)
+  const sess=getSession()
+  const uid=sess&&sess.user&&sess.user.id
+
   useEffect(()=>{
     let alive=true
-    const loadEvents=()=>fetch(SB_URL+'/rest/v1/quests?cafe_id=eq.'+cafe.id+'&active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,discount_pct,collectible_defs(icon,title,rarity)&order=created_at.desc&limit=6',
-      {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}})
-      .then(r=>r.json()).then(rows=>{ if(alive) setCafeEvents(Array.isArray(rows)?rows:[]) }).catch(()=>{})
-      .finally(()=>{ if(alive) setEvLoading(false) })
+    const h={apikey:SB_KEY,Authorization:'Bearer '+((sess&&sess.access_token)||SB_KEY)}
+    const loadEvents=()=>{
+      fetch(SB_URL+'/rest/v1/quests?cafe_id=eq.'+cafe.id+'&active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,discount_pct,collectible_defs(icon,title,rarity)&order=created_at.desc&limit=6',{headers:h})
+        .then(r=>r.json()).then(rows=>{ if(alive) setCafeEvents(Array.isArray(rows)?rows:[]) }).catch(()=>{})
+        .finally(()=>{ if(alive) setEvLoading(false) })
+      if(uid){
+        fetch(SB_URL+'/rest/v1/quest_progress?user_id=eq.'+uid+'&select=quest_id,progress,completed',{headers:h})
+          .then(r=>r.json()).then(rows=>{ if(!alive)return; const m={}; (Array.isArray(rows)?rows:[]).forEach(p=>{m[p.quest_id]=p}); setEvProgress(m) }).catch(()=>{})
+      }
+    }
     setEvLoading(true)
     loadEvents()
-    const unsub=subscribeToTables([{table:'quests',event:'*',filter:'cafe_id=eq.'+cafe.id}],()=>loadEvents())
+    const subs=[{table:'quests',event:'*',filter:'cafe_id=eq.'+cafe.id}]
+    if(uid) subs.push({table:'quest_progress',event:'*',filter:'user_id=eq.'+uid})
+    const unsub=subscribeToTables(subs,()=>loadEvents())
     return ()=>{ alive=false; unsub() }
-  },[cafe.id])
+  },[cafe.id,uid])
+
+  async function joinEvent(ev){
+    if(!sess||!sess.access_token){ showToast('اول وارد شو','warn'); return }
+    setJoiningId(ev.id)
+    const res=await fetch(SB_URL+'/rest/v1/rpc/join_quest',{
+      method:'POST',
+      headers:{apikey:SB_KEY,Authorization:'Bearer '+sess.access_token,'Content-Type':'application/json'},
+      body:JSON.stringify({p_quest_id:ev.id})
+    }).then(r=>r.json()).catch(()=>null)
+    setJoiningId(null)
+    if(res&&res.ok){
+      if(res.already_completed){ showToast('قبلاً شرکت کردی!','warn') }
+      else if(res.completed){
+        const gift=res.collectible?(' + '+(res.collectible.icon||'🎁')+' '+res.collectible.title):''
+        showToast('🎯 شرکت کردی! '+res.reward+' — کد: '+res.code+gift,'xp')
+      }else{
+        showToast('پیشرفت ثبت شد: '+res.progress+' از '+res.target,'xp')
+      }
+    }else{
+      const em={quest_not_active:'این رویداد دیگه فعال نیست',not_new_customer:'این رویداد فقط مخصوص مشتری‌های جدیده',not_authenticated:'اول وارد شو'}
+      showToast(em[res&&res.error]||'خطا در شرکت','warn')
+    }
+  }
   return <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)'}} onClick={onClose}>
     <div onClick={(e)=>e.stopPropagation()} style={{position:'absolute',bottom:0,left:0,right:0,maxHeight:'88dvh',overflowY:'auto',background:C.card,borderRadius:'24px 24px 0 0',border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
       <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'14px auto'}}/>
@@ -2124,18 +2160,25 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
       <div style={{padding:'16px 18px'}}>
         {cafe.tags?.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:14}}>{cafe.tags.map((t)=><span key={t} style={{background:C.chip,borderRadius:99,fontSize:11,color:C.text,padding:'3px 11px',fontWeight:500}}>{t}</span>)}</div>}
 
-        {/* رویدادها/آیتم‌های فعال این کافه — واقعی و لحظه‌ای */}
+        {/* رویدادها/آیتم‌های فعال این کافه — واقعی، لحظه‌ای و قابل شرکت */}
         {!evLoading&&cafeEvents.length>0&&(
           <div style={{marginBottom:14}}>
             <div style={{fontSize:11.5,fontWeight:700,color:C.sub,marginBottom:8}}>🎉 رویدادهای فعال این کافه</div>
             {cafeEvents.map(ev=>{
               const cd=ev.collectible_defs
-              return <div key={ev.id} style={{background:'#FFF9F0',border:'1px solid #FFE0B2',borderRadius:14,padding:'11px 13px',display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
-                <span style={{fontSize:22}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:700,color:'#E65100'}}>{ev.title}{cd?' — '+cd.title:''}</div>
-                  <div style={{fontSize:11,color:C.sub,marginTop:2}}>🎁 {ev.reward_label}{ev.reward_xp>0?' · +'+ev.reward_xp+' XP':''}</div>
+              const joined=!!(evProgress[ev.id]&&evProgress[ev.id].completed)
+              const busy=joiningId===ev.id
+              return <div key={ev.id} style={{background:C.accentL,border:'1px solid '+C.accent+'44',borderRadius:14,padding:'11px 13px',marginBottom:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontSize:22}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:800,color:C.text}}>{ev.title}{cd?' — '+cd.title:''}</div>
+                    <div style={{fontSize:11,color:C.sub,marginTop:2}}>🎁 {ev.reward_label}{ev.reward_xp>0?' · +'+ev.reward_xp+' XP':''}{ev.discount_pct>0?' · 🏷️'+ev.discount_pct+'٪':''}</div>
+                  </div>
                 </div>
+                <button onClick={()=>joinEvent(ev)} disabled={joined||busy} style={{width:'100%',marginTop:9,background:joined?C.green:C.accent,color:joined?'#fff':C.accentText,border:'none',borderRadius:10,padding:'8px',fontSize:12,fontWeight:800,fontFamily:'inherit',opacity:busy?.6:1}}>
+                  {joined?'✅ شرکت کردی':busy?'...':'🎯 شرکت در رویداد'}
+                </button>
               </div>
             })}
           </div>
@@ -2158,7 +2201,7 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
             </button>
           ))}
         </div>
-        <button onClick={onCheckin} disabled={isChecked} style={{width:'100%',background:isChecked?C.green:C.accent,color:'white',border:'none',borderRadius:14,padding:15,fontSize:15,fontWeight:700,fontFamily:'inherit',boxShadow:'0 4px 18px '+(isChecked?C.green:C.accent)+'44',opacity:isChecked?.85:1,transition:'all .3s'}}>
+        <button onClick={onCheckin} disabled={isChecked} style={{width:'100%',background:isChecked?C.green:C.accent,color:isChecked?'#fff':C.accentText,border:'none',borderRadius:14,padding:15,fontSize:15,fontWeight:700,fontFamily:'inherit',boxShadow:'0 4px 18px '+(isChecked?C.green:C.accent)+'44',opacity:isChecked?.85:1,transition:'all .3s'}}>
           {isChecked?'✅ چک‌این شد!':'📍 چک‌این — +'+xpAmount+' XP'}
         </button>
         <button onClick={()=>isAdmin?ownerClaimDirect(cafe,showToast):claimCafe(cafe,showToast)} style={{width:'100%',marginTop:10,background:'transparent',color:C.sub,border:'1.5px dashed '+C.border,borderRadius:14,padding:12,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
