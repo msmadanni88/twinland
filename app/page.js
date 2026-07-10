@@ -467,32 +467,18 @@ function TwinLand({ session, onLogout }) {
   },[mapReady,cafes,checkedIn,mapDisplay.markerMode,mapDisplay.dotColor,mapDisplay.dotSize])
 
   // هایلایت کافه‌ای که الان توی اسلایدشوی رویدادها نشون داده می‌شه — دوربین حرکت نمی‌کنه
+  // برای هر دو حالت (پین/نقطه) یه حلقه‌ی پالس مستقل (divIcon واقعی) دقیقاً روی مختصات کافه اضافه می‌کنیم؛
+  // این کار مستقل از نوع رندر مارکر زیرینه (پین=DOM، نقطه=canvas مشترک با preferCanvas) و همیشه کار می‌کنه.
   useEffect(()=>{
     if(!activeEventCafeId || !mapReady || !window.L || !mapInst.current) return
     const L=window.L
-    const isDot = mapDisplay.markerMode==='dot'
-
-    if(isDot){
-      // حالت نقطه با preferCanvas رندر می‌شه (یه canvas مشترک، بدون DOM مجزا برای هر مارکر)
-      // برای همین به‌جای کلاس‌گذاری، یه حلقه‌ی پالس شبح (divIcon مجزا) دقیقاً روی همون مختصات اضافه می‌کنیم
-      const cafe = cafes.find(c=>c.id===activeEventCafeId)
-      if(!cafe) return
-      const icon=L.divIcon({html:'<div class="tl-event-pulse-ring"></div>',iconSize:[26,26],iconAnchor:[13,13],className:''})
-      const ghost=L.marker([cafe.lat,cafe.lng],{icon,interactive:false,zIndexOffset:9999})
-      try{ ghost.addTo(mapInst.current) }catch(e){}
-      return ()=>{ try{ mapInst.current.removeLayer(ghost) }catch(e){} }
-    }
-
-    // حالت پین: فرزند داخلی مارکر رو کلاس می‌زنیم (ریشه رو خود Leaflet برای موقعیت‌یابی transform می‌کنه)
-    const mk = mksRef.current[activeEventCafeId]
-    if(!mk) return
-    let el=null
-    try{ el = mk.getElement && mk.getElement() }catch(e){}
-    const inner = el && el.firstElementChild
-    if(!inner) return
-    inner.classList.add('tl-event-pulse')
-    return ()=>{ try{ inner.classList.remove('tl-event-pulse') }catch(e){} }
-  },[activeEventCafeId, mapReady, cafes, mapDisplay.markerMode])
+    const cafe = cafes.find(c=>c.id===activeEventCafeId)
+    if(!cafe) return
+    const icon=L.divIcon({html:'<div class="tl-event-pulse-ring"></div>',iconSize:[26,26],iconAnchor:[13,13],className:''})
+    const ghost=L.marker([cafe.lat,cafe.lng],{icon,interactive:false,zIndexOffset:9999})
+    try{ ghost.addTo(mapInst.current) }catch(e){}
+    return ()=>{ try{ mapInst.current.removeLayer(ghost) }catch(e){} }
+  },[activeEventCafeId, mapReady, cafes])
 
   // بازسازی گروه خوشه‌بندی وقتی شدت cluster یا حالت فیلتر منطقه عوض شه
   useEffect(()=>{
@@ -881,8 +867,6 @@ function TwinLand({ session, onLogout }) {
         @keyframes ledScroll{from{transform:translateX(-50%)}to{transform:translateX(0)}}
         @keyframes evSlide{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
         @keyframes coachPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
-        @keyframes tlMarkerPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 4px 8px rgba(0,0,0,.2))}50%{transform:scale(1.22);filter:drop-shadow(0 0 14px #FF9500)}}
-        .tl-event-pulse{animation:tlMarkerPulse 1.1s ease-in-out infinite;transform-origin:bottom center;z-index:9999}
         @keyframes tlRingPulse{0%{transform:scale(.5);opacity:1}70%{transform:scale(1.9);opacity:0}100%{transform:scale(1.9);opacity:0}}
         .tl-event-pulse-ring{width:26px;height:26px;border-radius:50%;border:3px solid #FF9500;box-shadow:0 0 14px #FF9500;animation:tlRingPulse 1.2s ease-out infinite}
         .xp-float{animation:xpFloat 1.8s ease forwards}
@@ -1476,10 +1460,12 @@ function LedAdBar({ C }) {
   const [visible, setVisible] = useState(false)
   useEffect(()=>{
     let hideTimer
-    function trigger(){ setVisible(true); hideTimer=setTimeout(()=>setVisible(false),15000) }
-    const firstTimer=setTimeout(trigger,8000)          // اولین نمایش کمی بعد از باز شدن اپ
-    const hourTimer=setInterval(trigger,3600000)         // بعدش هر ۱ ساعت یک‌بار
-    return ()=>{ clearTimeout(firstTimer); clearTimeout(hideTimer); clearInterval(hourTimer) }
+    const VISIBLE_MS = LED_ADS.length*15000   // دقیقاً کافی برای نمایش کامل هر ۵ ویدیو
+    const INTERVAL_MS = 10*60*1000            // هر ۱۰ دقیقه یک‌بار
+    function trigger(){ setVisible(true); hideTimer=setTimeout(()=>setVisible(false),VISIBLE_MS) }
+    trigger()                                  // بلافاصله با رفرش/ورود، بدون تأخیر
+    const intervalTimer=setInterval(trigger,INTERVAL_MS)
+    return ()=>{ clearTimeout(hideTimer); clearInterval(intervalTimer) }
   },[])
   if(!visible) return null
   return <LedAdBarInner C={C}/>
@@ -1575,8 +1561,8 @@ function LedAdBarInner({ C }) {
 
   const cur=LED_ADS[idx]
   return (
-    <div style={{flexShrink:0}}>
-      <div style={{height:30,position:'relative',borderRadius:'10px 10px 0 0',overflow:'hidden',background:'#050506'}}>
+    <div style={{padding:'0 14px 6px',flexShrink:0}}>
+      <div style={{height:30,position:'relative',borderRadius:14,overflow:'hidden',background:'#050506'}}>
         {/* ویدیوی پنهان (منبع افکت) — فقط وقتی اسلاید ویدیویی فعاله */}
         {cur&&cur.type==='video'&&(
           <video key={idx} ref={videoRef} src={cur.src} autoPlay loop muted playsInline
