@@ -89,12 +89,14 @@ const RAW = {
     dark: { bg:'#0F1826', card:'#1A2636', accent:'#6B7285', grad:'linear-gradient(90deg,#6B7285,#9CA1B4)' } },
 
   white: { name:'سفید', emoji:'⚪',
-    light:{ bg:'#FFFFFF', card:'#FFFFFF', accent:'#B8B8B8', accentText:'#1a1a1a', chip:'#F0F0F0', grad:'linear-gradient(90deg,#DEDEDE,#B8B8B8)' },
-    dark: { bg:'#121212', card:'#1C1C1C', accent:'#8A8A8A', chip:'#262626', grad:'linear-gradient(90deg,#8A8A8A,#B8B8B8)' } },
+    // روز: پس‌زمینه سفید تمیز، accent طوسی تیره (خوانا)، دکمه‌ها/چیپ طوسی روشن
+    light:{ bg:'#FFFFFF', card:'#FFFFFF', accent:'#4B4B4B', chip:'#EDEDED', grad:'linear-gradient(90deg,#6E6E6E,#3A3A3A)' },
+    dark: { bg:'#121212', card:'#1E1E1E', accent:'#D4D4D4', accentText:'#1a1a1a', chip:'#2A2A2A', grad:'linear-gradient(90deg,#D4D4D4,#9A9A9A)' } },
 
   graphite: { name:'طوسی', emoji:'🌑',
-    light:{ bg:'#E5E5E5', card:'#F2F2F2', accent:'#FFFFFF', accentText:'#1a1a1a', chip:'#D8D8D8', grad:'linear-gradient(90deg,#FFFFFF,#E0E0E0)' },
-    dark: { bg:'#2A2A2A', card:'#363636', accent:'#F2F2F2', accentText:'#1a1a1a', chip:'#444444', grad:'linear-gradient(90deg,#FFFFFF,#CFCFCF)' } },
+    // روز: پس‌زمینه طوسی روشن، کارت سفید (کنتراست با bg)، accent طوسی تیره
+    light:{ bg:'#E8E8E8', card:'#FFFFFF', accent:'#3D3D3D', chip:'#DADADA', grad:'linear-gradient(90deg,#5C5C5C,#2E2E2E)' },
+    dark: { bg:'#242424', card:'#333333', accent:'#C8C8C8', accentText:'#1a1a1a', chip:'#454545', grad:'linear-gradient(90deg,#E0E0E0,#A8A8A8)' } },
 
   mono: { name:'تک‌رنگ', emoji:'◑',
     light:{ bg:'#FFFFFF', card:'#FAFAFA', accent:'#1a1a1a', accentText:'#FFFFFF', chip:'#EDEDED', grad:'linear-gradient(90deg,#333,#000)' },
@@ -111,8 +113,8 @@ export const PALETTES = Object.fromEntries(
   }])
 )
 
-export const PALETTE_ORDER = ['cyberpunk','luna','lemon','forest','mocha','mint','slate','white','graphite','mono']
-export const DEFAULT_PALETTE = 'cyberpunk'
+export const PALETTE_ORDER = ['graphite','cyberpunk','luna','lemon','forest','mocha','mint','slate','white','mono']
+export const DEFAULT_PALETTE = 'graphite'
 export const DEFAULT_MODE = 'dark'
 
 export function buildC(paletteKey, mode) {
