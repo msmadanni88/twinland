@@ -894,14 +894,14 @@ function TwinLand({ session, onLogout }) {
         )}
         {isMobile&&<div style={{flex:1}}/>}
 
-        <button onClick={()=>setShowNotif(v=>!v)} style={{position:'relative',background:showNotif?C.accent:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:showNotif?'#fff':C.text}}>
+        <button onClick={()=>setShowNotif(v=>!v)} style={{position:'relative',background:showNotif?C.accent:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:showNotif?C.accentText:C.text}}>
           🔔
           {notifications.some(n=>!n.read) && (
             <span style={{position:'absolute',top:4,left:4,width:8,height:8,borderRadius:'50%',background:'#ef4444',border:'1.5px solid '+C.bg}}/>
           )}
         </button>
 
-        <button onClick={()=>setPanelOpen(v=>!v)} style={{background:panelOpen?C.accent:C.chip,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:panelOpen?'white':C.sub,fontFamily:'inherit',fontWeight:700,flexShrink:0,display:'flex',alignItems:'center',gap:5}}>
+        <button onClick={()=>setPanelOpen(v=>!v)} style={{background:panelOpen?C.accent:C.chip,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:panelOpen?C.accentText:C.sub,fontFamily:'inherit',fontWeight:700,flexShrink:0,display:'flex',alignItems:'center',gap:5}}>
           {panelOpen?<span style={{fontSize:15,fontWeight:800}}>✕</span>:<img src="/dashboard@256.png" alt="داشبورد" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>}{!isMobile&&<span>{panelOpen?'بستن':'پنل'}</span>}
         </button>
         <button onClick={()=>setShowMode(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.accent,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center'}}>
@@ -913,7 +913,7 @@ function TwinLand({ session, onLogout }) {
         <button onClick={()=>setShowPalette(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:14,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
           <img src="/theme@256.png" alt="پالت" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>{!isMobile&&<span style={{fontSize:12}}> پالت</span>}
         </button>
-        <button onClick={()=>setShowCity(true)} style={{background:C.accent,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:'white',fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
+        <button onClick={()=>setShowCity(true)} style={{background:C.accent,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:C.accentText,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
           {CITIES[city].name} ▾
         </button>
       </div>
@@ -921,7 +921,7 @@ function TwinLand({ session, onLogout }) {
       {/* FILTER BAR */}
       <div style={{height:46,flexShrink:0,display:'flex',alignItems:'center',gap:7,padding:'0 12px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',background:C.glassDark,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
         {ZONES.map(z=>(
-          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'8px 17px',fontSize:13.5,fontWeight:zone===z.key?800:600,color:zone===z.key?'white':C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
+          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'8px 17px',fontSize:13.5,fontWeight:zone===z.key?800:600,color:zone===z.key?C.accentText:C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
         ))}
         <div style={{width:1,height:24,background:C.border,flexShrink:0,margin:'0 2px'}}/>
         <div style={{position:'relative',display:'flex',alignItems:'center',flexShrink:0}}>
@@ -1053,7 +1053,7 @@ function TwinLand({ session, onLogout }) {
               {/* tabs */}
               <div style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid '+C.border,overflowX:'auto',scrollbarWidth:'none'}}>
                 {[{key:'dashboard',icon:'📊',img:null,imgActive:'/dashboard@256.png',imgInactive:'/dashboard@256_disabled.png',label:'داشبورد'},{key:'missions',icon:'📋',img:'icon_mission',label:'ماموریت'},{key:'rank',icon:'🏆',img:'icon_rank',label:'رتبه'},{key:'clan',icon:'🛡',img:'icon_clan',label:'کلن'},{key:'profile',icon:'👤',img:'icon_profile',label:'پروفایل'}].map(t=>(
-                  <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:C.chip,border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?'white':C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
+                  <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:C.chip,border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?C.accentText:C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
                     {t.imgActive
                       ? <img src={panelTab===t.key?t.imgActive:t.imgInactive} alt={t.label} width={19} height={19} style={{objectFit:'contain',display:'block'}}/>
                       : t.img
@@ -1143,7 +1143,7 @@ function TwinLand({ session, onLogout }) {
             <div style={{fontSize:17,fontWeight:800,color:C.text,textAlign:'center',marginBottom:16}}>🏙️ انتخاب شهر</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
               {Object.entries(CITIES).map(([k,v])=>(
-                <button key={k} onClick={()=>{setCity(k);setShowCity(false);showToast('✈️ '+v.name)}} style={{background:city===k?C.accent:C.chip,border:'none',borderRadius:12,padding:'12px 6px',fontSize:12,fontWeight:city===k?800:500,color:city===k?'white':C.text,fontFamily:'inherit'}}>{v.name}</button>
+                <button key={k} onClick={()=>{setCity(k);setShowCity(false);showToast('✈️ '+v.name)}} style={{background:city===k?C.accent:C.chip,border:'none',borderRadius:12,padding:'12px 6px',fontSize:12,fontWeight:city===k?800:500,color:city===k?C.accentText:C.text,fontFamily:'inherit'}}>{v.name}</button>
               ))}
             </div>
           </div>
@@ -1159,8 +1159,8 @@ function TwinLand({ session, onLogout }) {
 
             {/* سوییچ روز / شب */}
             <div style={{display:'flex',background:C.chip,borderRadius:12,padding:4,marginBottom:18}}>
-              <button onClick={()=>themeMode!=='light'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='light'?C.accent:'transparent',color:themeMode==='light'?'#fff':C.sub}}>☀️ روز</button>
-              <button onClick={()=>themeMode!=='dark'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='dark'?C.accent:'transparent',color:themeMode==='dark'?'#fff':C.sub}}>🌙 شب</button>
+              <button onClick={()=>themeMode!=='light'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='light'?C.accent:'transparent',color:themeMode==='light'?C.accentText:C.sub}}>☀️ روز</button>
+              <button onClick={()=>themeMode!=='dark'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='dark'?C.accent:'transparent',color:themeMode==='dark'?C.accentText:C.sub}}>🌙 شب</button>
             </div>
 
             {/* لیست پالت‌ها */}
@@ -1177,7 +1177,7 @@ function TwinLand({ session, onLogout }) {
                       <span style={{width:22,height:22,borderRadius:7,background:pc.bg,display:'inline-block',border:'1px solid '+pc.border}}/>
                     </div>
                     <div style={{fontSize:13,fontWeight:800,color:pc.text}}>{p.emoji} {p.name}</div>
-                    {active&&<div style={{position:'absolute',top:8,left:8,width:20,height:20,borderRadius:99,background:pc.accent,color:'#fff',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center'}}>✓</div>}
+                    {active&&<div style={{position:'absolute',top:8,left:8,width:20,height:20,borderRadius:99,background:pc.accent,color:pc.accentText,fontSize:12,display:'flex',alignItems:'center',justifyContent:'center'}}>✓</div>}
                   </button>
                 )
               })}
@@ -1197,7 +1197,7 @@ function TwinLand({ session, onLogout }) {
             <div style={{fontSize:11,color:C.sub,textAlign:'center',marginBottom:16,lineHeight:1.6}}>روی هر منطقه روی نقشه بزن تا رنگش عوض بشه یا خاموش شه</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {[{key:'off',label:'❌ خاموش'},{key:'province',label:'🇮🇷 استان‌های ایران'},{key:'district',label:'🏙️ مناطق ۲۲گانه تهران'}].map(o=>(
-                <button key={o.key} onClick={()=>{setBoundaryMode(o.key);setShowBoundary(false);if(o.key!=='off')showToast(BOUNDARY_SOURCES[o.key]?.label+' فعال شد')}} style={{background:boundaryMode===o.key?C.accent:C.chip,border:boundaryMode===o.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'14px',fontSize:14,fontWeight:boundaryMode===o.key?800:500,color:boundaryMode===o.key?'white':C.text,fontFamily:'inherit',textAlign:'right'}}>{o.label}</button>
+                <button key={o.key} onClick={()=>{setBoundaryMode(o.key);setShowBoundary(false);if(o.key!=='off')showToast(BOUNDARY_SOURCES[o.key]?.label+' فعال شد')}} style={{background:boundaryMode===o.key?C.accent:C.chip,border:boundaryMode===o.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'14px',fontSize:14,fontWeight:boundaryMode===o.key?800:500,color:boundaryMode===o.key?C.accentText:C.text,fontFamily:'inherit',textAlign:'right'}}>{o.label}</button>
               ))}
             </div>
           </div>
@@ -1211,7 +1211,7 @@ function TwinLand({ session, onLogout }) {
             <div style={{fontSize:17,fontWeight:800,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:16}}><img src="/map_style@256.png" alt="" width={30} height={30} style={{objectFit:'contain'}}/>استایل نقشه</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               {MAP_MODES.map(m=>(
-                <button key={m.key} onClick={()=>{setMapMode(m.key);setShowMode(false);showToast(m.label+' فعال شد')}} style={{background:mapMode===m.key?C.accent:C.chip,border:mapMode===m.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'16px',fontSize:14,fontWeight:mapMode===m.key?800:500,color:mapMode===m.key?'white':C.text,fontFamily:'inherit'}}>{m.label}</button>
+                <button key={m.key} onClick={()=>{setMapMode(m.key);setShowMode(false);showToast(m.label+' فعال شد')}} style={{background:mapMode===m.key?C.accent:C.chip,border:mapMode===m.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'16px',fontSize:14,fontWeight:mapMode===m.key?800:500,color:mapMode===m.key?C.accentText:C.text,fontFamily:'inherit'}}>{m.label}</button>
               ))}
             </div>
           </div>
@@ -1289,7 +1289,7 @@ function RegionFilterPopup({ C, regions, value, setValue, onApply, onClose }) {
         </div>
 
         <button onClick={onApply}
-          style={{width:'100%',padding:15,borderRadius:14,border:'none',background:C.accent,color:'#fff',
+          style={{width:'100%',padding:15,borderRadius:14,border:'none',background:C.accent,color:C.accentText,
             fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer',boxShadow:'0 6px 20px '+C.accent+'55'}}>
           نمایش نتایج
         </button>
@@ -1344,8 +1344,8 @@ function RegionResultsPanel({ C, pages, onClose }) {
 
         {hasLb&&hasClan&&(
           <div style={{display:'flex',gap:8,marginBottom:14}}>
-            <button onClick={()=>setTab('lb')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='lb'?C.accent:C.chip,color:tab==='lb'?'#fff':C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🏆 برترین‌ها</button>
-            <button onClick={()=>setTab('clan')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='clan'?C.accent:C.chip,color:tab==='clan'?'#fff':C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🛡️ کلن‌ها</button>
+            <button onClick={()=>setTab('lb')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='lb'?C.accent:C.chip,color:tab==='lb'?C.accentText:C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🏆 برترین‌ها</button>
+            <button onClick={()=>setTab('clan')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='clan'?C.accent:C.chip,color:tab==='clan'?C.accentText:C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🛡️ کلن‌ها</button>
           </div>
         )}
 
@@ -1356,7 +1356,7 @@ function RegionResultsPanel({ C, pages, onClose }) {
                 <div style={{width:26,textAlign:'center',fontSize:u.rank<=3?18:14,fontWeight:800,color:u.rank<=3?C.text:C.sub}}>{medals[u.rank]||u.rank.toLocaleString('fa')}</div>
                 <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+C.accent+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{u.avatar}</div>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:14,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{u.name}{u.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{u.name}{u.me&&<span style={{fontSize:9,background:C.accent,color:C.accentText,borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
                   <div style={{fontSize:11,color:C.sub}}>{u.checkins.toLocaleString('fa')} چک‌این در منطقه</div>
                 </div>
                 <div style={{fontSize:13,fontWeight:800,color:C.accent}}>{u.xp.toLocaleString('fa')} XP</div>
@@ -1406,7 +1406,7 @@ function MapSettingsPopup({ C, value, setValue, onClose }) {
       <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:8}}>{label}</div>
       <div style={{display:'flex',gap:6}}>
         {options.map(o=>(
-          <button key={o.k} onClick={()=>onPick(o.k)} style={{flex:1,padding:'9px 4px',borderRadius:11,border:'2px solid '+(val===o.k?C.accent:C.border),background:val===o.k?C.accent:C.card,color:val===o.k?'#fff':C.text,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>{o.l}</button>
+          <button key={o.k} onClick={()=>onPick(o.k)} style={{flex:1,padding:'9px 4px',borderRadius:11,border:'2px solid '+(val===o.k?C.accent:C.border),background:val===o.k?C.accent:C.card,color:val===o.k?C.accentText:C.text,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>{o.l}</button>
         ))}
       </div>
     </div>
@@ -1440,7 +1440,7 @@ function MapSettingsPopup({ C, value, setValue, onClose }) {
           </>
         )}
 
-        <button onClick={onClose} style={{width:'100%',padding:14,borderRadius:14,border:'none',background:C.accent,color:'#fff',fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>تمام</button>
+        <button onClick={onClose} style={{width:'100%',padding:14,borderRadius:14,border:'none',background:C.accent,color:C.accentText,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>تمام</button>
       </div>
     </div>
   )
@@ -1682,7 +1682,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
       {topPlayers.map(p=>(
         <div key={p.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid '+C.border}}>
           <span style={{fontSize:18}}>{medals[p.rank]}</span>
-          <div style={{flex:1}}><div style={{fontSize:12,color:C.text,fontWeight:700,display:'flex',alignItems:'center',gap:5}}>{p.name}{p.me&&<span style={{fontSize:8,background:C.accent,color:'#fff',borderRadius:99,padding:'0 6px'}}>تو</span>}</div></div>
+          <div style={{flex:1}}><div style={{fontSize:12,color:C.text,fontWeight:700,display:'flex',alignItems:'center',gap:5}}>{p.name}{p.me&&<span style={{fontSize:8,background:C.accent,color:C.accentText,borderRadius:99,padding:'0 6px'}}>تو</span>}</div></div>
           <div style={{fontSize:12,color:C.accent,fontWeight:800}}>{p.xp.toLocaleString('fa')} XP</div>
         </div>
       ))}
@@ -1767,7 +1767,7 @@ function MissionsTab({C, cafes, setSelCafe, showToast}) {
             ? <div style={{marginTop:10,background:C.green+'15',border:'1px dashed '+C.green,borderRadius:10,padding:'8px 10px',textAlign:'center'}}>
                 <span style={{fontSize:11.5,color:C.green,fontWeight:800}}>🎁 {q.reward_label}{red?' — کد: '+red.code:''}</span>
               </div>
-            : <button onClick={()=>openCafe(q)} style={{marginTop:10,width:'100%',background:C.accent,border:'none',borderRadius:10,padding:'8px',fontSize:12,color:'white',fontWeight:700,fontFamily:'inherit'}}>📍 برو به {cafeName} و چک‌این کن</button>}
+            : <button onClick={()=>openCafe(q)} style={{marginTop:10,width:'100%',background:C.accent,border:'none',borderRadius:10,padding:'8px',fontSize:12,color:C.accentText,fontWeight:700,fontFamily:'inherit'}}>📍 برو به {cafeName} و چک‌این کن</button>}
         </div>
       })}
     </div>
@@ -1797,13 +1797,13 @@ function RankTab({C}) {
           <div style={{width:24,textAlign:'center',fontSize:rank<=3?18:14,fontWeight:800,color:rank<=3?C.text:C.sub}}>{medals[rank]||rank.toLocaleString('fa')}</div>
           <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+C.accent+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{p.avatar}</div>
           <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.name}{p.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}{p.sample&&<span style={{fontSize:9,background:C.chip,color:C.sub,border:'1px solid '+C.border,borderRadius:99,padding:'1px 6px'}}>نمونه</span>}</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.name}{p.me&&<span style={{fontSize:9,background:C.accent,color:C.accentText,borderRadius:99,padding:'1px 7px'}}>تو</span>}{p.sample&&<span style={{fontSize:9,background:C.chip,color:C.sub,border:'1px solid '+C.border,borderRadius:99,padding:'1px 6px'}}>نمونه</span>}</div>
           </div>
           <div style={{fontSize:12,fontWeight:800,color:C.accent}}>{p.xp.toLocaleString('fa')} XP</div>
         </div>
       })}
     </div>
-    <a href="/leaderboard" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده جدول کامل ›</a>
+    <a href="/leaderboard" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:C.accentText,borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده جدول کامل ›</a>
   </div>
 }
 
@@ -1837,7 +1837,7 @@ function ClanTab({C}) {
     <div style={{fontSize:40,marginBottom:8}}>🛡️</div>
     <div style={{fontWeight:800,color:C.text,marginBottom:4}}>هنوز عضو کلنی نیستی</div>
     <div style={{fontSize:12,color:C.sub,marginBottom:14}}>یه کلن بساز یا به یکی بپیوند</div>
-    <a href="/clan" style={{display:'inline-block',background:C.accent,color:'#fff',borderRadius:12,padding:'10px 20px',fontSize:13,fontWeight:700,textDecoration:'none'}}>رفتن به کلن‌ها ›</a>
+    <a href="/clan" style={{display:'inline-block',background:C.accent,color:C.accentText,borderRadius:12,padding:'10px 20px',fontSize:13,fontWeight:700,textDecoration:'none'}}>رفتن به کلن‌ها ›</a>
   </div>
 
   const c=clan.clans
@@ -1854,14 +1854,14 @@ function ClanTab({C}) {
           <div style={{width:22,textAlign:'center',fontWeight:800,color:C.sub,fontSize:14}}>{(i+1).toLocaleString('fa')}</div>
           <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+c.color+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{m.avatar}</div>
           <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{m.name}{m.me&&<span style={{fontSize:9,background:C.accent,color:'#fff',borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{m.name}{m.me&&<span style={{fontSize:9,background:C.accent,color:C.accentText,borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
             <div style={{fontSize:11,color:C.sub}}>{m.role==='leader'?'رهبر':m.role==='officer'?'افسر':'عضو'}</div>
           </div>
           <div style={{fontSize:12,fontWeight:800,color:C.accent}}>{m.xp.toLocaleString('fa')} XP</div>
         </div>
       ))}
     </div>
-    <a href="/clan" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده کامل کلن ›</a>
+    <a href="/clan" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:C.accentText,borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده کامل کلن ›</a>
   </div>
 }
 
@@ -1888,7 +1888,7 @@ function ProfileTab({C,xp,levelInfo,streak,checkedIn,userName,coins}) {
         </div>
       ))}
     </div>
-    <a href="/profile" style={{display:'block',textAlign:'center',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده پروفایل کامل ›</a>
+    <a href="/profile" style={{display:'block',textAlign:'center',background:C.accent,color:C.accentText,borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده پروفایل کامل ›</a>
   </div>
 }
 
@@ -2039,7 +2039,7 @@ function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, 
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13.5,fontWeight:800,color:C.text,marginBottom:3}}>{step.title}</div>
           <div style={{fontSize:12,color:C.sub,lineHeight:1.7}}>{step.text}</div>
-          <button onClick={dismiss} style={{marginTop:10,background:C.accent,color:'#fff',border:'none',borderRadius:10,padding:'7px 16px',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>فهمیدم</button>
+          <button onClick={dismiss} style={{marginTop:10,background:C.accent,color:C.accentText,border:'none',borderRadius:10,padding:'7px 16px',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>فهمیدم</button>
         </div>
         <button onClick={dismiss} style={{background:'none',border:'none',color:C.sub,fontSize:14,flexShrink:0}}>✕</button>
       </div>
