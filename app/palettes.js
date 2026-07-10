@@ -1,7 +1,11 @@
 // ─────────────────────────────────────────────────────────────
-//  TwinLand — سیستم پالت رنگی مشترک
+//  TwinLand — سیستم پالت رنگی مشترک (نسخه‌ی حرفه‌ای)
 //  هر پالت دو حالت دارد: light (روز) و dark (شب)
 //  رنگ‌های معنایی (green/blue/purple/gold/danger) بین همه مشترک‌اند
+//
+//  اصل مهم: هر حالت فقط چند مقدار «هسته» تعریف می‌کند (bg, card, accent, ...)
+//  و بقیه‌ی مقادیر مشتق (text/sub/border/chip/glass) به‌صورت خودکار با کنتراست
+//  درست ساخته می‌شوند. این تضمین می‌کند متن هیچ‌وقت روی زمینه‌ی هم‌رنگ گم نشود.
 // ─────────────────────────────────────────────────────────────
 
 const SEMANTIC = {
@@ -9,79 +13,108 @@ const SEMANTIC = {
   gold:'#FFD60A', danger:'#FF3B30',
 }
 
-export const PALETTES = {
-  cyberpunk: {
-    name:'سایبرپانک', emoji:'⚡',
-    light:{ bg:'#FAF0FF', card:'#FFFFFF', border:'rgba(217,70,239,.18)',
-      text:'#4A044E', sub:'#86708F', accent:'#C026D3', accentL:'#C026D318',
-      chip:'#FAE8FF', glass:'rgba(255,255,255,.72)', glassDark:'rgba(255,255,255,.92)',
-      grad:'linear-gradient(90deg,#D946EF,#06B6D4)' },
-    dark:{ bg:'#0A0118', card:'#120726', border:'rgba(217,70,239,.30)',
-      text:'#FAF5FF', sub:'#A78BC0', accent:'#E879F9', accentL:'rgba(217,70,239,.18)',
-      chip:'#1A0B2E', glass:'rgba(18,7,38,.72)', glassDark:'rgba(10,1,24,.92)',
-      grad:'linear-gradient(90deg,#D946EF,#06B6D4)' },
-  },
-  ocean: {
-    name:'اقیانوس', emoji:'🌊',
-    light:{ bg:'#F8FAFC', card:'#FFFFFF', border:'rgba(0,0,0,.08)',
-      text:'#0F172A', sub:'#64748B', accent:'#0EA5E9', accentL:'#0EA5E918',
-      chip:'#E2E8F0', glass:'rgba(255,255,255,.72)', glassDark:'rgba(255,255,255,.92)' },
-    dark:{ bg:'#0F172A', card:'#1E293B', border:'rgba(255,255,255,.08)',
-      text:'#F1F5F9', sub:'#94A3B8', accent:'#38BDF8', accentL:'rgba(56,189,248,.16)',
-      chip:'#334155', glass:'rgba(30,41,59,.72)', glassDark:'rgba(15,23,42,.92)' },
-  },
-  bubblegum: {
-    name:'آدامس', emoji:'🍬',
-    light:{ bg:'#FDF2F8', card:'#FFFFFF', border:'rgba(236,72,153,.14)',
-      text:'#831843', sub:'#9CA3AF', accent:'#EC4899', accentL:'#EC489918',
-      chip:'#FCE7F3', glass:'rgba(255,255,255,.72)', glassDark:'rgba(255,255,255,.92)' },
-    dark:{ bg:'#1A0E16', card:'#2A1622', border:'rgba(236,72,153,.25)',
-      text:'#FDF2F8', sub:'#C99AB3', accent:'#F472B6', accentL:'rgba(244,114,182,.16)',
-      chip:'#331824', glass:'rgba(42,22,34,.72)', glassDark:'rgba(26,14,22,.92)' },
-  },
-  slatepro: {
-    name:'حرفه‌ای', emoji:'💎',
-    light:{ bg:'#F8FAFC', card:'#FFFFFF', border:'rgba(0,0,0,.08)',
-      text:'#0F172A', sub:'#64748B', accent:'#0F766E', accentL:'#0F766E18',
-      chip:'#E2E8F0', glass:'rgba(255,255,255,.72)', glassDark:'rgba(255,255,255,.92)' },
-    dark:{ bg:'#0B1220', card:'#172033', border:'rgba(255,255,255,.08)',
-      text:'#F1F5F9', sub:'#94A3B8', accent:'#2DD4BF', accentL:'rgba(45,212,191,.16)',
-      chip:'#2A3850', glass:'rgba(23,32,51,.72)', glassDark:'rgba(11,18,32,.92)' },
-  },
-  cyber: {
-    name:'سایبر', emoji:'🤖',
-    light:{ bg:'#F0FDFF', card:'#FFFFFF', border:'rgba(6,182,212,.14)',
-      text:'#164E63', sub:'#94A3B8', accent:'#06B6D4', accentL:'#06B6D418',
-      chip:'#CFFAFE', glass:'rgba(255,255,255,.72)', glassDark:'rgba(255,255,255,.92)' },
-    dark:{ bg:'#070B14', card:'#0E1626', border:'rgba(34,211,238,.22)',
-      text:'#ECFEFF', sub:'#7BA0AD', accent:'#22D3EE', accentL:'rgba(34,211,238,.16)',
-      chip:'#0E2A33', glass:'rgba(14,22,38,.72)', glassDark:'rgba(7,11,20,.92)' },
-  },
-  pasteldream: {
-    name:'رویای پاستل', emoji:'🌸',
-    light:{ bg:'#FDF4FF', card:'#FFFFFF', border:'rgba(167,139,250,.16)',
-      text:'#4C1D95', sub:'#9CA3AF', accent:'#A78BFA', accentL:'#A78BFA20',
-      chip:'#F3E8FF', glass:'rgba(255,255,255,.72)', glassDark:'rgba(255,255,255,.92)' },
-    dark:{ bg:'#1E1B2E', card:'#2A2640', border:'rgba(196,181,253,.2)',
-      text:'#F5F3FF', sub:'#A5A0C0', accent:'#C4B5FD', accentL:'rgba(196,181,253,.16)',
-      chip:'#2D2A40', glass:'rgba(42,38,64,.72)', glassDark:'rgba(30,27,46,.92)' },
-  },
-  lavender: {
-    name:'اسطوخودوس', emoji:'💜',
-    light:{ bg:'#FAF5FF', card:'#FFFFFF', border:'rgba(139,92,246,.14)',
-      text:'#4C1D95', sub:'#9CA3AF', accent:'#8B5CF6', accentL:'#8B5CF618',
-      chip:'#EDE9FE', glass:'rgba(255,255,255,.72)', glassDark:'rgba(255,255,255,.92)' },
-    dark:{ bg:'#161325', card:'#221E38', border:'rgba(196,181,253,.18)',
-      text:'#F5F3FF', sub:'#9B95BD', accent:'#A5B4FC', accentL:'rgba(165,180,252,.16)',
-      chip:'#252040', glass:'rgba(34,30,56,.72)', glassDark:'rgba(22,19,37,.92)' },
-  },
+// ── ابزار رنگ ────────────────────────────────────────────────
+function hexToRgb(hex){
+  let h = String(hex||'').replace('#','').trim()
+  if(h.length===3) h = h.split('').map(c=>c+c).join('')
+  const n = parseInt(h||'000000',16)
+  return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 }
+}
+function rgba(hex, a){ const {r,g,b}=hexToRgb(hex); return 'rgba('+r+','+g+','+b+','+a+')' }
+function luminance(hex){ const {r,g,b}=hexToRgb(hex); return 0.299*r+0.587*g+0.114*b }
+function isDark(hex){ return luminance(hex) < 140 }
+function inkOn(hex, darkInk, lightInk){
+  return isDark(hex) ? (lightInk||'#F8FAFC') : (darkInk||'#0F172A')
+}
+function clamp(v){ return Math.max(0,Math.min(255,Math.round(v))) }
+function rgbHex(r,g,b){ return '#'+[r,g,b].map(x=>clamp(x).toString(16).padStart(2,'0')).join('') }
+function lighten(hex,amt){ const {r,g,b}=hexToRgb(hex); return rgbHex(r+255*amt,g+255*amt,b+255*amt) }
+function darken(hex,amt){ const {r,g,b}=hexToRgb(hex); return rgbHex(r-255*amt,g-255*amt,b-255*amt) }
+
+// ── هسته‌ی هر حالت را به آبجکت کامل رنگ تبدیل می‌کند ──────────
+function expand(core){
+  const bgIsDark   = isDark(core.bg)
+  const cardIsDark = isDark(core.card)
+
+  const text = core.text || (cardIsDark ? (core.textLight||'#F8FAFC') : (core.textDark||'#0F172A'))
+  const sub  = core.sub  || (cardIsDark ? rgba(text,0.62) : rgba('#000000',0.45))
+  const chip = core.chip || (bgIsDark ? lighten(core.card,0.06) : darken(core.bg,0.05))
+
+  return {
+    bg: core.bg,
+    card: core.card,
+    text,
+    sub,
+    accent: core.accent,
+    accentText: core.accentText || inkOn(core.accent),
+    accentL: rgba(core.accent, 0.16),
+    border: bgIsDark ? rgba('#FFFFFF',0.10) : rgba('#000000',0.09),
+    chip,
+    chipText: inkOn(chip),
+    glass:     bgIsDark ? rgba(core.card,0.72) : rgba('#FFFFFF',0.72),
+    glassDark: bgIsDark ? rgba(core.bg,0.90)  : rgba('#FFFFFF',0.92),
+    grad: core.grad || core.accent,
+    isDarkBg: bgIsDark,
+  }
 }
 
-export const PALETTE_ORDER = ['cyberpunk','ocean','bubblegum','slatepro','cyber','pasteldream','lavender']
+// ── تعریف پالت‌ها (فقط هسته — بقیه خودکار ساخته می‌شود) ───────
+const RAW = {
+  cyberpunk: { name:'سایبرپانک', emoji:'⚡',
+    light:{ bg:'#FAF0FF', card:'#FFFFFF', accent:'#C026D3', grad:'linear-gradient(90deg,#D946EF,#06B6D4)' },
+    dark: { bg:'#0A0118', card:'#120726', accent:'#E879F9', grad:'linear-gradient(90deg,#D946EF,#06B6D4)' } },
+
+  luna: { name:'لونا', emoji:'🌙',
+    light:{ bg:'#EAF6FB', card:'#FFFFFF', accent:'#26658C', grad:'linear-gradient(90deg,#54ACBF,#26658C)' },
+    dark: { bg:'#011C40', card:'#022E5A', accent:'#54ACBF', grad:'linear-gradient(90deg,#54ACBF,#A7EBF2)' } },
+
+  lemon: { name:'لیمو', emoji:'🍋',
+    light:{ bg:'#FFFDF2', card:'#FFFFFF', accent:'#E0A800', grad:'linear-gradient(90deg,#FFD54F,#FFB300)' },
+    dark: { bg:'#1A1705', card:'#26220A', accent:'#FFD54F', grad:'linear-gradient(90deg,#FFD54F,#FFECB3)' } },
+
+  forest: { name:'جنگل', emoji:'🌿',
+    light:{ bg:'#F4F7EE', card:'#FFFFFF', accent:'#5E7345', grad:'linear-gradient(90deg,#88976C,#5E7345)' },
+    dark: { bg:'#12160C', card:'#1D2413', accent:'#98A77C', grad:'linear-gradient(90deg,#98A77C,#CFE1B9)' } },
+
+  mocha: { name:'موکا', emoji:'☕',
+    light:{ bg:'#FFF8F0', card:'#FFFFFF', accent:'#8C6E63', grad:'linear-gradient(90deg,#D3A376,#8C6E63)' },
+    dark: { bg:'#1A0F0A', card:'#2A1B14', accent:'#C79E7F', grad:'linear-gradient(90deg,#C79E7F,#FFE0B2)' } },
+
+  mint: { name:'مینت', emoji:'🌱',
+    light:{ bg:'#EFFBF9', card:'#FFFFFF', accent:'#0F9D95', grad:'linear-gradient(90deg,#46DFB1,#09D1C7)' },
+    dark: { bg:'#07201F', card:'#0E2E2C', accent:'#2DD4BF', grad:'linear-gradient(90deg,#46DFB1,#80EE98)' } },
+
+  slate: { name:'اسلیت', emoji:'🪨',
+    light:{ bg:'#F4F6F8', card:'#FFFFFF', accent:'#2E4156', grad:'linear-gradient(90deg,#3B4256,#2E4156)' },
+    dark: { bg:'#0F1826', card:'#1A2636', accent:'#6B7285', grad:'linear-gradient(90deg,#6B7285,#9CA1B4)' } },
+
+  white: { name:'سفید', emoji:'⚪',
+    light:{ bg:'#FFFFFF', card:'#FFFFFF', accent:'#B8B8B8', accentText:'#1a1a1a', chip:'#F0F0F0', grad:'linear-gradient(90deg,#DEDEDE,#B8B8B8)' },
+    dark: { bg:'#121212', card:'#1C1C1C', accent:'#8A8A8A', chip:'#262626', grad:'linear-gradient(90deg,#8A8A8A,#B8B8B8)' } },
+
+  graphite: { name:'طوسی', emoji:'🌑',
+    light:{ bg:'#E5E5E5', card:'#F2F2F2', accent:'#FFFFFF', accentText:'#1a1a1a', chip:'#D8D8D8', grad:'linear-gradient(90deg,#FFFFFF,#E0E0E0)' },
+    dark: { bg:'#2A2A2A', card:'#363636', accent:'#F2F2F2', accentText:'#1a1a1a', chip:'#444444', grad:'linear-gradient(90deg,#FFFFFF,#CFCFCF)' } },
+
+  mono: { name:'تک‌رنگ', emoji:'◑',
+    light:{ bg:'#FFFFFF', card:'#FAFAFA', accent:'#1a1a1a', accentText:'#FFFFFF', chip:'#EDEDED', grad:'linear-gradient(90deg,#333,#000)' },
+    dark: { bg:'#000000', card:'#0D0D0D', accent:'#FFFFFF', accentText:'#000000', chip:'#1A1A1A', grad:'linear-gradient(90deg,#FFF,#BBB)' } },
+}
+
+export const PALETTES = Object.fromEntries(
+  Object.entries(RAW).map(([key,p])=>[key,{
+    name:p.name, emoji:p.emoji,
+    light: expand(p.light),
+    dark:  expand(p.dark),
+    swatch: [p.light.bg, p.light.card, p.light.accent],
+    swatchDark: [p.dark.bg, p.dark.card, p.dark.accent],
+  }])
+)
+
+export const PALETTE_ORDER = ['cyberpunk','luna','lemon','forest','mocha','mint','slate','white','graphite','mono']
 export const DEFAULT_PALETTE = 'cyberpunk'
 export const DEFAULT_MODE = 'dark'
 
-// می‌سازد آبجکت رنگ نهایی (C) از یک پالت و حالت روز/شب
 export function buildC(paletteKey, mode) {
   const p = PALETTES[paletteKey] || PALETTES[DEFAULT_PALETTE]
   const m = (mode === 'light' || mode === 'dark') ? mode : DEFAULT_MODE
@@ -95,14 +128,14 @@ export function buildC(paletteKey, mode) {
   }
 }
 
-// خواندن انتخاب کاربر از مرورگر (فقط سمت کلاینت)
 export function loadPrefs() {
   if (typeof window === 'undefined') return { palette: DEFAULT_PALETTE, mode: DEFAULT_MODE }
   try {
-    return {
-      palette: localStorage.getItem('tl_palette') || DEFAULT_PALETTE,
-      mode: localStorage.getItem('tl_thememode') || DEFAULT_MODE,
-    }
+    const savedPalette = localStorage.getItem('tl_palette')
+    const savedMode = localStorage.getItem('tl_thememode')
+    const palette = (savedPalette && PALETTES[savedPalette]) ? savedPalette : DEFAULT_PALETTE
+    const mode = (savedMode === 'light' || savedMode === 'dark') ? savedMode : DEFAULT_MODE
+    return { palette, mode }
   } catch { return { palette: DEFAULT_PALETTE, mode: DEFAULT_MODE } }
 }
 
