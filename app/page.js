@@ -1072,10 +1072,8 @@ function TwinLand({ session, onLogout }) {
             </div>
           </>
         )}
+        <LedAdBar C={C} />
       </div>
-
-      {/* LED AD BAR — نوار تبلیغاتی سبک استادیوم با افکت پیکسل RGB (تستی) */}
-      <LedAdBar C={C} />
 
       {/* BOTTOM NAV */}
       <div style={{height:BH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'stretch'}}>
@@ -1561,8 +1559,8 @@ function LedAdBarInner({ C }) {
 
   const cur=LED_ADS[idx]
   return (
-    <div style={{padding:'0 14px 6px',flexShrink:0}}>
-      <div style={{height:30,position:'relative',borderRadius:14,overflow:'hidden',background:'#050506'}}>
+    <div style={{position:'absolute',left:'50%',bottom:10,transform:'translateX(-50%)',zIndex:18,width:'min(260px, calc(100vw - 100px))'}}>
+      <div style={{height:30,position:'relative',borderRadius:99,overflow:'hidden',background:'#050506'}}>
         {/* ویدیوی پنهان (منبع افکت) — فقط وقتی اسلاید ویدیویی فعاله */}
         {cur&&cur.type==='video'&&(
           <video key={idx} ref={videoRef} src={cur.src} autoPlay loop muted playsInline
