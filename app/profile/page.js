@@ -19,6 +19,8 @@ const BADGE_DEFS = [
   { icon: '🏆', name: 'قهرمان هفته',  ok: s => false },
 ]
 
+const RARITY_FA = { common: 'معمولی', rare: 'کمیاب', epic: 'حماسی', legendary: 'افسانه‌ای' }
+
 function faWhen(iso) {
   const d = new Date(iso).getTime()
   const mins = Math.floor((Date.now() - d) / 60000)
@@ -31,13 +33,41 @@ function faWhen(iso) {
   return days.toLocaleString('fa') + ' روز پیش'
 }
 
+// تاریخ کامل شمسی: «۲۰ تیر ۱۴۰۵»
+function faDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString('fa-IR-u-ca-persian', {
+      day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Tehran',
+    })
+  } catch (e) { return '' }
+}
+// تاریخ میلادی: «11 Jul 2026»
+function enDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Tehran',
+    })
+  } catch (e) { return '' }
+}
+// تاریخ + ساعت کامل برای هر فعالیت: «۲۰ تیر ۱۴۰۵ · ۱۴:۳۰»
+function faDateTime(iso) {
+  try {
+    const t = new Date(iso).toLocaleTimeString('fa-IR', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran',
+    })
+    return faDate(iso) + ' · ' + t
+  } catch (e) { return faWhen(iso) }
+}
+
 export default function ProfilePage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [tab, setTab] = useState('badges')
+  const [histFilter, setHistFilter] = useState('all')
   const [profile, setProfile] = useState(null)
   const [checkins, setCheckins] = useState([])
   const [xpHistory, setXpHistory] = useState([])
   const [awards, setAwards] = useState([])
+  const [clanHistory, setClanHistory] = useState([])
 
   useEffect(() => { setPal(loadPrefs()) }, [])
 
@@ -51,26 +81,32 @@ export default function ProfilePage() {
     // پروفایل واقعی (منبع واحد XP)
     fetchMyProfile(sess).then(p => { if (alive && p) setProfile(p) })
     // چک‌این‌های واقعی (برای آمار و مدال‌ها)
-    fetch(SB_URL + '/rest/v1/checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone)&order=created_at.desc&limit=50', { headers: h })
+    fetch(SB_URL + '/rest/v1/checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone,district,city)&order=created_at.desc&limit=500', { headers: h })
       .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setCheckins(rows) }).catch(() => {})
     // تاریخچه‌ی دقیق XP + جوایز
     fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) })
     fetchAwards(sess).then(rows => { if (alive) setAwards(rows) })
+    // تاریخچه‌ی کلن
+    const reloadClanHist=()=>fetch(SB_URL + '/rest/v1/clan_history?user_id=eq.' + uid + '&select=*&order=created_at.desc&limit=100', { headers: h })
+      .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setClanHistory(rows) }).catch(() => {})
+    reloadClanHist()
 
     // realtime: پروفایل، بج‌ها، تاریخچه و چک‌این‌ها لحظه‌ای آپدیت شن
-    const reloadCheckins=()=>fetch(SB_URL + '/rest/v1/checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone)&order=created_at.desc&limit=50', { headers: h })
+    const reloadCheckins=()=>fetch(SB_URL + '/rest/v1/checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone,district,city)&order=created_at.desc&limit=500', { headers: h })
       .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setCheckins(rows) }).catch(() => {})
     const unsub = subscribeToTables([
       { table:'profiles',   event:'UPDATE', filter:'id=eq.'+uid },
       { table:'awards',     event:'*',      filter:'user_id=eq.'+uid },
       { table:'xp_history', event:'INSERT', filter:'user_id=eq.'+uid },
       { table:'checkins',   event:'INSERT', filter:'user_id=eq.'+uid },
+      { table:'clan_history', event:'*',    filter:'user_id=eq.'+uid },
     ],(p)=>{
       if(!alive) return
       if(p.table==='profiles' && p.record) setProfile(prev => ({ ...(prev || {}), ...p.record }))
       if(p.table==='xp_history') fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) })
       if(p.table==='awards') fetchAwards(sess).then(rows => { if (alive) setAwards(rows) })
       if(p.table==='checkins') reloadCheckins()
+      if(p.table==='clan_history') reloadClanHist()
     })
     return () => { alive = false; unsub() }
   }, [])
@@ -82,6 +118,8 @@ export default function ProfilePage() {
   const { current, next, progress } = getLevelInfo(xp)
   const name = profile?.display_name || 'کاربر'
   const streak = profile?.streak || 0
+  // «عضو از» = چند روز از تاریخ ثبت‌نام کاربر گذشته (مثل توییتر/یوتیوب).
+  // این با ریست حساب عوض نمی‌شه چون تاریخ عضویت ثابته.
   const joinedDays = profile?.created_at
     ? Math.max(1, Math.ceil((Date.now() - new Date(profile.created_at).getTime()) / 86400000)) : 1
 
@@ -94,6 +132,92 @@ export default function ProfilePage() {
   const earnedBadges = awards.filter(a => a.kind === 'badge')
   const useRealAwards = earnedBadges.length > 0
   const collectibles = awards.filter(a => a.kind !== 'badge')
+
+  // ── تایم‌لاین یکپارچه: همه‌ی فعالیت‌ها از منابع مختلف در یک لیست زمانی ──────
+  // هر رویداد یک category دارد که فیلتر بر اساس آن کار می‌کند.
+  const timeline = (() => {
+    const items = []
+    // نگاشت رتبه‌ی چک‌این‌ها از xp_history (که rank_after دارن) بر اساس زمان تقریبی
+    const checkinRanks = xpHistory
+      .filter(h => h.reason === 'checkin' || h.reason === 'checkin_first')
+      .map(h => ({ t: new Date(h.created_at).getTime(), rank: h.rank_after }))
+    const findRank = (iso) => {
+      const t = new Date(iso).getTime()
+      let best = null, bestDiff = 5000 // تا ۵ ثانیه اختلاف = همون فعالیت
+      for (const r of checkinRanks) {
+        const diff = Math.abs(r.t - t)
+        if (diff < bestDiff) { bestDiff = diff; best = r.rank }
+      }
+      return best
+    }
+    // چک‌این‌ها (با جزئیات کامل کافه/منطقه/شهر + رتبه)
+    checkins.forEach(c => {
+      const cf = c.cafes || {}
+      const parts = []
+      if (cf.district) parts.push('منطقه ' + cf.district)
+      else if (cf.zone) parts.push(cf.zone)
+      if (cf.city) parts.push(cf.city)
+      items.push({
+        cat: 'checkin', icon: '☕', ts: c.created_at,
+        title: cf.name || 'چک‌این',
+        sub: parts.join(' · '),
+        rank: findRank(c.created_at),
+        xp: c.xp_awarded || 0,
+      })
+    })
+    // رویدادها و XP از xp_history (به‌جز خود چک‌این که بالا آوردیم)
+    xpHistory.forEach(h => {
+      const isQuest = h.reason === 'quest'
+      const isCheckin = h.reason === 'checkin' || h.reason === 'checkin_first'
+      if (isCheckin) return
+      items.push({
+        cat: isQuest ? 'quest' : 'xp',
+        icon: isQuest ? '🎯' : '⭐',
+        ts: h.created_at,
+        title: isQuest ? 'رویداد تکمیل شد' : (REASON_LABELS[h.reason] || h.reason),
+        sub: 'مجموع: ' + (h.resulting_xp || 0).toLocaleString('fa') + ' XP',
+        rank: h.rank_after,
+        xp: h.amount || 0,
+      })
+    })
+    // تاریخچه‌ی کلن (عضو شدن/ترک/ساخت)
+    const CLAN_EVENT = {
+      joined: ['🛡️', 'عضو کلن شدی'], left: ['🚪', 'کلن رو ترک کردی'],
+      created: ['👑', 'کلن رو ساختی'], record: ['🏆', 'رکورد کلنی'],
+    }
+    clanHistory.forEach(ch => {
+      const [icon, def] = CLAN_EVENT[ch.event_type] || ['🛡️', ch.event_type]
+      items.push({
+        cat: 'clan', icon, ts: ch.created_at,
+        title: (ch.detail || def) + (ch.clan_name ? ' — ' + ch.clan_name : ''),
+        sub: '', xp: 0,
+      })
+    })
+    // مدال‌ها و کلکسیون‌ها
+    awards.forEach(a => {
+      items.push({
+        cat: a.kind === 'badge' ? 'badge' : 'collectible',
+        icon: a.icon || (a.kind === 'badge' ? '🏅' : '💎'),
+        ts: a.earned_at,
+        title: (a.kind === 'badge' ? 'مدال: ' : 'آیتم: ') + (a.title || ''),
+        sub: a.rarity ? RARITY_FA[a.rarity] || a.rarity : '',
+        xp: 0,
+      })
+    })
+    // مرتب‌سازی: جدیدترین اول
+    return items.filter(x => x.ts).sort((a, b) => new Date(b.ts) - new Date(a.ts))
+  })()
+
+  const HIST_FILTERS = [
+    ['all', '🕐', 'همه'],
+    ['checkin', '☕', 'چک‌این'],
+    ['quest', '🎯', 'رویداد'],
+    ['xp', '⭐', 'XP'],
+    ['clan', '🛡️', 'کلن'],
+    ['badge', '🏅', 'مدال'],
+    ['collectible', '💎', 'کلکسیون'],
+  ]
+  const filteredTimeline = histFilter === 'all' ? timeline : timeline.filter(x => x.cat === histFilter)
 
   return (
     <div style={S.page}>
@@ -115,6 +239,12 @@ export default function ProfilePage() {
             <div style={{ flex: 1 }}>
               <div style={S.name}>{name}</div>
               <div style={{ ...S.levelPill, background: current.color }}>{current.icon} {current.name}</div>
+              {profile?.created_at && (
+                <div style={{ fontSize: 10.5, color: C.sub, marginTop: 6 }}>
+                  📅 عضو از {faDate(profile.created_at)}
+                  <span style={{ opacity: 0.6 }}> ({enDate(profile.created_at)})</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -134,7 +264,7 @@ export default function ProfilePage() {
           <Stat S={S} icon="📍" value={checkinCount} label="چک‌این" />
           <Stat S={S} icon="☕" value={cafeCount} label="کافه" />
           <Stat S={S} icon="🔥" value={streak} label="استریک" />
-          <Stat S={S} icon="📅" value={joinedDays} label="روز فعال" />
+          <Stat S={S} icon="📅" value={joinedDays} label="روز عضویت" />
         </div>
 
         {/* پیش‌نمایش نگارخانه */}
@@ -181,37 +311,41 @@ export default function ProfilePage() {
         )}
 
         {tab === 'history' && (
-          <div style={S.historyList}>
-            {/* تاریخچه‌ی دقیق XP از جدول xp_history */}
-            {xpHistory.length > 0 && xpHistory.map((h, i) => (
-              <div key={'xp' + i} style={S.historyItem}>
-                <div style={S.historyIcon}>⭐</div>
-                <div style={{ flex: 1 }}>
-                  <div style={S.historyCafe}>{REASON_LABELS[h.reason] || h.reason}</div>
-                  <div style={S.historyArea}>{faWhen(h.created_at)} · مجموع: {(h.resulting_xp || 0).toLocaleString('fa')}</div>
-                </div>
-                <div style={S.historyXp}>+{(h.amount || 0).toLocaleString('fa')} XP</div>
-              </div>
-            ))}
+          <>
+            {/* چیپ‌های فیلتر */}
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2 }}>
+              {HIST_FILTERS.map(([k, icon, label]) => (
+                <button key={k} onClick={() => setHistFilter(k)}
+                  style={{
+                    flexShrink: 0, padding: '7px 12px', borderRadius: 10, border: 'none',
+                    background: histFilter === k ? C.accent : C.chip,
+                    color: histFilter === k ? C.accentText : C.sub,
+                    fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
+                  }}>{icon} {label}</button>
+              ))}
+            </div>
 
-            {/* اگه هنوز تاریخچه‌ی XP نداریم، از چک‌این‌ها نشون بده */}
-            {xpHistory.length === 0 && checkins.map((h, i) => (
-              <div key={'ci' + i} style={S.historyItem}>
-                <div style={S.historyIcon}>☕</div>
-                <div style={{ flex: 1 }}>
-                  <div style={S.historyCafe}>{h.cafes?.name || 'کافه'}</div>
-                  <div style={S.historyArea}>{(h.cafes?.description || '') + ' · ' + faWhen(h.created_at)}</div>
+            <div style={S.historyList}>
+              {filteredTimeline.length === 0 ? (
+                <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '24px 0' }}>
+                  {histFilter === 'all' ? 'هنوز فعالیتی نداری. برو روی نقشه یه کافه رو بزن! ☕' : 'در این دسته فعالیتی نیست.'}
                 </div>
-                <div style={S.historyXp}>+{(h.xp_awarded || 0).toLocaleString('fa')} XP</div>
-              </div>
-            ))}
-
-            {xpHistory.length === 0 && checkins.length === 0 && (
-              <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '24px 0' }}>
-                هنوز چک‌این نکردی. برو روی نقشه یه کافه رو بزن! ☕
-              </div>
-            )}
-          </div>
+              ) : filteredTimeline.map((it, i) => (
+                <div key={i} style={S.historyItem}>
+                  <div style={S.historyIcon}>{it.icon}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={S.historyCafe}>{it.title}</div>
+                    {it.sub && <div style={S.historyArea}>{it.sub}</div>}
+                    <div style={{ ...S.historyArea, opacity: 0.7, marginTop: 2 }}>
+                      {faDateTime(it.ts)}
+                      {it.rank ? <span style={{ color: C.accent, fontWeight: 700 }}> · رتبه #{it.rank.toLocaleString('fa')}</span> : null}
+                    </div>
+                  </div>
+                  {it.xp > 0 && <div style={S.historyXp}>+{it.xp.toLocaleString('fa')} XP</div>}
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         <button style={S.editBtn}>ویرایش پروفایل</button>
