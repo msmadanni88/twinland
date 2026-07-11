@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { PALETTES, PALETTE_ORDER, DEFAULT_PALETTE, DEFAULT_MODE, buildC, loadPrefs, savePalette, saveMode } from './palettes'
 import AuthGate from './AuthGate'
-import { LEVELS, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile, subscribeToTables, fetchMyClans, fetchClanStandings, fetchClanMembers, clanLevel, fetchRegionLeaderboard, fetchRegionClans } from './gameSystem'
+import { LEVELS, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile, subscribeToTables, subscribeToChanges, sortEventsByDistance, fetchMyClans, fetchClanStandings, fetchClanMembers, clanLevel, fetchRegionLeaderboard, fetchRegionClans } from './gameSystem'
 
 const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
 const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
@@ -144,6 +144,7 @@ const BP = { mobile:640, tablet:1024 }
 function TwinLand({ session, onLogout }) {
   const mapRef   = useRef(null)
   const mapInst  = useRef(null)
+  const mapCenterRef = useRef(null)
   const mksRef   = useRef({})
   const clusterRef = useRef(null)   // گروه خوشه‌بندی مارکرها
 
@@ -398,6 +399,10 @@ function TwinLand({ session, onLogout }) {
 
           mapInst.current=m
           setMapReady(true)
+
+          // مرکز فعلی نقشه را ثبت کن تا نوار رویدادها «نزدیک‌ترین اول» را درست مرتب کند
+          try{ const c=m.getCenter(); mapCenterRef.current={lat:c.lat,lng:c.lng} }catch(e){}
+          m.on('moveend',()=>{ try{ const c=m.getCenter(); mapCenterRef.current={lat:c.lat,lng:c.lng} }catch(e){} })
 
           // ── گروه خوشه‌بندی: پین‌های نزدیک رو جمع می‌کنه (برای مقیاس ده‌ها هزار) ──
           if(L.markerClusterGroup){
@@ -815,30 +820,19 @@ function TwinLand({ session, onLogout }) {
     if(res.level>prevLevel) setTimeout(()=>showToast(`🎉 لول آپ! ${getLevelInfo(res.xp).current.name}`,'level'),400)
     else showToast(res.is_new_cafe?`🎉 کافه‌ی جدید! +${res.awarded} XP`:`✅ چک‌این! +${res.awarded} XP`,'xp')
 
-    // Quest دوطرفه + نگارخانه: پیشرفت/جایزه (silent روی خطا، تجربه‌ی چک‌این رو کند نمی‌کنه)
+    // ── نمایش toast تکمیل رویداد ──────────────────────────────────────────────
+    // ثبتِ واقعیِ پیشرفت کوئست و کلکسیون‌ها تضمینی سمت سرور داخل do_checkin انجام
+    // می‌شه، و نتیجه‌ی کوئست‌های تازه‌تکمیل‌شده مستقیم در همون پاسخ (completed_quests)
+    // برمی‌گرده. پس دیگه هیچ فراخوانی دومی لازم نیست — اگه مرورگر همین‌جا قطع بشه،
+    // جایزه از قبل سمت سرور ثبت شده و فقط toast دیده نمی‌شه (که نوتیف جبرانش می‌کنه).
     try{
-      const uid=session.user && session.user.id
-      if(uid){
-        fetch(SB_URL+'/rest/v1/rpc/quest_progress_checkin',{
-          method:'POST',
-          headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-          body:JSON.stringify({p_user:uid,p_cafe:cafe.id})
-        }).then(r=>r.json()).then(qr=>{
-          if(qr&&qr.ok&&Array.isArray(qr.completed)&&qr.completed.length>0){
-            qr.completed.forEach((c,i)=>{
-              setTimeout(()=>{
-                const giftTxt=c.collectible?(' + '+(c.collectible.icon||'🎁')+' '+c.collectible.title):''
-                showToast('🎯 Quest تمام شد: '+c.title+' — کد: '+c.code+giftTxt,'xp')
-              },900+i*1400)
-            })
-          }
-        }).catch(()=>{})
-        fetch(SB_URL+'/rest/v1/rpc/sync_platform_collectibles',{
-          method:'POST',
-          headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-          body:JSON.stringify({p_user:uid})
-        }).catch(()=>{})
-      }
+      const done=Array.isArray(res.completed_quests)?res.completed_quests:[]
+      done.forEach((c,i)=>{
+        setTimeout(()=>{
+          const giftTxt=c.collectible?(' + '+(c.collectible.icon||'🎁')+' '+c.collectible.title):''
+          showToast('🎯 Quest تمام شد: '+c.title+' — کد: '+c.code+giftTxt,'xp')
+        },900+i*1400)
+      })
     }catch(e){}
   }
 
@@ -1590,7 +1584,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
     let alive=true
     const load=()=>fetchLeaderboard(sess).then(list=>{ if(alive) setTopPlayers(list.slice(0,3)) })
     load()
-    const unsub=subscribeToTables([{table:'profiles',event:'UPDATE'}],()=>load())
+    const unsub=subscribeToChanges(['profiles'],()=>load())
     return ()=>{ alive=false; unsub() }
   },[])
   useEffect(()=>{
@@ -1598,7 +1592,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
     const loadEvents=()=>fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,cafes(name,district),collectible_defs(icon,rarity)&order=created_at.desc&limit=5',
       {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}}).then(r=>r.json()).then(rows=>{ if(alive) setHotEvents(Array.isArray(rows)?rows:[]) }).catch(()=>{})
     loadEvents()
-    const unsub=subscribeToTables([{table:'quests',event:'*'}],()=>loadEvents())
+    const unsub=subscribeToChanges(['quests'],()=>loadEvents())
     return ()=>{ alive=false; unsub() }
   },[])
   const medals={1:'🥇',2:'🥈',3:'🥉'}
@@ -1716,10 +1710,17 @@ function MissionsTab({C, cafes, setSelCafe, showToast}) {
 
   useEffect(()=>{ load() },[load])
   useEffect(()=>{
-    const subs=[{table:'quests',event:'*'}]
-    if(uid){ subs.push({table:'quest_progress',event:'*',filter:'user_id=eq.'+uid}); subs.push({table:'redemptions',event:'*',filter:'user_id=eq.'+uid}) }
-    const unsub=subscribeToTables(subs,()=>load())
-    return ()=>unsub()
+    // رویدادها (عمومی، پرحجم) → کانال سبک مشترک با debounce
+    const unsubLight=subscribeToChanges(['quests'],()=>load())
+    // پیشرفت/جوایزِ خودِ کاربر (شخصی، کم‌حجم) → اتصال فیلترشده‌ی معمولی
+    let unsubPersonal=()=>{}
+    if(uid){
+      unsubPersonal=subscribeToTables([
+        {table:'quest_progress',event:'*',filter:'user_id=eq.'+uid},
+        {table:'redemptions',event:'*',filter:'user_id=eq.'+uid},
+      ],()=>load())
+    }
+    return ()=>{ unsubLight(); unsubPersonal() }
   },[load,uid])
 
   function openCafe(q){
@@ -1787,8 +1788,8 @@ function RankTab({C}) {
     let alive=true
     const load=()=>fetchLeaderboard(sess).then(list=>{ if(alive) setRows(list.slice(0,5)) })
     load()
-    // با هر تغییر XP هر کاربری، لیدربورد لحظه‌ای به‌روز شه
-    const unsub=subscribeToTables([{table:'profiles',event:'UPDATE'}],()=>load())
+    // با هر تغییر XP هر کاربری، لیدربورد لحظه‌ای به‌روز شه (کانال سبک با debounce)
+    const unsub=subscribeToChanges(['profiles'],()=>load())
     return ()=>{ alive=false; unsub() }
   },[])
   return <div style={{padding:'12px 12px 32px'}}>
@@ -1897,23 +1898,34 @@ function ProfileTab({C,xp,levelInfo,streak,checkedIn,userName,coins}) {
 }
 
 // ── پیل شیشه‌ای رویدادها روی نقشه (هم‌استایل پیل آمار زنده، بدون بک‌گراند مجزا) ──
-function EventBanner({C, cafes, setSelCafe, onActiveCafeChange}) {
-  const [events, setEvents] = useState([])
+function EventBanner({C, cafes, setSelCafe, onActiveCafeChange, mapCenterRef}) {
+  const [rawEvents, setRawEvents] = useState([])
   const [idx, setIdx] = useState(0)
   const timerRef = useRef(null)
   const touchXRef = useRef(null)
 
   const load = useCallback(()=>{
-    fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,discount_pct,cafe_id,cafes(name,district),collectible_defs(icon,rarity)&order=created_at.desc&limit=20',
+    fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,discount_pct,cafe_id,cafes(name,district),collectible_defs(icon,rarity)&order=created_at.desc&limit=30',
       {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}})
-      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setEvents(rows) }).catch(()=>{})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setRawEvents(rows) }).catch(()=>{})
   },[])
 
   useEffect(()=>{ load() },[load])
+  // اشتراک سبک مشترک با debounce — به‌جای باز کردن WebSocket جدا و گوش‌دادن به هر INSERT
   useEffect(()=>{
-    const unsub=subscribeToTables([{table:'quests',event:'INSERT'}],()=>{ load(); setIdx(0) })
+    const unsub=subscribeToChanges(['quests'],()=>{ load(); setIdx(0) })
     return ()=>unsub()
   },[load])
+
+  // مرتب‌سازی: نزدیک‌ترین رویداد به مرکز فعلی نقشه اول. مختصات هر رویداد از روی cafes.
+  const events = (()=>{
+    const withCoords = rawEvents.map(ev=>{
+      const cf = cafes.find(c=>c.id===ev.cafe_id)
+      return cf ? { ...ev, cafe_lat:cf.lat, cafe_lng:cf.lng } : ev
+    })
+    const center = mapCenterRef && mapCenterRef.current
+    return center ? sortEventsByDistance(withCoords, center.lat, center.lng) : withCoords
+  })()
 
   useEffect(()=>{
     if(events.length<2) return
@@ -2114,10 +2126,12 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
     }
     setEvLoading(true)
     loadEvents()
-    const subs=[{table:'quests',event:'*',filter:'cafe_id=eq.'+cafe.id}]
-    if(uid) subs.push({table:'quest_progress',event:'*',filter:'user_id=eq.'+uid})
-    const unsub=subscribeToTables(subs,()=>loadEvents())
-    return ()=>{ alive=false; unsub() }
+    const unsubLight=subscribeToChanges(['quests'],()=>loadEvents())
+    let unsubPersonal=()=>{}
+    if(uid){
+      unsubPersonal=subscribeToTables([{table:'quest_progress',event:'*',filter:'user_id=eq.'+uid}],()=>loadEvents())
+    }
+    return ()=>{ alive=false; unsubLight(); unsubPersonal() }
   },[cafe.id,uid])
 
   async function joinEvent(ev){
