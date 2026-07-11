@@ -299,6 +299,174 @@ export function subscribeToTables(specs, cb) {
 }
 
 // ============================================================================
+// ── کانال تغییرات سبک و مشترک (برای رویدادها/داده‌های عمومی) ─────────────────
+// چرا این جدا از subscribeToTables است؟
+//   subscribeToTables برای هر بار صدا زدن، یک WebSocket جدید باز می‌کند. اگر ۵
+//   کامپوننت به رویدادها گوش دهند، ۵ اتصال باز می‌شود × هزاران کاربر = انفجار.
+//   این سیستم فقط «یک» WebSocket برای کل اپ باز می‌کند و همه‌ی مشترک‌ها را روی
+//   همان یک اتصال جمع می‌کند. علاوه بر آن، تلنگرهای پشت‌سرهم را debounce می‌کند
+//   تا اگر ۱۰ رویداد در یک ثانیه منتشر شد، فقط یک‌بار callback صدا زده شود.
+//
+//   نکته‌ی کلیدی: این سیستم «کل ردیف داده» را به کامپوننت نمی‌دهد؛ فقط یک تلنگر
+//   می‌زند «چیزی در فلان جدول عوض شد». خود کامپوننت تصمیم می‌گیرد که (با تأخیر و
+//   یک‌بار) دوباره لیست را fetch کند. این باعث می‌شود بار شبکه ۹۰٪+ کمتر شود.
+// ============================================================================
+
+let _sharedWS = null
+let _sharedState = { ws: null, closed: false, ref: 0, heartbeat: null, retry: null, joined: false }
+const _tableListeners = {}       // table -> Set of debounced callbacks
+const _debounceTimers = {}       // table -> timer
+
+function _ensureSharedSocket() {
+  if (typeof window === 'undefined') return
+  if (_sharedState.ws && (_sharedState.ws.readyState === 0 || _sharedState.ws.readyState === 1)) return
+
+  const st = _sharedState
+  st.closed = false
+
+  function connect() {
+    if (st.closed) return
+    try {
+      const wsUrl = SB_URL.replace('https://', 'wss://') +
+        '/realtime/v1/websocket?apikey=' + SB_KEY + '&vsn=1.0.0'
+      const ws = new WebSocket(wsUrl)
+      st.ws = ws
+
+      ws.onopen = () => {
+        if (st.closed) return
+        // به همه‌ی جدول‌هایی که فعلاً شنونده دارند join کن (فقط INSERT/UPDATE/DELETE سبک)
+        const tables = Object.keys(_tableListeners).filter(t => _tableListeners[t].size > 0)
+        ws.send(JSON.stringify({
+          topic: 'realtime:public',
+          event: 'phx_join',
+          payload: {
+            config: {
+              postgres_changes: tables.map(t => ({ event: '*', schema: 'public', table: t })),
+            },
+          },
+          ref: String(++st.ref),
+        }))
+        st.joined = true
+        st.heartbeat = setInterval(() => {
+          if (ws.readyState === 1) {
+            ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++st.ref) }))
+          }
+        }, 30000)
+      }
+
+      ws.onmessage = (msg) => {
+        try {
+          const data = JSON.parse(msg.data)
+          if (data.event === 'postgres_changes') {
+            const d = data.payload && data.payload.data
+            const table = d && d.table
+            if (table && _tableListeners[table]) {
+              // debounce: تلنگرهای پشت‌سرهم یک جدول را در ۶۰۰ms یکی کن
+              if (_debounceTimers[table]) clearTimeout(_debounceTimers[table])
+              _debounceTimers[table] = setTimeout(() => {
+                _tableListeners[table].forEach(fn => { try { fn() } catch (e) {} })
+              }, 600)
+            }
+          }
+        } catch (e) {}
+      }
+
+      ws.onclose = () => {
+        if (st.closed) return
+        if (st.heartbeat) clearInterval(st.heartbeat)
+        st.joined = false
+        st.retry = setTimeout(connect, 3000)
+      }
+      ws.onerror = () => { try { ws.close() } catch (e) {} }
+    } catch (e) {
+      if (!st.closed) st.retry = setTimeout(connect, 3000)
+    }
+  }
+  connect()
+}
+
+// اگر جدول تازه‌ای شنونده گرفت و سوکت از قبل باز بود، دوباره join کن تا شاملش شود
+function _rejoinIfNeeded() {
+  const st = _sharedState
+  if (st.ws && st.ws.readyState === 1) {
+    const tables = Object.keys(_tableListeners).filter(t => _tableListeners[t].size > 0)
+    try {
+      st.ws.send(JSON.stringify({
+        topic: 'realtime:public',
+        event: 'phx_join',
+        payload: {
+          config: { postgres_changes: tables.map(t => ({ event: '*', schema: 'public', table: t })) },
+        },
+        ref: String(++st.ref),
+      }))
+    } catch (e) {}
+  }
+}
+
+// subscribeToChanges(tables, cb): cb یک تابع بدون آرگومان است که می‌گوید «تازه کن».
+// tables: آرایه‌ای از نام جدول‌ها، مثلاً ['quests']
+// cb با تأخیر (debounce) و حداکثر یک‌بار در هر ۶۰۰ms صدا زده می‌شود.
+// خروجی: تابع پاک‌کننده.
+export function subscribeToChanges(tables, cb) {
+  if (typeof window === 'undefined' || !tables || !tables.length || typeof cb !== 'function') {
+    return () => {}
+  }
+  const list = Array.isArray(tables) ? tables : [tables]
+  let needRejoin = false
+  list.forEach(t => {
+    if (!_tableListeners[t]) { _tableListeners[t] = new Set(); needRejoin = true }
+    _tableListeners[t].add(cb)
+  })
+  _ensureSharedSocket()
+  if (needRejoin) _rejoinIfNeeded()
+
+  return () => {
+    list.forEach(t => {
+      if (_tableListeners[t]) {
+        _tableListeners[t].delete(cb)
+        if (_tableListeners[t].size === 0) {
+          delete _tableListeners[t]
+          if (_debounceTimers[t]) { clearTimeout(_debounceTimers[t]); delete _debounceTimers[t] }
+        }
+      }
+    })
+    // اگر هیچ شنونده‌ای نماند، سوکت مشترک را ببند (صرفه‌جویی منابع)
+    const anyLeft = Object.keys(_tableListeners).some(t => _tableListeners[t].size > 0)
+    if (!anyLeft) {
+      _sharedState.closed = true
+      if (_sharedState.heartbeat) clearInterval(_sharedState.heartbeat)
+      if (_sharedState.retry) clearTimeout(_sharedState.retry)
+      try { _sharedState.ws && _sharedState.ws.close() } catch (e) {}
+      _sharedState.ws = null
+    }
+  }
+}
+
+// ── ابزار: فاصله‌ی دو نقطه (کیلومتر) با فرمول Haversine ───────────────────────
+export function distanceKm(lat1, lng1, lat2, lng2) {
+  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return Infinity
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+// مرتب‌سازی رویدادها بر اساس نزدیکی به کاربر (نزدیک‌ترین اول).
+// اگر موقعیت کاربر نبود، ترتیب اصلی (که معمولاً جدیدترین اول است) حفظ می‌شود.
+// هر رویداد باید cafe_lat / cafe_lng داشته باشد؛ رویدادهای شهری (بدون مختصات) آخر می‌آیند.
+export function sortEventsByDistance(events, userLat, userLng) {
+  if (!Array.isArray(events)) return []
+  if (userLat == null || userLng == null) return events
+  return [...events].sort((a, b) => {
+    const da = distanceKm(userLat, userLng, a.cafe_lat, a.cafe_lng)
+    const db = distanceKm(userLat, userLng, b.cafe_lat, b.cafe_lng)
+    return da - db
+  })
+}
+
+// ============================================================================
 // ── سیستم کلن ────────────────────────────────────────────────────────────────
 // ============================================================================
 
