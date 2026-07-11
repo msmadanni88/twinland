@@ -785,11 +785,16 @@ function TwinLand({ session, onLogout }) {
 
   async function resetMe(){
     if(!session||!session.access_token) return
+    if(typeof window!=='undefined' && !window.confirm('کل پروفایلت به حالت تازه‌وارد برمی‌گرده و همه‌ی XP، مدال، کلکسیون، رویداد، نوتیف و تاریخچه‌ات پاک می‌شه. مطمئنی؟')) return
     const token=await freshToken()
     try{
       const r=await fetch(SB_URL+'/rest/v1/rpc/reset_me',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:'{}'}).then(r=>r.json())
-      if(r&&r.ok){ setXp(0);setStreak(0);setCoins(0);setCheckedIn(new Set()); showToast('حساب ریست شد ♻️','xp') }
-      else showToast('ریست نشد','warn')
+      if(r&&r.ok){
+        showToast('حساب ریست شد ♻️ در حال تازه‌سازی…','xp')
+        // رفرش کامل صفحه تا همه‌ی بخش‌ها (مدال، کلکسیون، نوتیف، پروفایل) از نو و خالی لود بشن
+        setTimeout(()=>{ if(typeof window!=='undefined') window.location.reload() }, 900)
+      }
+      else showToast('ریست نشد'+(r&&r.error?': '+r.error:''),'warn')
     }catch(e){ showToast('ریست نشد','warn') }
   }
 
