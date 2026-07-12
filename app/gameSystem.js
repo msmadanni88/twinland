@@ -143,14 +143,14 @@ export async function awardXP(sess, amount, reason, refId = null) {
 }
 
 // ── تاریخچه‌ی XP کاربر (برای بخش «تاریخچه» داشبورد/پروفایل) ────────────────────
-export async function fetchXpHistory(sess, limit = 50) {
+export async function fetchXpHistory(sess, limit = 200) {
   const s = sess || getSession()
   const uid = s && s.user && s.user.id
   if (!uid) return []
   try {
     const rows = await fetch(
       SB_URL + '/rest/v1/xp_history?user_id=eq.' + uid +
-      '&select=amount,reason,resulting_xp,created_at&order=created_at.desc&limit=' + limit,
+      '&select=amount,reason,resulting_xp,rank_after,created_at&order=created_at.desc&limit=' + limit,
       { headers: authHeaders(s) }
     ).then(r => r.json())
     return Array.isArray(rows) ? rows : []
@@ -165,7 +165,7 @@ export async function fetchAwards(sess) {
   try {
     const rows = await fetch(
       SB_URL + '/rest/v1/awards?user_id=eq.' + uid +
-      '&select=kind,code,title,icon,earned_at&order=earned_at.desc',
+      '&select=kind,code,title,icon,rarity,source,earned_at&order=earned_at.desc',
       { headers: authHeaders(s) }
     ).then(r => r.json())
     return Array.isArray(rows) ? rows : []
