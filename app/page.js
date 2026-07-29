@@ -276,7 +276,7 @@ function TwinLand({ session, onLogout }) {
     const h={'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token}
     fetch(SB_URL+'/rest/v1/profiles?id=eq.'+uid+'&select=*',{headers:h})
       .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin); setViewAsUser(!!p.view_as_user); setAccountType(p.account_type||'user'); setTutorialSeen(p.tutorial_seen||{}) } setTutorialLoaded(true) }).catch(()=>setTutorialLoaded(true))
-    setIsOwner(!!(sess.user.email && sess.user.email.toLowerCase()==='msmadani88@gmail.com'))
+    setIsOwner(!!(session.user.email && session.user.email.toLowerCase()==='msmadani88@gmail.com'))
     // علاقه‌مندی‌ها (قلب‌ها) — حالا واقعی و سمت سرور ذخیره می‌شن
     fetch(SB_URL+'/rest/v1/favorites?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
       .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setFavs(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
