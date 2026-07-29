@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
+import { L, ICON } from '../labels'
 import {
   getSession, getLevelInfo, clanLevel,
   fetchMyClans, fetchClanStandings, fetchClanMembers, fetchClanMissions, subscribeToTables,
@@ -82,8 +83,8 @@ export default function ClanPage() {
   return (
     <div style={S.page}>
       <div style={S.topbar}>
-        <a href="/" style={S.backBtn}>‹ نقشه</a>
-        <div style={S.brand}>کلن</div>
+        <a href="/" style={S.backBtn}>‹ {L.map}</a>
+        <div style={S.brand}>{ICON.clans} {L.clans}</div>
         <div style={{ width: 64 }} />
       </div>
 
@@ -104,7 +105,7 @@ export default function ClanPage() {
               <div style={{ fontSize: 44, marginBottom: 8 }}>🛡️</div>
               <div style={{ fontWeight: 800, marginBottom: 4 }}>هنوز عضو کلنی نیستی</div>
               <div style={{ fontSize: 13, color: C.sub, marginBottom: 16 }}>یه کلن بساز یا به یکی بپیوند</div>
-              <button style={S.primaryBtn} onClick={() => setTab('discover')}>کشف کلن‌ها</button>
+              <button style={S.primaryBtn} onClick={() => setTab('discover')}>کشف {L.clans}</button>
             </div>
           ) : (
             <>
@@ -180,7 +181,7 @@ export default function ClanPage() {
               {/* لیست کلن‌های من + سوییچ فعال */}
               {myClans.length > 1 && (
                 <>
-                  <div style={S.sectionTitle}>کلن‌های من</div>
+                  <div style={S.sectionTitle}>{L.clans}ی من</div>
                   <div style={S.list}>
                     {myClans.map(mc => (
                       <div key={mc.clan_id} style={S.miniClan}>
@@ -207,7 +208,7 @@ export default function ClanPage() {
         {/* ── کشف ── */}
         {!loading && tab === 'discover' && (
           <>
-            <div style={S.sectionTitle}>کلن‌های برتر</div>
+            <div style={S.sectionTitle}>{L.clans}ی برتر</div>
             <div style={S.list}>
               {standings.length === 0 && <div style={S.empty}>هنوز کلنی ساخته نشده. اولین باش!</div>}
               {standings.map(c => {
