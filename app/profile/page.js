@@ -6,6 +6,7 @@ import {
   SB_URL, SB_KEY, getLevelInfo, getSession,
   fetchMyProfile, fetchXpHistory, fetchAwards, subscribeToTables, REASON_LABELS,
 } from '../gameSystem'
+import { L, ICON, fa as faNum } from '../labels'
 
 // مدال‌های محاسبه‌شده از آمار واقعی (fallback وقتی جدول awards هنوز پر نشده)
 const BADGE_DEFS = [
@@ -68,6 +69,8 @@ export default function ProfilePage() {
   const [xpHistory, setXpHistory] = useState([])
   const [awards, setAwards] = useState([])
   const [clanHistory, setClanHistory] = useState([])
+  const [favCount, setFavCount] = useState(0)
+  const [loadWarn, setLoadWarn] = useState('')
 
   useEffect(() => { setPal(loadPrefs()) }, [])
 
@@ -80,9 +83,39 @@ export default function ProfilePage() {
     let alive = true
     // پروفایل واقعی (منبع واحد XP)
     fetchMyProfile(sess).then(p => { if (alive && p) setProfile(p) })
-    // چک‌این‌های واقعی (برای آمار و مدال‌ها)
-    fetch(SB_URL + '/rest/v1/checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone,district,city)&order=created_at.desc&limit=500', { headers: h })
-      .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setCheckins(rows) }).catch(() => {})
+    // ── چک‌این‌های واقعی (برای آمار و مدال‌ها) ─────────────────────────────
+    // 🐞 باگی که آمار رو صفر نشون می‌داد: کوئری قبلی ستون‌های cafes رو با نام
+    // ثابت می‌خواست. اگه فقط یکی از اون نام‌ها توی دیتابیس نبود (مثلاً city)،
+    // PostgREST به‌جای آرایه یک آبجکتِ خطا برمی‌گردوند، Array.isArray رد می‌شد
+    // و لیست خالی می‌موند → «۰ چک‌این» با اینکه دیتا سر جاش بود.
+    // حالا: اول کوئری کامل، و اگه شکست خورد خودکار سراغ نسخه‌ی ساده می‌ریم.
+    // نتیجه: آمار هیچ‌وقت الکی صفر نمی‌شه.
+    const CK_FULL = 'checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone,district)&order=created_at.desc&limit=500'
+    const CK_MIN  = 'checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at&order=created_at.desc&limit=500'
+    const loadCheckins = () =>
+      fetch(SB_URL + '/rest/v1/' + CK_FULL, { headers: h })
+        .then(r => r.json())
+        .then(rows => {
+          if (Array.isArray(rows)) { if (alive) { setCheckins(rows); setLoadWarn('') } ; return }
+          // کوئری کامل خطا داد → با نسخه‌ی مینیمال دوباره تلاش کن
+          return fetch(SB_URL + '/rest/v1/' + CK_MIN, { headers: h })
+            .then(r2 => r2.json())
+            .then(rows2 => {
+              if (!alive) return
+              if (Array.isArray(rows2)) {
+                setCheckins(rows2)
+                setLoadWarn('جزئیات کافه‌ها لود نشد (اسم/منطقه) — ولی آمار درسته.')
+              } else {
+                setLoadWarn('چک‌این‌ها لود نشدن. اگه ادامه داشت، دسترسی جدول checkins رو چک کن.')
+              }
+            })
+        })
+        .catch(() => { if (alive) setLoadWarn('خطا در ارتباط با سرور') })
+    loadCheckins()
+
+    // ── قلب‌ها (کافه‌هایی که دوست داری) ───────────────────────────────────
+    fetch(SB_URL + '/rest/v1/favorites?user_id=eq.' + uid + '&select=cafe_id', { headers: h })
+      .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setFavCount(rows.length) }).catch(() => {})
     // تاریخچه‌ی دقیق XP + جوایز
     fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) })
     fetchAwards(sess).then(rows => { if (alive) setAwards(rows) })
@@ -92,14 +125,16 @@ export default function ProfilePage() {
     reloadClanHist()
 
     // realtime: پروفایل، بج‌ها، تاریخچه و چک‌این‌ها لحظه‌ای آپدیت شن
-    const reloadCheckins=()=>fetch(SB_URL + '/rest/v1/checkins?user_id=eq.' + uid + '&select=cafe_id,xp_awarded,created_at,cafes(name,description,zone,district,city)&order=created_at.desc&limit=500', { headers: h })
-      .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setCheckins(rows) }).catch(() => {})
+    const reloadCheckins = loadCheckins
+    const reloadFavs = () => fetch(SB_URL + '/rest/v1/favorites?user_id=eq.' + uid + '&select=cafe_id', { headers: h })
+      .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setFavCount(rows.length) }).catch(() => {})
     const unsub = subscribeToTables([
       { table:'profiles',   event:'UPDATE', filter:'id=eq.'+uid },
       { table:'awards',     event:'*',      filter:'user_id=eq.'+uid },
       { table:'xp_history', event:'INSERT', filter:'user_id=eq.'+uid },
       { table:'checkins',   event:'INSERT', filter:'user_id=eq.'+uid },
       { table:'clan_history', event:'*',    filter:'user_id=eq.'+uid },
+      { table:'favorites',  event:'*',      filter:'user_id=eq.'+uid },
     ],(p)=>{
       if(!alive) return
       if(p.table==='profiles' && p.record) setProfile(prev => ({ ...(prev || {}), ...p.record }))
@@ -107,6 +142,7 @@ export default function ProfilePage() {
       if(p.table==='awards') fetchAwards(sess).then(rows => { if (alive) setAwards(rows) })
       if(p.table==='checkins') reloadCheckins()
       if(p.table==='clan_history') reloadClanHist()
+      if(p.table==='favorites') reloadFavs()
     })
     return () => { alive = false; unsub() }
   }, [])
@@ -209,21 +245,21 @@ export default function ProfilePage() {
   })()
 
   const HIST_FILTERS = [
-    ['all', '🕐', 'همه'],
-    ['checkin', '☕', 'چک‌این'],
-    ['quest', '🎯', 'رویداد'],
-    ['xp', '⭐', 'XP'],
-    ['clan', '🛡️', 'کلن'],
-    ['badge', '🏅', 'مدال'],
-    ['collectible', '💎', 'کلکسیون'],
+    ['all', ICON.history, 'همه'],
+    ['checkin', ICON.cafe, L.checkin],
+    ['quest', ICON.quests, L.questsShort],
+    ['xp', ICON.xpSystem, L.xp],
+    ['clan', ICON.clans, L.clanShort],
+    ['badge', ICON.badges, L.badges],
+    ['collectible', ICON.gallery, L.gallery],
   ]
   const filteredTimeline = histFilter === 'all' ? timeline : timeline.filter(x => x.cat === histFilter)
 
   return (
     <div style={S.page}>
       <div style={S.topbar}>
-        <a href="/" style={S.backBtn}>‹ نقشه</a>
-        <div style={S.brand}>پروفایل</div>
+        <a href="/" style={S.backBtn}>‹ {L.map}</a>
+        <div style={S.brand}>{ICON.profile} {L.profile}</div>
         <div style={{ width: 64 }} />
       </div>
 
@@ -260,11 +296,17 @@ export default function ProfilePage() {
         </div>
 
         {/* آمار واقعی */}
+        {loadWarn && (
+          <div style={{ background: '#FF950022', border: '1px solid #FF950055', borderRadius: 12, padding: '9px 12px', fontSize: 11, color: C.text, marginBottom: 10, lineHeight: 1.7 }}>
+            ⚠️ {loadWarn}
+          </div>
+        )}
         <div style={S.statsGrid}>
-          <Stat S={S} icon="📍" value={checkinCount} label="چک‌این" />
-          <Stat S={S} icon="☕" value={cafeCount} label="کافه" />
-          <Stat S={S} icon="🔥" value={streak} label="استریک" />
-          <Stat S={S} icon="📅" value={joinedDays} label="روز عضویت" />
+          <Stat S={S} icon={ICON.checkin} value={checkinCount} label={L.checkin} accent={C.accent} />
+          <Stat S={S} icon={ICON.cafe} value={cafeCount} label={L.cafe} accent={C.accent} />
+          <Stat S={S} icon={ICON.streak} value={streak} label={L.streak} accent="#FF9F0A" />
+          <Stat S={S} icon={ICON.hearts} value={favCount} label={L.hearts} accent="#FF2D55" />
+          <Stat S={S} icon="📅" value={joinedDays} label="روز عضویت" accent={C.sub} />
         </div>
 
         {/* پیش‌نمایش نگارخانه */}
@@ -275,7 +317,7 @@ export default function ProfilePage() {
             ))}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>نگارخانه‌ی کلکسیون</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{ICON.gallery} {L.gallery}</div>
             <div style={{ fontSize: 11, color: C.sub }}>{collectibles.length > 0 ? collectibles.length.toLocaleString('fa') + ' آیتم داری' : 'هنوز چیزی نگرفتی'}</div>
           </div>
           <span style={{ color: C.accent, fontSize: 18 }}>‹</span>
@@ -283,8 +325,8 @@ export default function ProfilePage() {
 
         {/* تب‌ها */}
         <div style={S.tabs}>
-          <button style={tab === 'badges' ? S.tabActive : S.tab} onClick={() => setTab('badges')}>مدال‌ها</button>
-          <button style={tab === 'history' ? S.tabActive : S.tab} onClick={() => setTab('history')}>تاریخچه</button>
+          <button style={tab === 'badges' ? S.tabActive : S.tab} onClick={() => setTab('badges')}>{ICON.badges} {L.badges}</button>
+          <button style={tab === 'history' ? S.tabActive : S.tab} onClick={() => setTab('history')}>{ICON.history} {L.history}</button>
         </div>
 
         {tab === 'badges' && (
@@ -354,9 +396,9 @@ export default function ProfilePage() {
   )
 }
 
-function Stat({ icon, value, label, S }) {
+function Stat({ icon, value, label, S, accent }) {
   return (
-    <div style={S.statCard}>
+    <div style={{ ...S.statCard, borderColor: accent ? accent + '44' : S.statCard.borderColor }}>
       <div style={S.statIcon}>{icon}</div>
       <div style={S.statValue}>{Number(value).toLocaleString('fa')}</div>
       <div style={S.statLabel}>{label}</div>
@@ -379,7 +421,7 @@ const mkS = (C) => ({
   brand: { fontWeight: 800, fontSize: 17, color: C.text },
   container: { maxWidth: 480, margin: '0 auto', padding: '16px' },
   card: {
-    background: C.card, backdropFilter: 'blur(28px)',
+    background: 'linear-gradient(150deg,' + C.accent + '18, ' + C.card + ' 58%)', backdropFilter: 'blur(28px)',
     border: '1px solid ' + C.border, borderRadius: 20, padding: 18,
     boxShadow: '0 8px 30px rgba(0,0,0,0.06)', marginBottom: 14,
   },
@@ -400,22 +442,23 @@ const mkS = (C) => ({
   xpTrack: { height: 10, background: C.chip, borderRadius: 999, overflow: 'hidden' },
   xpFill: { height: '100%', borderRadius: 999, transition: 'width .6s ease' },
 
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, marginBottom: 16 },
   statCard: {
     background: C.card, backdropFilter: 'blur(20px)',
-    border: '1px solid ' + C.border,
-    borderRadius: 16, padding: '12px 6px', textAlign: 'center',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
+    border: '1.5px solid ' + C.border,
+    borderRadius: 16, padding: '12px 3px', textAlign: 'center',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
   },
-  statIcon: { fontSize: 20 },
-  statValue: { fontSize: 18, fontWeight: 800, marginTop: 2, color: C.text },
-  statLabel: { fontSize: 11, color: C.sub },
+  statIcon: { fontSize: 19 },
+  statValue: { fontSize: 17, fontWeight: 900, marginTop: 2, color: C.text },
+  statLabel: { fontSize: 9.5, color: C.sub, marginTop: 1 },
 
   galleryStrip: {
     display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none',
-    background: C.card, backdropFilter: 'blur(20px)', border: '1px solid ' + C.border,
-    borderRadius: 16, padding: '12px 14px', marginBottom: 14,
-    boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
+    background: 'linear-gradient(120deg,' + C.accent + '20, ' + C.card + ' 60%)',
+    backdropFilter: 'blur(20px)', border: '1.5px solid ' + C.accent + '40',
+    borderRadius: 18, padding: '13px 14px', marginBottom: 14,
+    boxShadow: '0 4px 18px rgba(0,0,0,0.07)',
   },
   galleryIcon: {
     width: 30, height: 30, borderRadius: 9, background: C.chip,
