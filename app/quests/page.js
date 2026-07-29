@@ -7,8 +7,12 @@ import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 import { SB_URL, SB_KEY, getSession, subscribeToTables } from '../gameSystem'
 import { L, ICON, fa } from '../labels'
 
-const CATEGORY_LABEL = { general: 'عمومی', drink: 'نوشیدنی', food: 'غذا', discount: 'تخفیف', event: 'رویداد', collectible: 'کالکشن' }
-const CATEGORY_ICON = { general: '🎯', drink: '☕', food: '🍰', discount: '🏷️', event: '🎉', collectible: '💎' }
+// «عمومی» عمداً حذف شد — دیگه ماموریت/رویداد بدون دسته نداریم.
+// اگه ماموریت قدیمی‌ای هنوز category='general' داشته باشه، به‌جای اینکه ناپدید
+// بشه، زیر «رویداد» نشون داده می‌شه (تابع normCat پایین همین کار رو می‌کنه).
+const CATEGORY_LABEL = { drink: 'نوشیدنی', food: 'غذا', discount: 'تخفیف', event: 'رویداد', collectible: 'کالکشن' }
+const CATEGORY_ICON = { drink: '☕', food: '🍰', discount: '🏷️', event: '🎉', collectible: '💎' }
+const normCat = (c) => (c && CATEGORY_LABEL[c]) ? c : 'event'
 const GREEN = '#10b981'
 
 // ── گاه‌شمار: فاصله تا یک زمان، به روز/ساعت/دقیقه/ثانیه ──────────────────────
@@ -81,7 +85,7 @@ export default function QuestsPage() {
   // قبلاً با فیلتر از لیست بیرون می‌رفتن، برای همین کاربر نمی‌فهمید چی رو تموم
   // کرده. حالا توی لیست می‌مونن ولی غیرفعال و با تیک سبز، و می‌رن ته لیست.
   const shown = quests
-    .filter(q => catFilter === 'all' || q.category === catFilter)
+    .filter(q => catFilter === 'all' || normCat(q.category) === catFilter)
     .map(q => ({ q, done: !!(progress[q.id] && progress[q.id].completed) }))
     .sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1))
 
@@ -94,7 +98,12 @@ export default function QuestsPage() {
         @keyframes qFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
         @keyframes qPulse{0%,100%{opacity:1}50%{opacity:.55}}
         @keyframes qShine{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
-        .q-card{animation:qFadeUp .35s ease both}
+        .q-card{animation:qFadeUp .35s ease both;transition:transform .2s cubic-bezier(.2,.9,.3,1), box-shadow .25s ease}
+        .q-card.live:active{transform:scale(.985)}
+        @media (hover:hover){ .q-card.live:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(0,0,0,.16)} }
+        .q-chip{transition:transform .16s ease, background .2s ease}
+        .q-chip:active{transform:scale(.95)}
+        @media (hover:hover){ .q-chip:hover{transform:translateY(-1px)} }
         .q-urgent{animation:qPulse 1.4s ease-in-out infinite}
       `}} />
 
@@ -106,15 +115,16 @@ export default function QuestsPage() {
 
       <div style={S.container}>
         <div style={S.tabs}>
-          <button style={tab === 'active' ? S.tabActive : S.tab} onClick={() => setTab('active')}>{L.quests} ({fa(openCount)})</button>
-          <button style={tab === 'rewards' ? S.tabActive : S.tab} onClick={() => setTab('rewards')}>جایزه‌های من ({fa(redemptions.length)})</button>
+          <button className="q-chip" style={tab === 'active' ? S.tabActive : S.tab} onClick={() => setTab('active')}>{L.quests} ({fa(openCount)})</button>
+          <button className="q-chip" style={tab === 'rewards' ? S.tabActive : S.tab} onClick={() => setTab('rewards')}>جایزه‌های من ({fa(redemptions.length)})</button>
         </div>
 
         {tab === 'active' && (
           <>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
+            <div onWheel={(e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft -= e.deltaY }}
+              style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none', overscrollBehaviorX: 'contain' }}>
               {[['all', '🎯', 'همه'], ...Object.keys(CATEGORY_LABEL).map(k => [k, CATEGORY_ICON[k], CATEGORY_LABEL[k]])].map(([k, icon, label]) => (
-                <button key={k} onClick={() => setCatFilter(k)} style={{ flexShrink: 0, padding: '7px 13px', borderRadius: 99, border: '1px solid ' + C.border, background: catFilter === k ? C.accent : C.chip, color: catFilter === k ? C.accentText : C.sub, fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>{icon} {label}</button>
+                <button key={k} className="q-chip" onClick={() => setCatFilter(k)} style={{ flexShrink: 0, padding: '7px 13px', borderRadius: 99, border: '1px solid ' + C.border, background: catFilter === k ? C.accent : C.chip, color: catFilter === k ? C.accentText : C.sub, fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>{icon} {label}</button>
               ))}
             </div>
             {doneCount > 0 && (
@@ -177,7 +187,7 @@ function QuestCard({ C, q, prog, done, idx, tick }) {
     : { background: 'linear-gradient(145deg,' + C.accent + '14, ' + C.card + ' 55%)', border: '1.5px solid ' + C.border }
 
   return (
-    <div className="q-card" style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, padding: 16, marginBottom: 12, boxShadow: done ? 'none' : '0 6px 20px rgba(0,0,0,.07)', animationDelay: Math.min(idx * 45, 500) + 'ms', ...cardStyle }}>
+    <div className={'q-card' + (done ? '' : ' live')} style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, padding: 16, marginBottom: 12, boxShadow: done ? 'none' : '0 6px 20px rgba(0,0,0,.07)', animationDelay: Math.min(idx * 45, 500) + 'ms', ...cardStyle }}>
       {!done && <div style={{ position: 'absolute', top: 0, bottom: 0, width: '45%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.10),transparent)', animation: 'qShine 4s ease-in-out infinite', pointerEvents: 'none' }} />}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, position: 'relative' }}>
@@ -218,7 +228,7 @@ function QuestCard({ C, q, prog, done, idx, tick }) {
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', position: 'relative' }}>
-        <span style={{ fontSize: 10, background: C.chip, borderRadius: 99, padding: '3px 9px', color: C.sub }}>{CATEGORY_ICON[q.category] || '🎯'} {CATEGORY_LABEL[q.category] || 'عمومی'}</span>
+        <span style={{ fontSize: 10, background: C.chip, borderRadius: 99, padding: '3px 9px', color: C.sub }}>{CATEGORY_ICON[normCat(q.category)]} {CATEGORY_LABEL[normCat(q.category)]}</span>
         {q.discount_pct > 0 && <span style={{ fontSize: 10, background: GREEN + '22', borderRadius: 99, padding: '3px 9px', color: GREEN, fontWeight: 700 }}>🏷️ {fa(q.discount_pct)}٪ تخفیف</span>}
       </div>
 
