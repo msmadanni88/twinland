@@ -166,6 +166,9 @@ function TwinLand({ session, onLogout }) {
   const [showNotif,  setShowNotif]  = useState(false)
   const [notifications, setNotifications] = useState([])
   const [tutorialSeen, setTutorialSeen] = useState({})
+  const [tutorialLoaded, setTutorialLoaded] = useState(false)   // تا پروفایل نیومده، تیوتوریال نشون نده (رفع فلشِ هر لاگین)
+  const [tutorialReplay, setTutorialReplay] = useState(false)   // پخش دوباره از منوی «آموزش»
+  const [celebration, setCelebration] = useState(null)          // دیتای انیمیشن جشن بعد از چک‌این
   const [toast,      setToast]      = useState(null)
   const [mapReady,   setMapReady]   = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
@@ -262,7 +265,10 @@ function TwinLand({ session, onLogout }) {
     const uid=session.user.id
     const h={'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token}
     fetch(SB_URL+'/rest/v1/profiles?id=eq.'+uid+'&select=*',{headers:h})
-      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin); setAccountType(p.account_type||'user'); setTutorialSeen(p.tutorial_seen||{}) } }).catch(()=>{})
+      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin); setAccountType(p.account_type||'user'); setTutorialSeen(p.tutorial_seen||{}) } setTutorialLoaded(true) }).catch(()=>setTutorialLoaded(true))
+    // علاقه‌مندی‌ها (قلب‌ها) — حالا واقعی و سمت سرور ذخیره می‌شن
+    fetch(SB_URL+'/rest/v1/favorites?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setFavs(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
     fetch(SB_URL+'/rest/v1/checkins?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
       .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setCheckedIn(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
     fetch(SB_URL+'/rest/v1/notifications?user_id=eq.'+uid+'&select=*&order=created_at.desc&limit=40',{headers:h})
@@ -820,25 +826,27 @@ function TwinLand({ session, onLogout }) {
       return
     }
     setXp(res.xp); setStreak(res.streak); setCoins(res.coins)
-    setXpAnim({amount:res.awarded}); setTimeout(()=>setXpAnim(null),1800)
     setCheckedIn(prev=>new Set([...prev,cafe.id]))
-    if(res.level>prevLevel) setTimeout(()=>showToast(`🎉 لول آپ! ${getLevelInfo(res.xp).current.name}`,'level'),400)
-    else showToast(res.is_new_cafe?`🎉 کافه‌ی جدید! +${res.awarded} XP`:`✅ چک‌این! +${res.awarded} XP`,'xp')
 
-    // ── نمایش toast تکمیل رویداد ──────────────────────────────────────────────
-    // ثبتِ واقعیِ پیشرفت کوئست و کلکسیون‌ها تضمینی سمت سرور داخل do_checkin انجام
-    // می‌شه، و نتیجه‌ی کوئست‌های تازه‌تکمیل‌شده مستقیم در همون پاسخ (completed_quests)
-    // برمی‌گرده. پس دیگه هیچ فراخوانی دومی لازم نیست — اگه مرورگر همین‌جا قطع بشه،
-    // جایزه از قبل سمت سرور ثبت شده و فقط toast دیده نمی‌شه (که نوتیف جبرانش می‌کنه).
-    try{
-      const done=Array.isArray(res.completed_quests)?res.completed_quests:[]
-      done.forEach((c,i)=>{
-        setTimeout(()=>{
-          const giftTxt=c.collectible?(' + '+(c.collectible.icon||'🎁')+' '+c.collectible.title):''
-          showToast('🎯 Quest تمام شد: '+c.title+' — کد: '+c.code+giftTxt,'xp')
-        },900+i*1400)
-      })
-    }catch(e){}
+    // ── انیمیشن جشن تمام‌صفحه ────────────────────────────────────────────────
+    // به‌جای toastهای پراکنده، همه‌ی نتیجه‌ی چک‌این (XP، استریک، کافه‌ی جدید،
+    // رویدادهای تکمیل‌شده، آیتم کلکسیونی، رتبه) یک‌جا توی کارت جشن نشون داده
+    // می‌شه. ثبتِ واقعی همه‌چیز سمت سرور داخل do_checkin انجام شده — این فقط
+    // نمایشه؛ اگه مرورگر همین‌جا قطع بشه چیزی از دست نمی‌ره (نوتیف جبران می‌کنه).
+    const lvlInfo=getLevelInfo(res.xp)
+    setCelebration({
+      awarded: res.awarded||0,
+      levelUp: res.level>prevLevel,
+      levelName: lvlInfo.current.name,
+      levelIcon: lvlInfo.current.icon,
+      levelColor: lvlInfo.current.color,
+      streak: res.streak||0,
+      isNewCafe: !!res.is_new_cafe,
+      cafeName: cafe.name,
+      district: res.district||null,
+      rank: res.rank||null,
+      quests: Array.isArray(res.completed_quests)?res.completed_quests:[],
+    })
   }
 
   const TH=isMobile?52:56, BH=isMobile?58:62
@@ -867,6 +875,12 @@ function TwinLand({ session, onLogout }) {
         @keyframes ledScroll{from{transform:translateX(-50%)}to{transform:translateX(0)}}
         @keyframes evSlide{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
         @keyframes coachPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes tlConfetti{0%{transform:translateY(-8vh) rotate(0deg)}100%{transform:translateY(108vh) rotate(720deg)}}
+        @keyframes tlCelebPop{0%{opacity:0;transform:translateY(30px) scale(.85)}60%{opacity:1;transform:translateY(-6px) scale(1.03)}100%{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes tlCelebGlow{0%,100%{box-shadow:0 0 40px 4px rgba(255,255,255,.06)}50%{box-shadow:0 0 70px 10px rgba(255,255,255,.14)}}
+        @keyframes tlShuttle{from{transform:translateX(0)}to{transform:translateX(var(--shift,0px))}}
+        .tl-shuttle{animation:tlShuttle var(--dur,8s) ease-in-out 1s infinite alternate}
+        @keyframes tlSpotPulse{0%,100%{box-shadow:0 0 0 100vmax rgba(0,0,0,.62),0 0 0 3px #CCFF00,0 0 18px 3px #CCFF0088}50%{box-shadow:0 0 0 100vmax rgba(0,0,0,.62),0 0 0 3px #CCFF00,0 0 30px 8px #CCFF00cc}}
         @keyframes tlRingPulse{0%{transform:scale(.4);opacity:.9}70%{transform:scale(2.1);opacity:0}100%{transform:scale(2.1);opacity:0}}
         .tl-event-pulse-ring{width:30px;height:30px;border-radius:50%;border:5px solid var(--pulse-color,#1a1a1a);box-shadow:0 0 4px 1px var(--pulse-color,#1a1a1a);animation:tlRingPulse 1.3s ease-out infinite}
         .xp-float{animation:xpFloat 1.8s ease forwards}
@@ -877,7 +891,7 @@ function TwinLand({ session, onLogout }) {
 
       {/* TOPBAR */}
       <div style={{height:TH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',borderBottom:'1px solid '+C.border,padding:'0 12px',display:'flex',alignItems:'center',gap:8,zIndex:300,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
-        <button onClick={()=>setShowMenu(v=>!v)} style={{background:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>☰</button>
+        <button data-tut="menu-btn" onClick={()=>setShowMenu(v=>!v)} style={{background:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>☰</button>
         <img src="/twinland_logo.webp" alt="TwinLand" onClick={onLogoTap} style={{height:isMobile?32:38,width:'auto',flexShrink:0,objectFit:'contain',display:'block',cursor:'pointer'}}/>
 
         {!isMobile&&(
@@ -940,38 +954,6 @@ function TwinLand({ session, onLogout }) {
         <div style={{position:'absolute',inset:0,zIndex:1}}>
           <div ref={mapRef} style={{position:'absolute',inset:0,zIndex:1,isolation:'isolate'}}/>
 
-          {/* دکمه فیلتر منطقه — ظاهر شیشه‌ای هم‌سبک نوار آمار، هر سه هم‌اندازه */}
-          {selectedRegions.length>0 && !showRegionFilter && (
-            <div style={{position:'absolute',top:14,left:14,zIndex:20,display:'flex',flexDirection:'column',gap:7,alignItems:'stretch',width:170}}>
-              <button onClick={()=>setShowRegionFilter(true)}
-                style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,width:'100%',
-                  background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
-                  color:C.text,border:'1px solid '+C.border,borderRadius:99,padding:'7px 14px',
-                  fontSize:12.5,fontWeight:800,fontFamily:'inherit',cursor:'pointer',
-                  boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
-                فیلتر {selectedRegions.length.toLocaleString('fa')} منطقه
-              </button>
-              {filterApplied && (
-                <button onClick={clearRegionFilter}
-                  style={{width:'100%',background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
-                    color:C.text,border:'1px solid '+C.border,borderRadius:99,
-                    padding:'7px 14px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
-                    boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
-                  پاک کردن فیلتر
-                </button>
-              )}
-              {Array.isArray(regionResults) && regionResults.length>0 && !showRegionResults && (
-                <button onClick={()=>setShowRegionResults(true)}
-                  style={{width:'100%',background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
-                    color:C.text,border:'1px solid '+C.border,borderRadius:99,
-                    padding:'7px 14px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
-                    boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
-                  نتایج منطقه
-                </button>
-              )}
-            </div>
-          )}
-
           {/* پاپ‌آپ فیلتر حرفه‌ای */}
           {showRegionFilter && (
             <RegionFilterPopup
@@ -1019,7 +1001,39 @@ function TwinLand({ session, onLogout }) {
           {checkedIn.size>0&&<><span style={{color:C.border}}>|</span><span style={{color:C.green,fontWeight:700}}>✓ {checkedIn.size}</span></>}
         </div>
         <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe} onActiveCafeChange={setActiveEventCafeId}/>
-        {streak>=2&&<div style={{position:'absolute',top:52,left:10,zIndex:18,height:25,boxSizing:'border-box',display:'flex',alignItems:'center',background:streak>=5?C.gold:C.accent,borderRadius:99,padding:'0 10px',fontSize:11,fontWeight:700,color:'white',boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
+        {streak>=2&&<div style={{position:'absolute',top:52,left:10,zIndex:18,height:25,boxSizing:'border-box',display:'flex',alignItems:'center',background:streak>=5?C.gold:C.accent,borderRadius:99,padding:'0 10px',fontSize:11,fontWeight:700,color:streak>=5?'#fff':C.accentText,boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
+
+        {/* دکمه‌های فیلتر منطقه — بیرون از لایه‌ی نقشه و «زیرِ» نوار رویدادها، تا دیگه پشتش گم نشن */}
+        {selectedRegions.length>0 && !showRegionFilter && (
+          <div style={{position:'absolute',top:streak>=2?86:52,left:10,zIndex:18,display:'flex',flexDirection:'column',gap:7,alignItems:'stretch',width:170}}>
+            <button onClick={()=>setShowRegionFilter(true)}
+              style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,width:'100%',
+                background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                color:C.text,border:'1px solid '+C.border,borderRadius:99,padding:'7px 14px',
+                fontSize:12.5,fontWeight:800,fontFamily:'inherit',cursor:'pointer',
+                boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+              فیلتر {selectedRegions.length.toLocaleString('fa')} منطقه
+            </button>
+            {filterApplied && (
+              <button onClick={clearRegionFilter}
+                style={{width:'100%',background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                  color:C.text,border:'1px solid '+C.border,borderRadius:99,
+                  padding:'7px 14px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
+                  boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+                پاک کردن فیلتر
+              </button>
+            )}
+            {Array.isArray(regionResults) && regionResults.length>0 && !showRegionResults && (
+              <button onClick={()=>setShowRegionResults(true)}
+                style={{width:'100%',background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                  color:C.text,border:'1px solid '+C.border,borderRadius:99,
+                  padding:'7px 14px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
+                  boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+                نتایج منطقه
+              </button>
+            )}
+          </div>
+        )}
 
         {/* nav controls — بیرون از لایه‌ی نقشه. هنگام باز بودن هر پاپ‌آپ مخفی می‌شه */}
         {!(showRegionFilter||showRegionResults||showXP||showMenu||showCity||showMode||showBoundary||showPalette||showMapSettings||panelOpen) && (
@@ -1099,7 +1113,8 @@ function TwinLand({ session, onLogout }) {
       {selCafe&&<CafePopup C={C} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={isAdmin} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
       {showXP&&<XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={()=>setShowXP(false)}/>}
       {showNotif&&<NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={()=>setShowNotif(false)}/>}
-      <TutorialCoach C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} isMobile={isMobile}/>
+      <TutorialCoach C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} tutorialLoaded={tutorialLoaded} replay={tutorialReplay} onReplayEnd={()=>setTutorialReplay(false)} isMobile={isMobile}/>
+      {celebration&&<CelebrationOverlay C={C} data={celebration} onClose={()=>setCelebration(null)}/>}
 
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
@@ -1111,10 +1126,11 @@ function TwinLand({ session, onLogout }) {
               {key:'rank',icon:'🏆',img:'/icon_rank_active@2x.png',label:'رتبه‌بندی',href:'/leaderboard'},
               {key:'clans',icon:'🛡',img:'/icon_clan_active@2x.png',label:'کلن‌ها',href:'/clan'},
               {key:'quests',icon:'🎯',label:'رویدادها',href:'/quests'},
-              {key:'gallery',icon:'💎',label:'نگارخانه',href:'/gallery'},
+              {key:'gallery',icon:'💎',label:'گنجینه',href:'/gallery'},
               {key:'business',icon:'🏪',label:'پنل کافه‌دار',href:'/business',smeOnly:true},
               {key:'admin',icon:'🛡️',label:'پنل ادمین',href:'/admin',adminOnly:true},
               {key:'xp',icon:'⭐',img:'/xp_coin@256-1.png',label:'سیستم XP',href:null},
+              {key:'tutorial',icon:'🎓',label:'آموزش',href:null},
               {key:'settings',icon:'⚙️',img:'/settings@256.png',label:'تنظیمات',href:null},
               {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
               {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
@@ -1127,7 +1143,7 @@ function TwinLand({ session, onLogout }) {
                   <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
                 </a>
               }
-              return <button key={item.key} onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+              return <button key={item.key} onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='tutorial'){setTutorialReplay(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
                 {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.key==='backfill'&&backfilling?'در حال پردازش…':item.label}
               </button>
             })}
@@ -1908,6 +1924,10 @@ function EventBanner({C, cafes, setSelCafe, onActiveCafeChange, mapCenterRef}) {
   const [idx, setIdx] = useState(0)
   const timerRef = useRef(null)
   const touchXRef = useRef(null)
+  // «زیرنویس روان»: اگه متن از عرض نوار بلندتر بود، آروم رفت‌وبرگشتی حرکت کنه تا کلش دیده بشه
+  const textWrapRef = useRef(null)
+  const textRef = useRef(null)
+  const [marquee, setMarquee] = useState({on:false, shift:0, dur:8})
 
   const load = useCallback(()=>{
     fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,discount_pct,cafe_id,cafes(name,district),collectible_defs(icon,rarity)&order=created_at.desc&limit=30',
@@ -1932,15 +1952,33 @@ function EventBanner({C, cafes, setSelCafe, onActiveCafeChange, mapCenterRef}) {
     return center ? sortEventsByDistance(withCoords, center.lat, center.lng) : withCoords
   })()
 
+  const safeIdx = events.length ? (idx % events.length) : 0
+  const ev = events.length ? events[safeIdx] : null
+
+  // اندازه‌گیری سرریز متن: بعد از هر تغییر رویداد، اگه متن جا نشد marquee روشن می‌شه
+  useEffect(()=>{
+    const wrap=textWrapRef.current, txt=textRef.current
+    if(!wrap||!txt){ setMarquee({on:false,shift:0,dur:8}); return }
+    const t=setTimeout(()=>{
+      const overflow=txt.scrollWidth-wrap.clientWidth
+      if(overflow>6){
+        // RTL: بخش پنهان متن سمت چپه؛ با translateX مثبت میاد تو دید
+        setMarquee({on:true, shift:overflow, dur:Math.max(3, overflow/28)})
+      }else{
+        setMarquee({on:false, shift:0, dur:8})
+      }
+    },350) // بعد از انیمیشن evSlide اندازه بگیر
+    return ()=>clearTimeout(t)
+  },[ev&&ev.id])
+
   useEffect(()=>{
     if(events.length<2) return
     clearInterval(timerRef.current)
-    timerRef.current=setInterval(()=>setIdx(i=>(i+1)%events.length),4500)
+    // اگه متن بلنده، قبل از رفتن به رویداد بعدی صبر کن یه رفت‌وبرگشت کامل دیده بشه
+    const delay = marquee.on ? Math.max(4500, (marquee.dur*2+3)*1000) : 4500
+    timerRef.current=setInterval(()=>setIdx(i=>(i+1)%events.length),delay)
     return ()=>clearInterval(timerRef.current)
-  },[events.length])
-
-  const safeIdx = events.length ? (idx % events.length) : 0
-  const ev = events.length ? events[safeIdx] : null
+  },[events.length, marquee.on, marquee.dur])
 
   // به پدر بگو الان کدوم کافه رو باید روی نقشه هایلایت کنه (بدون حرکت دوربین)
   useEffect(()=>{
@@ -1969,13 +2007,15 @@ function EventBanner({C, cafes, setSelCafe, onActiveCafeChange, mapCenterRef}) {
   }
 
   return (
-    <div style={{position:'absolute',top:10,left:10,zIndex:18,display:'flex',flexDirection:'column',gap:5,alignItems:'flex-start',maxWidth:280}}>
+    <div data-tut="event-banner" style={{position:'absolute',top:10,left:10,zIndex:18,display:'flex',flexDirection:'column',gap:5,alignItems:'flex-start',maxWidth:'min(64vw,400px)'}}>
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={onClickBanner}
-        style={{height:25,boxSizing:'border-box',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'0 8px',display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)',cursor:'pointer',minWidth:0}}>
+        style={{height:27,boxSizing:'border-box',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'0 9px',display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)',cursor:'pointer',minWidth:0,maxWidth:'100%'}}>
         <button onClick={(e)=>{e.stopPropagation();go(1)}} style={{background:'none',border:'none',color:C.sub,fontSize:12,padding:'0 1px',flexShrink:0,fontFamily:'inherit',lineHeight:1}}>‹</button>
         <span key={ev.id} style={{display:'flex',alignItems:'center',gap:5,minWidth:0,animation:'evSlide .3s ease'}}>
           <span style={{fontSize:11,flexShrink:0,lineHeight:1}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
-          <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',fontWeight:700,color:C.text,lineHeight:1}}>{ev.cafes?ev.cafes.name:'کافه'}: {ev.title}</span>
+          <span ref={textWrapRef} style={{whiteSpace:'nowrap',overflow:'hidden',minWidth:0,lineHeight:1}}>
+            <span ref={textRef} className={marquee.on?'tl-shuttle':''} style={{display:'inline-block',fontWeight:700,color:C.text,lineHeight:1,'--shift':marquee.shift+'px','--dur':marquee.dur+'s'}}>{ev.cafes?ev.cafes.name:'کافه'}: {ev.title}</span>
+          </span>
         </span>
         <button onClick={(e)=>{e.stopPropagation();go(-1)}} style={{background:'none',border:'none',color:C.sub,fontSize:12,padding:'0 1px',flexShrink:0,fontFamily:'inherit',lineHeight:1}}>›</button>
       </div>
@@ -2028,21 +2068,59 @@ function NotificationPanel({C, notifications, onMark, onMarkAll, onClose}) {
   </div>
 }
 
-// ── تیوتوریال داینامیک: کارت راهنمای کوچیک context-aware، وضعیت سمت سرور ────
+// ── تیوتوریال تعاملی: صفحه تیره می‌شه، اسپات‌لایت فسفری می‌ره روی خودِ المان ──
+// فقط بار اول برای هر تازه‌وارد (وضعیت سمت سرور در profiles.tutorial_seen).
+// از منو → «آموزش» هم می‌شه دوباره دیدش (replay، بدون ثبت مجدد).
+const TUT_NEON='#CCFF00'
 const TUTORIAL_STEPS = [
-  { key:'welcome_map', forRole:'any', title:'به TwinLand خوش اومدی! ☕', text:'روی هر کافه‌ی نقشه بزن تا چک‌این کنی و XP بگیری.' },
-  { key:'event_banner', forRole:'any', title:'رویدادهای زنده 🎉', text:'این نوار بالای نقشه هر چیزی که کافه‌دارها همین الان منتشر می‌کنن رو نشون می‌ده — روش بزن تا بری به کافه‌ش.' },
-  { key:'gallery_intro', forRole:'any', title:'نگارخانه‌ی کلکسیون 💎', text:'با چک‌این و شرکت در رویدادها، آیتم‌های کمیاب جمع می‌کنی. از منو برو «نگارخانه» تا ببینیشون.' },
-  { key:'business_intro', forRole:'sme', title:'پنل کافه‌دار 🏪', text:'از تب «کمپین‌ها» می‌تونی رویداد/تخفیف/آیتم کلکسیونی منتشر کنی تا همون لحظه رو نقشه‌ی همه بیاد.' },
+  { key:'welcome_map',    forRole:'any', target:null,                        title:'به TwinLand خوش اومدی! ☕', text:'روی هر کافه‌ی نقشه بزن تا چک‌این کنی و XP بگیری.' },
+  { key:'event_banner',   forRole:'any', target:'[data-tut="event-banner"]', title:'رویدادهای زنده 🎉', text:'این نوار هر چیزی که کافه‌دارها همین الان منتشر می‌کنن رو نشون می‌ده — روش بزن تا بری به کافه‌ش.' },
+  { key:'gallery_intro',  forRole:'any', target:'[data-tut="menu-btn"]',     title:'گنجینه 💎', text:'با چک‌این و شرکت در رویدادها آیتم‌های کمیاب جمع می‌کنی. از همین منو برو «گنجینه» تا ببینیشون.' },
+  { key:'business_intro', forRole:'sme', target:'[data-tut="menu-btn"]',     title:'پنل کافه‌دار 🏪', text:'از منو → «پنل کافه‌دار» می‌تونی رویداد/تخفیف/آیتم کلکسیونی منتشر کنی تا همون لحظه رو نقشه‌ی همه بیاد.' },
 ]
-function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, isMobile}) {
-  const [dismissing, setDismissing] = useState(false)
+function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, tutorialLoaded, replay, onReplayEnd, isMobile}) {
+  const [replayIdx, setReplayIdx] = useState(0)
+  const [rect, setRect] = useState(null)
+  const roleSteps = TUTORIAL_STEPS.filter(s => s.forRole==='any' || s.forRole===accountType)
+
+  // مرحله‌ی فعلی: در حالت عادی اولین دیده‌نشده؛ در حالت replay بر اساس ایندکس
+  const step = replay
+    ? (roleSteps[replayIdx] || null)
+    : (tutorialLoaded ? roleSteps.find(s => !tutorialSeen[s.key]) : null)
+
+  // موقعیت المان هدف رو پیدا کن (و با تغییر سایز صفحه به‌روز نگه دار)
+  useEffect(()=>{
+    if(!step){ setRect(null); return }
+    function measure(){
+      if(!step.target){ setRect(null); return }
+      const el = typeof document!=='undefined' ? document.querySelector(step.target) : null
+      if(el){ const r=el.getBoundingClientRect(); setRect({top:r.top,left:r.left,width:r.width,height:r.height}) }
+      else setRect(null)
+    }
+    measure()
+    window.addEventListener('resize',measure)
+    const iv=setInterval(measure,600) // اگه المان دیر رندر شد یا جابه‌جا شد
+    return ()=>{ window.removeEventListener('resize',measure); clearInterval(iv) }
+  },[step && step.key])
+
+  // اگه در حالت replay مرحله‌ای نموند، بیرون از رندر تمومش کن
+  useEffect(()=>{
+    if(replay && !step && onReplayEnd) onReplayEnd()
+  },[replay, step && step.key])
+
   if(!session || !session.user) return null
-  const step = TUTORIAL_STEPS.find(s => !tutorialSeen[s.key] && (s.forRole==='any' || s.forRole===accountType))
   if(!step) return null
 
-  async function dismiss(){
-    setDismissing(true)
+  const isLast = replay
+    ? replayIdx >= roleSteps.length-1
+    : roleSteps.filter(s=>!tutorialSeen[s.key]).length<=1
+
+  function next(){
+    if(replay){
+      if(replayIdx>=roleSteps.length-1){ setReplayIdx(0); onReplayEnd&&onReplayEnd() }
+      else setReplayIdx(i=>i+1)
+      return
+    }
     setTutorialSeen(prev=>({...prev,[step.key]:true}))
     const token=(session&&session.access_token)||SB_KEY
     fetch(SB_URL+'/rest/v1/rpc/mark_tutorial_seen',{
@@ -2050,19 +2128,156 @@ function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, 
       headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
       body:JSON.stringify({p_key:step.key})
     }).catch(()=>{})
-    setTimeout(()=>setDismissing(false),50)
+  }
+  function skipAll(){
+    if(replay){ setReplayIdx(0); onReplayEnd&&onReplayEnd(); return }
+    const token=(session&&session.access_token)||SB_KEY
+    roleSteps.filter(s=>!tutorialSeen[s.key]).forEach(s=>{
+      fetch(SB_URL+'/rest/v1/rpc/mark_tutorial_seen',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({p_key:s.key})
+      }).catch(()=>{})
+    })
+    setTutorialSeen(prev=>{ const n={...prev}; roleSteps.forEach(s=>{n[s.key]=true}); return n })
   }
 
+  // جای کارت: اگه هدف بالای صفحه‌ست کارت میاد زیرش، وگرنه بالاش؛ بدون هدف → وسط
+  const vh = typeof window!=='undefined' ? window.innerHeight : 700
+  const cardBelow = rect ? (rect.top + rect.height/2 < vh/2) : false
+  const cardStyle = rect
+    ? (cardBelow
+        ? {position:'fixed',left:14,right:14,top:Math.min(rect.top+rect.height+18, vh-220),zIndex:4002}
+        : {position:'fixed',left:14,right:14,bottom:Math.max(vh-rect.top+18, 90),zIndex:4002})
+    : {position:'fixed',left:14,right:14,top:'50%',transform:'translateY(-50%)',zIndex:4002}
+
   return (
-    <div style={{position:'fixed',left:14,right:14,bottom:isMobile?76:20,zIndex:1500,animation:'coachPop .3s ease'}}>
-      <div style={{background:C.card,border:'1.5px solid '+C.accent+'55',borderRadius:18,padding:'14px 16px',boxShadow:'0 8px 30px rgba(0,0,0,.18)',maxWidth:420,margin:'0 auto',display:'flex',gap:12,alignItems:'flex-start'}}>
-        <div style={{fontSize:24,flexShrink:0}}>💡</div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13.5,fontWeight:800,color:C.text,marginBottom:3}}>{step.title}</div>
-          <div style={{fontSize:12,color:C.sub,lineHeight:1.7}}>{step.text}</div>
-          <button onClick={dismiss} style={{marginTop:10,background:C.accent,color:C.accentText,border:'none',borderRadius:10,padding:'7px 16px',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>فهمیدم</button>
+    <>
+      {/* پس‌زمینه‌ی تیره — اگه اسپات‌لایت هست، سوراخِ نورش با box-shadow ساخته می‌شه */}
+      {!rect && <div style={{position:'fixed',inset:0,zIndex:4000,background:'rgba(0,0,0,.62)',animation:'fadeIn .25s ease'}}/>}
+      {rect && (
+        <div style={{position:'fixed',top:rect.top-7,left:rect.left-7,width:rect.width+14,height:rect.height+14,zIndex:4001,borderRadius:16,pointerEvents:'none',animation:'tlSpotPulse 1.6s ease-in-out infinite'}}/>
+      )}
+      <div style={{...cardStyle,animation:'coachPop .32s ease'}}>
+        <div style={{background:'rgba(18,18,22,.96)',border:'2px solid '+TUT_NEON,borderRadius:20,padding:'16px 18px',boxShadow:'0 0 26px '+TUT_NEON+'55, 0 12px 40px rgba(0,0,0,.4)',maxWidth:420,margin:'0 auto'}}>
+          <div style={{fontSize:15,fontWeight:900,color:TUT_NEON,marginBottom:5}}>{step.title}</div>
+          <div style={{fontSize:12.5,color:'#EDEDEF',lineHeight:1.8}}>{step.text}</div>
+          <div style={{display:'flex',gap:8,marginTop:13,alignItems:'center'}}>
+            <button onClick={next} style={{flex:1,background:TUT_NEON,color:'#111',border:'none',borderRadius:12,padding:'9px 16px',fontSize:13,fontWeight:900,fontFamily:'inherit'}}>{isLast?'شروع کن! 🚀':'بعدی ←'}</button>
+            <button onClick={skipAll} style={{background:'none',border:'1px solid rgba(255,255,255,.25)',color:'#bbb',borderRadius:12,padding:'9px 14px',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>رد شو</button>
+          </div>
+          <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:11}}>
+            {roleSteps.map((s,i)=>{
+              const active = replay ? i===replayIdx : s.key===step.key
+              return <span key={s.key} style={{width:active?16:5,height:5,borderRadius:99,background:active?TUT_NEON:'rgba(255,255,255,.25)',transition:'all .3s'}}/>
+            })}
+          </div>
         </div>
-        <button onClick={dismiss} style={{background:'none',border:'none',color:C.sub,fontSize:14,flexShrink:0}}>✕</button>
+      </div>
+    </>
+  )
+}
+
+// ── انیمیشن جشن تمام‌صفحه (بعد از چک‌این / لِوِل‌آپ / تکمیل رویداد) ──────────
+// کانفتی CSS خالص، بدون هیچ کتابخانه. داده از پاسخ do_checkin میاد.
+const RARITY_GRAD = {
+  common:    'linear-gradient(135deg,#8E8E93,#C7C7CC)',
+  rare:      'linear-gradient(135deg,#0A84FF,#5AC8FA)',
+  epic:      'linear-gradient(135deg,#7A3CFF,#BF5AF2)',
+  legendary: 'linear-gradient(135deg,#FF9F0A,#FFD60A)',
+}
+const CONFETTI_COLORS = ['#FF6B35','#FFD60A','#34C759','#0A84FF','#BF5AF2','#FF2D55','#CCFF00','#5AC8FA']
+function CelebrationOverlay({C, data, onClose}) {
+  // ۴۲ تکه کانفتی با موقعیت/تاخیر/سرعت تصادفی — یک‌بار ساخته می‌شن
+  const confetti = useMemo(()=>Array.from({length:42}).map((_,i)=>({
+    left: Math.random()*100,
+    delay: Math.random()*1.6,
+    dur: 2.6+Math.random()*2.4,
+    size: 6+Math.random()*8,
+    color: CONFETTI_COLORS[i%CONFETTI_COLORS.length],
+    round: Math.random()>.5,
+  })),[])
+
+  // بعد از ۷ ثانیه خودش بسته می‌شه (با لمس هم بسته می‌شه)
+  useEffect(()=>{
+    const t=setTimeout(onClose, data.levelUp?9000:7000)
+    return ()=>clearTimeout(t)
+  },[])
+
+  const grad = data.levelUp
+    ? 'linear-gradient(150deg,'+(data.levelColor||C.accent)+'ee, #1c1030f2 70%)'
+    : 'linear-gradient(150deg,'+C.accent+'22, rgba(20,18,26,.94) 60%)'
+  const title = data.levelUp ? '🎉 لِوِل آپ!' : data.isNewCafe ? '🎉 کافه‌ی جدید کشف کردی!' : '✅ چک‌این شد!'
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:5000,background:'radial-gradient(ellipse at 50% 30%, rgba(60,40,120,.45), rgba(0,0,0,.72))',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',animation:'fadeIn .25s ease',overflow:'hidden'}}>
+      {/* کانفتی */}
+      {confetti.map((p,i)=>(
+        <span key={i} style={{position:'absolute',top:0,left:p.left+'%',width:p.size,height:p.round?p.size:p.size*1.8,background:p.color,borderRadius:p.round?'50%':2,opacity:.95,animation:'tlConfetti '+p.dur+'s linear '+p.delay+'s infinite',willChange:'transform'}}/>
+      ))}
+
+      {/* کارت تبریک شیشه‌ای */}
+      <div onClick={e=>e.stopPropagation()} style={{width:'min(88vw,380px)',background:grad,border:'1.5px solid rgba(255,255,255,.22)',borderRadius:28,padding:'26px 22px 20px',textAlign:'center',animation:'tlCelebPop .5s cubic-bezier(.34,1.5,.5,1), tlCelebGlow 2.4s ease-in-out infinite',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)'}}>
+        {data.levelUp ? (
+          <>
+            <div style={{fontSize:64,lineHeight:1,marginBottom:8,filter:'drop-shadow(0 0 18px '+(data.levelColor||'#fff')+'aa)'}}>{data.levelIcon||'🏆'}</div>
+            <div style={{fontSize:22,fontWeight:900,color:'#fff'}}>{title}</div>
+            <div style={{fontSize:15,fontWeight:800,marginTop:4,background:'linear-gradient(90deg,#FFD60A,#FF9F0A)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>به لولِ «{data.levelName}» رسیدی</div>
+          </>
+        ) : (
+          <>
+            <div style={{fontSize:48,lineHeight:1,marginBottom:8}}>{data.isNewCafe?'🗺️':'☕'}</div>
+            <div style={{fontSize:20,fontWeight:900,color:'#fff'}}>{title}</div>
+            <div style={{fontSize:12.5,color:'rgba(255,255,255,.75)',marginTop:4}}>{data.cafeName}{data.district?' · منطقه '+data.district:''}</div>
+          </>
+        )}
+
+        {/* آمارها */}
+        <div style={{display:'flex',gap:8,justifyContent:'center',marginTop:18,flexWrap:'wrap'}}>
+          <div style={{background:'rgba(255,255,255,.12)',border:'1px solid rgba(255,255,255,.18)',borderRadius:14,padding:'9px 15px',minWidth:76}}>
+            <div style={{fontSize:19,fontWeight:900,color:'#7CFF9B'}}>+{(data.awarded||0).toLocaleString('fa')}</div>
+            <div style={{fontSize:9.5,color:'rgba(255,255,255,.65)',marginTop:1}}>XP</div>
+          </div>
+          {data.streak>=2&&(
+            <div style={{background:'rgba(255,255,255,.12)',border:'1px solid rgba(255,255,255,.18)',borderRadius:14,padding:'9px 15px',minWidth:76}}>
+              <div style={{fontSize:19,fontWeight:900,color:'#FFB340'}}>🔥 {data.streak.toLocaleString('fa')}</div>
+              <div style={{fontSize:9.5,color:'rgba(255,255,255,.65)',marginTop:1}}>روز پشت هم</div>
+            </div>
+          )}
+          {data.rank&&(
+            <div style={{background:'rgba(255,255,255,.12)',border:'1px solid rgba(255,255,255,.18)',borderRadius:14,padding:'9px 15px',minWidth:76}}>
+              <div style={{fontSize:19,fontWeight:900,color:'#5AC8FA'}}>#{Number(data.rank).toLocaleString('fa')}</div>
+              <div style={{fontSize:9.5,color:'rgba(255,255,255,.65)',marginTop:1}}>رتبه‌ی الانت</div>
+            </div>
+          )}
+        </div>
+
+        {/* رویدادهای تکمیل‌شده + آیتم کلکسیونی با گرادیانت کمیابی */}
+        {data.quests.length>0&&(
+          <div style={{marginTop:16,display:'flex',flexDirection:'column',gap:8}}>
+            {data.quests.map((q,i)=>{
+              const cd=q.collectible
+              const rar=(cd&&cd.rarity)||'common'
+              return (
+                <div key={i} style={{background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',borderRadius:16,padding:'11px 13px',textAlign:'right'}}>
+                  <div style={{fontSize:12.5,fontWeight:800,color:'#fff'}}>🎯 «{q.title}» تکمیل شد!</div>
+                  {q.code&&<div style={{fontSize:11.5,color:'#CCFF00',fontWeight:800,marginTop:4,letterSpacing:1,direction:'ltr',textAlign:'center',background:'rgba(0,0,0,.3)',borderRadius:8,padding:'5px 8px',border:'1px dashed #CCFF0066'}}>🎁 {q.code}</div>}
+                  {cd&&(
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginTop:7,background:RARITY_GRAD[rar]||RARITY_GRAD.common,borderRadius:12,padding:'7px 11px'}}>
+                      <span style={{fontSize:22}}>{cd.icon||'💎'}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:11.5,fontWeight:900,color:'#fff',textShadow:'0 1px 3px rgba(0,0,0,.35)'}}>{cd.title}</div>
+                        <div style={{fontSize:9,color:'rgba(255,255,255,.85)'}}>به گنجینه‌ت اضافه شد 💎</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <button onClick={onClose} style={{marginTop:18,width:'100%',background:'rgba(255,255,255,.95)',color:'#111',border:'none',borderRadius:14,padding:'12px',fontSize:14,fontWeight:900,fontFamily:'inherit',boxShadow:'0 4px 20px rgba(255,255,255,.25)'}}>ادامه بده 🚀</button>
       </div>
     </div>
   )
@@ -2213,7 +2428,28 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
           ))}
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:7,marginBottom:14}}>
-          {[{icon:'❤️',lbl:'علاقه',active:isFav,fn:()=>{const n=new Set(favs);isFav?n.delete(cafe.id):n.add(cafe.id);setFavs(n);showToast(isFav?'حذف شد':'❤️ ذخیره شد')}},{icon:'📤',lbl:'اشتراک',active:false,fn:()=>showToast('🔗 کپی شد!')},{icon:'🗺',lbl:'مسیر',active:false,fn:()=>window.open('https://www.google.com/maps?q='+cafe.lat+','+cafe.lng,'_blank')},{icon:'💬',lbl:'نظر',active:false,fn:()=>showToast('💬 به زودی!')}].map((item)=>(
+          {[{icon:'❤️',lbl:'علاقه',active:isFav,fn:async()=>{
+            // آپدیت خوش‌بینانه + ثبت واقعی سمت سرور (جدول favorites)
+            const wasFav=isFav
+            const n=new Set(favs); wasFav?n.delete(cafe.id):n.add(cafe.id); setFavs(n)
+            try{
+              const r=await fetch(SB_URL+'/rest/v1/rpc/toggle_favorite',{
+                method:'POST',
+                headers:{apikey:SB_KEY,Authorization:'Bearer '+((sess&&sess.access_token)||SB_KEY),'Content-Type':'application/json'},
+                body:JSON.stringify({p_cafe_id:cafe.id})
+              }).then(x=>x.json())
+              if(r&&r.ok){
+                showToast(r.fav?('❤️ ذخیره شد — '+(r.count||1).toLocaleString('fa')+' نفر این کافه رو دوست دارن'):'از علاقه‌مندی‌ها حذف شد')
+              }else{
+                // سرور قبول نکرد → برگرد به حالت قبل
+                const back=new Set(favs); wasFav?back.add(cafe.id):back.delete(cafe.id); setFavs(back)
+                showToast(r&&r.error==='not_authenticated'?'اول وارد شو':'ثبت نشد، دوباره بزن','warn')
+              }
+            }catch(e){
+              const back=new Set(favs); wasFav?back.add(cafe.id):back.delete(cafe.id); setFavs(back)
+              showToast('خطا در ارتباط','warn')
+            }
+          }},{icon:'📤',lbl:'اشتراک',active:false,fn:()=>showToast('🔗 کپی شد!')},{icon:'🗺',lbl:'مسیر',active:false,fn:()=>window.open('https://www.google.com/maps?q='+cafe.lat+','+cafe.lng,'_blank')},{icon:'💬',lbl:'نظر',active:false,fn:()=>showToast('💬 به زودی!')}].map((item)=>(
             <button key={item.lbl} onClick={item.fn} style={{background:item.active?C.accent+'18':C.chip,border:'1.5px solid '+(item.active?C.accent:'transparent'),borderRadius:12,padding:'9px 4px',color:C.text,fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
               <span style={{fontSize:20}}>{item.icon}</span>
               <span style={{fontSize:9,color:item.active?C.accent:C.sub,fontWeight:item.active?700:400}}>{item.lbl}</span>
