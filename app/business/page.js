@@ -31,7 +31,7 @@ export default function BusinessPage() {
     // مالک‌بودن + حالت نمایش: اگه «حالت کاربر» روشنه، دکمه‌های مخصوص مالک
     // اینجا هم مخفی می‌شن تا تجربه دقیقاً مثل کاربر عادی باشه.
     const isOwnerEmail = !!(s.user.email && s.user.email.toLowerCase() === 'msmadani88@gmail.com')
-    fetch(SB_URL + '/rest/v1/profiles?id=eq.' + s.user.id + '&select=view_as_user', { headers: h })
+    fetch(SB_URL + '/rest/v1/profiles?id=eq.' + s.user.id + '&select=view_as_user', { headers: H(s) })
       .then(r => r.json())
       .then(rows => {
         const vau = !!(Array.isArray(rows) && rows[0] && rows[0].view_as_user)
