@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 import { L, ICON } from '../labels'
+import { UIStyles, onColor } from '../ui'
 import {
   getSession, getLevelInfo, clanLevel,
   fetchMyClans, fetchClanStandings, fetchClanMembers, fetchClanMissions, subscribeToTables,
@@ -83,6 +84,7 @@ export default function ClanPage() {
   return (
     <div style={S.page}>
       <div style={S.topbar}>
+        <UIStyles/>
         <a href="/" style={S.backBtn}>‹ {L.map}</a>
         <div style={S.brand}>{ICON.clans} {L.clans}</div>
         <div style={{ width: 64 }} />
@@ -105,7 +107,7 @@ export default function ClanPage() {
               <div style={{ fontSize: 44, marginBottom: 8 }}>🛡️</div>
               <div style={{ fontWeight: 800, marginBottom: 4 }}>هنوز عضو کلنی نیستی</div>
               <div style={{ fontSize: 13, color: C.sub, marginBottom: 16 }}>یه کلن بساز یا به یکی بپیوند</div>
-              <button style={S.primaryBtn} onClick={() => setTab('discover')}>کشف {L.clans}</button>
+              <button className="tl-press" style={S.primaryBtn} onClick={() => setTab('discover')}>کشف {L.clans}</button>
             </div>
           ) : (
             <>
