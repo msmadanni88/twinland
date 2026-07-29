@@ -1183,10 +1183,10 @@ function TwinLand({ session, onLogout }) {
               {key:'clans',icon:ICON.clans,img:'/icon_clan_active@2x.png',label:L.clans,href:ROUTE.clans},
               {key:'quests',icon:ICON.quests,label:L.quests,href:ROUTE.quests},
               {key:'gallery',icon:ICON.gallery,label:L.gallery,href:ROUTE.gallery},
-              {/* قبلاً smeOnly بود و چون حساب تو 'sme' نیست اصلاً رندر نمی‌شد —
-                  آیتم پایینی جاش می‌اومد و با همون ضربه می‌رفتی گنجینه.
-                  حالا برای همه هست: هر کسی ممکنه کافه‌دار باشه و باید بتونه
-                  کافه‌ش رو claim کنه. خودِ صفحه اگه کافه‌ای نداشتی راهنمایی می‌کنه. */}
+              // قبلاً smeOnly بود و چون حساب تو 'sme' نیست اصلاً رندر نمی‌شد —
+              // آیتم پایینی جاش می‌اومد و با همون ضربه می‌رفتی گنجینه.
+              // حالا برای همه هست: هر کسی ممکنه کافه‌دار باشه و باید بتونه
+              // کافه‌ش رو claim کنه. خودِ صفحه اگه کافه نداشتی راهنمایی می‌کنه.
               {key:'business',icon:ICON.business,label:L.business,href:ROUTE.business},
               {key:'admin',icon:'🛡️',label:'پنل ادمین',href:'/admin',adminOnly:true},
               {key:'xp',icon:ICON.xpSystem,img:'/xp_coin@256-1.png',label:L.xpSystem,href:null},
