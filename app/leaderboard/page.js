@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
-import { getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile } from '../gameSystem'
+import { SB_URL, SB_KEY, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile } from '../gameSystem'
+import { L, ICON, fa } from '../labels'
 
 export default function LeaderboardPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [rows, setRows] = useState([])
+  const [stats, setStats] = useState({})   // user_id -> {checkin_count, cafe_count, fav_count}
 
   useEffect(() => { setPal(loadPrefs()) }, [])
 
@@ -15,9 +17,23 @@ export default function LeaderboardPage() {
     let alive = true
     const load = () => fetchLeaderboard(sess).then(list => { if (alive) setRows(list) })
     load()
+
+    // ── آمار عمومی هر کاربر (چک‌این / کافه / قلب) ──────────────────────────
+    // از ویوی user_public_stats میاد که فقط «عدد» می‌ده، نه اینکه کی کجا رفته.
+    // اگه ویو هنوز ساخته نشده باشه، صفحه بدون این خط زیر اسم‌ها کار می‌کنه
+    // و چیزی نمی‌شکنه.
+    const h = { apikey: SB_KEY, Authorization: 'Bearer ' + ((sess && sess.access_token) || SB_KEY) }
+    const loadStats = () => fetch(SB_URL + '/rest/v1/user_public_stats?select=*', { headers: h })
+      .then(r => r.json())
+      .then(list => {
+        if (!alive || !Array.isArray(list)) return
+        const m = {}; list.forEach(x => { m[x.user_id] = x })
+        setStats(m)
+      }).catch(() => {})
+    loadStats()
     // realtime: با هر تغییر XP خودم، جدول رو دوباره بساز تا رتبه‌ها به‌روز شن
     const uid = sess?.user?.id
-    const unsub = subscribeToProfile(uid, () => load())
+    const unsub = subscribeToProfile(uid, () => { load(); loadStats() })
     return () => { alive = false; unsub() }
   }, [])
 
@@ -33,8 +49,8 @@ export default function LeaderboardPage() {
   return (
     <div style={S.page}>
       <div style={S.topbar}>
-        <a href="/" style={S.backBtn}>‹ نقشه</a>
-        <div style={S.brand}>برترین‌ها</div>
+        <a href="/" style={S.backBtn}>‹ {L.map}</a>
+        <div style={S.brand}>{ICON.leaderboard} {L.leaderboard}</div>
         <div style={{ width: 64 }} />
       </div>
 
@@ -61,7 +77,8 @@ export default function LeaderboardPage() {
                       <span style={S.podiumMedal}>{medals[rank]}</span>
                     </div>
                     <div style={S.podiumName}>{p.name}{p.sample && <span style={S.sampleTag}>نمونه</span>}{p.me && <span style={S.youTag}>تو</span>}</div>
-                    <div style={S.podiumXp}>{p.xp.toLocaleString('fa')}</div>
+                    <div style={S.podiumXp}>{p.xp.toLocaleString('fa')} XP</div>
+                    <MiniStats S={S} st={stats[p.id]} center />
                     <div style={{ ...S.podiumStand, height: heights[rank], background: lv.color }}>
                       <span style={S.podiumRankNum}>{rank.toLocaleString('fa')}</span>
                     </div>
@@ -87,6 +104,7 @@ export default function LeaderboardPage() {
                     {p.sample && <span style={S.sampleTag}>نمونه</span>}
                   </div>
                   <div style={S.rowLevel}>{lv.icon} {lv.name}</div>
+                  <MiniStats S={S} st={stats[p.id]} />
                 </div>
                 <div style={S.rowXp}>{p.xp.toLocaleString('fa')} XP</div>
               </div>
@@ -98,7 +116,28 @@ export default function LeaderboardPage() {
   )
 }
 
+// ── سه عدد ریز زیر اسم: چک‌این · کافه · قلب ─────────────────────────────
+// اگه هنوز آماری نیومده، هیچی نشون نمی‌ده (به‌جای نوشتن صفرِ گمراه‌کننده).
+function MiniStats({ S, st, center }) {
+  if (!st) return null
+  const parts = [
+    [ICON.checkin, st.checkin_count],
+    [ICON.cafe, st.cafe_count],
+    [ICON.hearts, st.fav_count],
+  ].filter(([, v]) => v > 0)
+  if (parts.length === 0) return null
+  return (
+    <div style={{ ...S.miniStats, justifyContent: center ? 'center' : 'flex-start' }}>
+      {parts.map(([icon, v], i) => (
+        <span key={i} style={S.miniStat}>{icon} {fa(v)}</span>
+      ))}
+    </div>
+  )
+}
+
 const mkS = (C) => ({
+  miniStats: { display: 'flex', gap: 7, marginTop: 3, flexWrap: 'wrap' },
+  miniStat: { fontSize: 10, color: C.sub, opacity: 0.9, whiteSpace: 'nowrap' },
   page: { minHeight: '100vh', background: C.bg, fontFamily: 'inherit', direction: 'rtl', color: C.text, paddingBottom: 40 },
   topbar: {
     position: 'sticky', top: 0, zIndex: 10,
@@ -124,8 +163,8 @@ const mkS = (C) => ({
   },
   podiumMedal: { position: 'absolute', bottom: -6, fontSize: 18 },
   podiumName: { fontWeight: 800, fontSize: 13, marginTop: 8, color: C.text, display: 'flex', alignItems: 'center', gap: 4 },
-  podiumXp: { fontSize: 12, color: C.sub, marginBottom: 6 },
-  podiumStand: { width: '100%', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 8 },
+  podiumXp: { fontSize: 11.5, color: C.sub, fontWeight: 700 },
+  podiumStand: { width: '100%', borderRadius: '10px 10px 0 0', marginTop: 6, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 8 },
   podiumRankNum: { color: '#fff', fontWeight: 800, fontSize: 20 },
 
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
