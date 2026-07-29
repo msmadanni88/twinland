@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 import { SB_URL, SB_KEY, getSession, subscribeToTables } from '../gameSystem'
 import { L, ICON, RARITY_LOCKED, rarityOf, fa, SOURCE_LABEL } from '../labels'
+import { UIStyles, useDragScroll, hscroll, onColor } from '../ui'
 
 export default function GalleryPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
@@ -60,6 +61,7 @@ export default function GalleryPage() {
 
   const C = buildC(pal.palette, pal.mode)
   const S = mkS(C)
+  const filtRef = useDragScroll()
 
   const visible = defs.filter(d => {
     if (filter === 'owned') return !!owned[d.code]
@@ -87,6 +89,7 @@ export default function GalleryPage() {
 
   return (
     <div style={S.page}>
+      <UIStyles/>
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes glFadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
         @keyframes glShine{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
@@ -120,9 +123,9 @@ export default function GalleryPage() {
           </div>
         </div>
 
-        <div style={S.filterRow}>
+        <div ref={filtRef} className="tl-hscroll" style={S.filterRow}>
           {[['all', 'همه'], ['owned', 'مال من'], ['locked', 'قفل'], ['platform', 'اکتشافی'], ['business', 'کمپینی']].map(([k, label]) => (
-            <button key={k} onClick={() => setFilter(k)} style={filter === k ? S.filterActive : S.filter}>{label}</button>
+            <button key={k} className="tl-press" onClick={() => setFilter(k)} style={filter === k ? S.filterActive : S.filter}>{label}</button>
           ))}
         </div>
 
@@ -134,7 +137,7 @@ export default function GalleryPage() {
                   const isOwned = !!owned[d.code]
                   const R = rarityOf(d.rarity)
                   return (
-                    <button key={d.code} className="gl-cell" onClick={() => openCard(d)}
+                    <button key={d.code} className="gl-cell tl-tile" onClick={() => openCard(d)}
                       style={{ ...S.cell, background: isOwned ? R.grad : RARITY_LOCKED, animationDelay: Math.min(i * 28, 600) + 'ms', boxShadow: isOwned ? '0 4px 14px ' + R.color + '55' : 'none' }}>
                       <div style={{ fontSize: 38, filter: isOwned ? 'none' : 'grayscale(1) opacity(.65)' }}>{isOwned ? d.icon : '🔒'}</div>
                       {isOwned && <div style={S.cellTitle}>{d.title}</div>}
@@ -223,9 +226,9 @@ const mkS = (C) => ({
   heroShine: { position: 'absolute', top: 0, bottom: 0, width: '55%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent)', animation: 'glShine 3.4s ease-in-out infinite' },
   heroTrack: { position: 'relative', height: 8, background: C.border, borderRadius: 99, overflow: 'hidden', marginTop: 12 },
   heroFill: { height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,' + C.accent + ',#FFD60A)', transition: 'width .9s cubic-bezier(.2,.9,.3,1)' },
-  filterRow: { display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto', scrollbarWidth: 'none' },
+  filterRow: { ...hscroll, gap: 6, marginBottom: 14 },
   filter: { flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: '1px solid ' + C.border, background: C.chip, color: C.sub, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' },
-  filterActive: { flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: 'none', background: C.accent, color: C.accentText, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' },
+  filterActive: { flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: 'none', background: C.accent, color: onColor(C.accent), fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 },
   cell: { position: 'relative', aspectRatio: '1', border: 'none', borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontFamily: 'inherit', overflow: 'hidden', padding: '6px 4px' },
   cellTitle: { fontSize: 9.5, fontWeight: 800, color: '#fff', textAlign: 'center', textShadow: '0 1px 4px rgba(0,0,0,.45)', lineHeight: 1.3, paddingTop: 2 },
