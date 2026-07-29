@@ -1,626 +1,235 @@
 'use client'
+// ⚠️ این فایل مخصوص مسیر: app/gallery/page.js
+// اسم صفحه از app/labels.js میاد — اینجا دستی ننویس.
 
 import { useState, useEffect, useCallback } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
-import { getSession, subscribeToTables, SB_URL, SB_KEY } from '../gameSystem'
+import { SB_URL, SB_KEY, getSession, subscribeToTables } from '../gameSystem'
+import { L, ICON, RARITY_LOCKED, rarityOf, fa, SOURCE_LABEL } from '../labels'
 
-const fa = (n) => Number(n || 0).toLocaleString('fa')
-const WEEKDAYS = ['شنبه', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'جمعه']
-const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
-
-export default function BusinessPage() {
+export default function GalleryPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
-  const [businesses, setBusinesses] = useState([])
-  const [data, setData] = useState({})   // همه‌ی داده‌ها per cafe_id
+  const [defs, setDefs] = useState([])        // کاتالوگ کامل
+  const [owned, setOwned] = useState({})      // code -> ردیف کامل award
+  const [cafeMap, setCafeMap] = useState({})  // cafe_id -> {name, district}
+  const [bizMap, setBizMap] = useState({})    // business_id -> cafe_id
   const [loading, setLoading] = useState(true)
-  const [isOwnerAcct, setIsOwnerAcct] = useState(false)
-  const [claimingAll, setClaimingAll] = useState(false)
+  const [filter, setFilter] = useState('all')
+  const [selected, setSelected] = useState(null)
+  const [flipped, setFlipped] = useState(false)
 
   useEffect(() => { setPal(loadPrefs()) }, [])
+
   const H = (s) => ({ apikey: SB_KEY, Authorization: 'Bearer ' + ((s && s.access_token) || SB_KEY) })
   const get = (url, h) => fetch(SB_URL + '/rest/v1/' + url, { headers: h }).then(r => r.json()).catch(() => [])
-  const post = (url, h, body) => fetch(SB_URL + '/rest/v1/' + url, { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(r => r.json()).catch(() => null)
-  const one = (arr) => (Array.isArray(arr) && arr[0]) ? arr[0] : null
 
   const load = useCallback(async () => {
     const s = getSession()
     if (!s || !s.user) { if (typeof window !== 'undefined') window.location.href = '/'; return }
-    setIsOwnerAcct(!!(s.user.email && s.user.email.toLowerCase() === 'msmadani88@gmail.com'))
     const h = H(s)
-    const biz = await get('businesses?owner_id=eq.' + s.user.id + '&select=id,cafe_id,status,plan,created_at,cafes(name,district)&order=created_at.desc', h)
-    const bizArr = Array.isArray(biz) ? biz : []
-    setBusinesses(bizArr)
-    const statRows = await get('business_stats?owner_id=eq.' + s.user.id + '&select=*', h)
-    const statMap = {}; if (Array.isArray(statRows)) statRows.forEach(r => statMap[r.cafe_id] = r)
-
-    const map = {}
-    for (const b of bizArr.filter(x => x.status === 'verified' || x.status === 'pending')) {
-      const cid = b.cafe_id
-      const [daily, hourly, weekday, retention, periods, clv, cohort, rank, clans, covisit, quests, qstats] = await Promise.all([
-        get('business_daily?cafe_id=eq.' + cid + '&select=day,checkins&order=day.asc', h),
-        get('business_hourly?cafe_id=eq.' + cid + '&select=hour,checkins&order=hour.asc', h),
-        get('business_weekday?cafe_id=eq.' + cid + '&select=weekday,checkins&order=weekday.asc', h),
-        get('business_retention?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_periods?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_clv?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_cohort?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_rank?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_clans?cafe_id=eq.' + cid + '&select=*&order=members_visited.desc&limit=5', h),
-        get('business_covisit?cafe_id=eq.' + cid + '&select=*&order=shared_customers.desc&limit=6', h),
-        get('quests?business_id=eq.' + b.id + '&select=*&order=created_at.desc', h),
-        get('quest_stats?business_id=eq.' + b.id + '&select=*', h),
-      ])
-      map[cid] = {
-        stat: statMap[cid] || {},
-        daily: daily || [], hourly: hourly || [], weekday: weekday || [],
-        retention: one(retention), periods: one(periods), clv: one(clv),
-        cohort: one(cohort), rank: one(rank),
-        clans: Array.isArray(clans) ? clans : [], covisit: Array.isArray(covisit) ? covisit : [],
-        quests: Array.isArray(quests) ? quests : [], qstats: Array.isArray(qstats) ? qstats : [],
-      }
-    }
-    setData(map)
+    // select=* می‌گیریم تا هر ستون اضافه‌ای (مثل cafe_id/quest_id) که وجود داره
+    // خودکار استفاده بشه، بدون اینکه لازم باشه این فایل عوض بشه.
+    const [allDefs, myAwards, allCafes, allBiz] = await Promise.all([
+      get('collectible_defs?select=*&order=rarity.asc,created_at.asc', h),
+      get('awards?user_id=eq.' + s.user.id + '&select=*', h),
+      get('cafes?select=id,name,district', h),
+      // awards ستون business_id داره (نه cafe_id) — پس اول باید business رو
+      // به cafe نگاشت کنیم تا بفهمیم جایزه از کدوم کافه اومده.
+      get('businesses?select=id,cafe_id', h),
+    ])
+    setDefs(Array.isArray(allDefs) ? allDefs : [])
+    const om = {}; (Array.isArray(myAwards) ? myAwards : []).forEach(a => { if (a.code) om[a.code] = a })
+    setOwned(om)
+    const cm = {}; (Array.isArray(allCafes) ? allCafes : []).forEach(c => { cm[c.id] = c })
+    setCafeMap(cm)
+    const bm = {}; (Array.isArray(allBiz) ? allBiz : []).forEach(b => { bm[b.id] = b.cafe_id })
+    setBizMap(bm)
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
+    const s = getSession()
+    if (!s || !s.user) return
     const unsub = subscribeToTables([
-      { table: 'checkins', event: 'INSERT' }, { table: 'businesses', event: '*' },
-      { table: 'quests', event: '*' }, { table: 'quest_progress', event: '*' }, { table: 'redemptions', event: '*' },
+      { table: 'awards', event: '*', filter: 'user_id=eq.' + s.user.id },
+      { table: 'collectible_defs', event: '*' },
     ], () => load())
     return () => unsub()
   }, [load])
 
   const C = buildC(pal.palette, pal.mode)
-  const verified = businesses.filter(b => b.status === 'verified')
-  const pending = businesses.filter(b => b.status === 'pending')
+  const S = mkS(C)
 
-  async function claimAll() {
-    const s = getSession()
-    if (!s || !s.access_token) return
-    setClaimingAll(true)
-    const res = await post('rpc/owner_claim_all_cafes', H(s), {})
-    setClaimingAll(false)
-    if (res && res.ok) load()
-  }
-
-  return (
-    <div style={{ minHeight: '100dvh', background: C.bg, color: C.text, fontFamily: 'Estedad, sans-serif', direction: 'rtl' }}>
-      <div style={{ background: C.card, borderBottom: '1px solid ' + C.border, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 24 }}>🏪</span>
-          <div><div style={{ fontSize: 17, fontWeight: 800 }}>پنل کافه‌دار</div><div style={{ fontSize: 11, color: C.sub }}>TwinLand Business</div></div>
-        </div>
-        <a href="/" style={{ fontSize: 13, color: C.accent, fontWeight: 700, textDecoration: 'none', background: C.chip, padding: '8px 14px', borderRadius: 99 }}>← برگشت</a>
-      </div>
-
-      {isOwnerAcct && (
-        <div style={{ maxWidth: 680, margin: '14px auto 0', padding: '0 18px' }}>
-          <button disabled={claimingAll} onClick={claimAll} style={{ width: '100%', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 14, padding: '12px', fontWeight: 700, fontSize: 13 }}>
-            {claimingAll ? 'در حال اضافه‌کردن…' : '👑 (فقط صاحب اپ) افزودن همه‌ی کافه‌ها برای تست'}
-          </button>
-        </div>
-      )}
-
-      <div style={{ padding: '18px', maxWidth: 680, margin: '0 auto' }}>
-        {loading ? <div style={{ textAlign: 'center', color: C.sub, padding: '60px 0' }}>در حال بارگذاری…</div>
-          : businesses.length === 0 ? <EmptyState C={C} />
-          : <>
-            {verified.map(b => <BusinessCard key={b.id} C={C} biz={b} d={data[b.cafe_id]} onReload={load} />)}
-            {pending.map(b => <BusinessCard key={b.id} C={C} biz={b} d={data[b.cafe_id]} onReload={load} />)}
-          </>}
-      </div>
-    </div>
-  )
-}
-
-function EmptyState({ C }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '50px 20px' }}>
-      <div style={{ fontSize: 52, marginBottom: 16 }}>🏪</div>
-      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>هنوز کافه‌ای نداری</div>
-      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.8, marginBottom: 20 }}>توی اپ اصلی کافه‌ت رو پیدا کن و «صاحب این کافه هستید؟» رو بزن.</div>
-      <a href="/" style={{ display: 'inline-block', background: C.accent, color: '#fff', padding: '12px 24px', borderRadius: 14, fontWeight: 700, textDecoration: 'none', fontSize: 14 }}>رفتن به نقشه</a>
-    </div>
-  )
-}
-
-function BusinessCard({ C, biz, d, onReload }) {
-  const [tab, setTab] = useState('overview')
-  if (!d) return null
-  const isPending = biz.status === 'pending'
-  const TABS = [['overview', 'نمای کلی'], ['customers', 'مشتری‌ها'], ['timing', 'زمان‌بندی'], ['market', 'بازار'], ['campaigns', 'رویدادها']]
-  return (
-    <div style={{ background: C.card, border: '1px solid ' + (isPending ? '#f59e0b44' : C.border), borderRadius: 20, padding: 18, marginBottom: 16 }}>
-      {isPending && (
-        <div style={{ background: '#f59e0b18', border: '1px solid #f59e0b44', borderRadius: 12, padding: '9px 12px', fontSize: 11.5, color: '#b45309', fontWeight: 700, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 16 }}>⏳</span> در انتظار تأیید — می‌تونی همه‌چیز رو ببینی و پیش‌نویس بسازی، ولی انتشار عمومی رویداد بعد از تأیید فعال می‌شه.
-        </div>
-      )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 13, background: C.accent + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>☕</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 800 }}>{biz.cafes ? biz.cafes.name : 'کافه'}</div>
-          <div style={{ fontSize: 11, color: C.sub }}>{biz.cafes ? biz.cafes.district : ''} · <span style={{ color: isPending ? '#f59e0b' : '#10b981', fontWeight: 700 }}>{isPending ? '⏳ در انتظار تأیید' : '✓ تأییدشده'}</span></div>
-        </div>
-        <span style={{ fontSize: 10, background: biz.plan === 'pro' ? '#f59e0b' : C.chip, color: biz.plan === 'pro' ? '#fff' : C.sub, borderRadius: 99, padding: '3px 10px', fontWeight: 700 }}>{biz.plan === 'pro' ? 'PRO' : 'رایگان'}</span>
-      </div>
-
-      {/* تب‌ها */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto' }}>
-        {TABS.map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 10, border: 'none', background: tab === k ? C.accent : C.chip, color: tab === k ? '#fff' : C.sub, fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>{label}</button>
-        ))}
-      </div>
-
-      {tab === 'overview' && <TabOverview C={C} d={d} />}
-      {tab === 'customers' && <TabCustomers C={C} d={d} />}
-      {tab === 'timing' && <TabTiming C={C} d={d} />}
-      {tab === 'market' && <TabMarket C={C} d={d} />}
-      {tab === 'campaigns' && <TabCampaigns C={C} d={d} biz={biz} isPending={isPending} onReload={onReload} />}
-    </div>
-  )
-}
-
-// ── تب نمای کلی: متریک‌های کلیدی + مقایسه دوره‌ای + بینش عملی ─────────────────
-function TabOverview({ C, d }) {
-  const s = d.stat || {}, p = d.periods || {}
-  const wkChange = p.last_week > 0 ? Math.round(((p.this_week - p.last_week) / p.last_week) * 100) : (p.this_week > 0 ? 100 : 0)
-  const moChange = p.last_month > 0 ? Math.round(((p.this_month - p.last_month) / p.last_month) * 100) : (p.this_month > 0 ? 100 : 0)
-  const metrics = [
-    { label: 'چک‌این امروز', value: s.today_checkins, icon: '📍', accent: C.accent },
-    { label: 'بازدیدکننده امروز', value: s.today_unique, icon: '👤', accent: '#10b981' },
-    { label: 'کل چک‌این‌ها', value: s.total_checkins, icon: '📊', accent: '#8b5cf6' },
-    { label: 'مشتری یکتا (هفته)', value: s.week_unique, icon: '🔄', accent: '#f59e0b' },
-  ]
-  const insights = buildInsights(C, d)
-  return <>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginBottom: 16 }}>
-      {metrics.map(m => (
-        <div key={m.label} style={{ background: C.chip, borderRadius: 14, padding: '14px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}><span style={{ fontSize: 15 }}>{m.icon}</span><span style={{ fontSize: 11, color: C.sub }}>{m.label}</span></div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: m.accent }}>{fa(m.value)}</div>
-        </div>
-      ))}
-    </div>
-
-    {/* مقایسه‌ی دوره‌ای */}
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginBottom: 16 }}>
-      <CompareCard C={C} label="این هفته" value={p.this_week} change={wkChange} prev={p.last_week} prevLabel="هفته قبل" />
-      <CompareCard C={C} label="این ماه" value={p.this_month} change={moChange} prev={p.last_month} prevLabel="ماه قبل" />
-    </div>
-
-    {/* بینش‌های عملی */}
-    {insights.length > 0 && (
-      <div style={{ marginBottom: 6 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8 }}>💡 بینش‌های عملی</div>
-        {insights.map((ins, i) => (
-          <div key={i} style={{ display: 'flex', gap: 10, background: ins.color + '0d', border: '1px solid ' + ins.color + '33', borderRadius: 12, padding: '11px 13px', marginBottom: 8 }}>
-            <span style={{ fontSize: 17 }}>{ins.icon}</span>
-            <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.7 }}>{ins.text}</div>
-          </div>
-        ))}
-      </div>
-    )}
-  </>
-}
-
-function CompareCard({ C, label, value, change, prev, prevLabel }) {
-  const up = change >= 0
-  return (
-    <div style={{ background: C.chip, borderRadius: 14, padding: 14 }}>
-      <div style={{ fontSize: 11, color: C.sub, marginBottom: 6 }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <div style={{ fontSize: 24, fontWeight: 900, color: C.text }}>{fa(value)}</div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: up ? '#10b981' : '#ef4444' }}>{up ? '▲' : '▼'} {fa(Math.abs(change))}٪</div>
-      </div>
-      <div style={{ fontSize: 10, color: C.sub, marginTop: 3 }}>{prevLabel}: {fa(prev)}</div>
-    </div>
-  )
-}
-
-// ── تب مشتری‌ها: CLV، لایه‌های وفاداری، کوهورت بازگشت ────────────────────────
-function TabCustomers({ C, d }) {
-  const clv = d.clv || {}, co = d.cohort || {}, ret = d.retention || {}
-  const tiers = [
-    { label: 'یک‌بار', value: clv.tier_1visit, color: '#94a3b8' },
-    { label: '۲ تا ۴ بار', value: clv.tier_2to4, color: '#3b82f6' },
-    { label: '۵ تا ۹ بار', value: clv.tier_5to9, color: '#8b5cf6' },
-    { label: '۱۰+ (وفادار)', value: clv.tier_loyal, color: '#10b981' },
-  ]
-  const totalTier = tiers.reduce((a, t) => a + (t.value || 0), 0)
-  const new30 = co.new_30d || 0, ret30 = co.new_30d_returned || 0
-  return <>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginBottom: 16 }}>
-      <BigStat C={C} label="میانگین دفعات بازگشت" value={clv.avg_visits_per_customer} suffix="بار" accent="#8b5cf6" hint="هر مشتری چند بار میاد" />
-      <BigStat C={C} label="وفادارترین مشتری" value={clv.top_customer_visits} suffix="بار" accent="#10b981" hint="بیشترین دفعات یک نفر" />
-    </div>
-
-    {/* لایه‌های وفاداری */}
-    <div style={{ background: C.chip, borderRadius: 14, padding: 14, marginBottom: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 12 }}>لایه‌های وفاداری مشتری</div>
-      {tiers.map(t => (
-        <div key={t.label} style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 4 }}>
-            <span style={{ color: C.sub }}>{t.label}</span>
-            <span style={{ color: C.text, fontWeight: 700 }}>{fa(t.value)} نفر ({fa(pct(t.value, totalTier))}٪)</span>
-          </div>
-          <div style={{ height: 7, background: C.border, borderRadius: 99, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: pct(t.value, totalTier) + '%', background: t.color, borderRadius: 99 }} />
-          </div>
-        </div>
-      ))}
-    </div>
-
-    {/* کوهورت بازگشت مشتری جدید */}
-    <div style={{ background: C.chip, borderRadius: 14, padding: 14, marginBottom: 8 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>نرخ بازگشت مشتری جدید (۳۰ روز)</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <DonutChart C={C} pct={pct(ret30, new30)} color="#10b981" />
-        <div style={{ flex: 1, fontSize: 12, color: C.sub, lineHeight: 1.8 }}>
-          از <b style={{ color: C.text }}>{fa(new30)}</b> مشتری جدید این ماه، <b style={{ color: '#10b981' }}>{fa(ret30)}</b> نفر دوباره برگشتن.
-          <div style={{ marginTop: 6 }}>فعال (۷ روز): <b style={{ color: C.accent }}>{fa(co.active_7d)}</b> · در خطر ریزش: <b style={{ color: '#ef4444' }}>{fa(co.churned)}</b></div>
-        </div>
-      </div>
-    </div>
-  </>
-}
-
-// ── تب زمان‌بندی: نمودار روزانه، ساعت، روز هفته ──────────────────────────────
-function TabTiming({ C, d }) {
-  const hasData = (d.daily && d.daily.length) || (d.hourly && d.hourly.length)
-  if (!hasData) return <NoData C={C} />
-  return <>
-    {d.daily && d.daily.length > 0 && <ChartBox C={C} title="روند چک‌این (۳۰ روز)"><LineChart C={C} data={d.daily.map(x => ({ y: x.checkins }))} color={C.accent} /></ChartBox>}
-    {d.hourly && d.hourly.length > 0 && <ChartBox C={C} title="ساعت‌های پیک"><BarChart C={C} data={hourBuckets(d.hourly)} color="#8b5cf6" labelEvery={3} /></ChartBox>}
-    {d.weekday && d.weekday.length > 0 && <ChartBox C={C} title="شلوغی روزهای هفته"><BarChart C={C} data={weekdayBuckets(d.weekday)} color="#f59e0b" labelEvery={1} /></ChartBox>}
-  </>
-}
-
-// ── تب بازار: رتبه در منطقه، کلن‌ها، هم‌بازدیدی ──────────────────────────────
-function TabMarket({ C, d }) {
-  const r = d.rank || {}
-  return <>
-    {/* رتبه در منطقه */}
-    <div style={{ background: 'linear-gradient(135deg,' + C.accent + '18,' + C.accent + '05)', border: '1px solid ' + C.accent + '33', borderRadius: 14, padding: 16, marginBottom: 16, textAlign: 'center' }}>
-      <div style={{ fontSize: 11, color: C.sub, marginBottom: 4 }}>رتبه‌ی کافه‌ت در {r.district || 'منطقه'}</div>
-      <div style={{ fontSize: 34, fontWeight: 900, color: C.accent }}>{fa(r.rank_in_district)}<span style={{ fontSize: 15, color: C.sub, fontWeight: 500 }}> از {fa(r.total_in_district)}</span></div>
-      <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>بر اساس چک‌این ۳۰ روز اخیر</div>
-    </div>
-
-    {/* کلن‌های مشتری */}
-    {d.clans && d.clans.length > 0 && (
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🛡️ کلن‌های پرتکرار مشتری‌هات</div>
-        {d.clans.map((c, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.chip, borderRadius: 12, padding: '10px 12px', marginBottom: 7 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: c.color || '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>{c.emblem || '⚔️'}</div>
-            <div style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{c.clan_name}</div>
-            <div style={{ fontSize: 11, color: C.sub }}>{fa(c.members_visited)} عضو · {fa(c.total_checkins)} چک‌این</div>
-          </div>
-        ))}
-      </div>
-    )}
-
-    {/* هم‌بازدیدی */}
-    {d.covisit && d.covisit.length > 0 && (
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>🔗 مشتری‌هات کجای دیگه می‌رن</div>
-        <div style={{ fontSize: 11, color: C.sub, marginBottom: 10, lineHeight: 1.6 }}>کافه‌هایی که مشتری‌های مشترک با تو دارن (بینش رقابتی و سلیقه)</div>
-        {d.covisit.map((c, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.chip, borderRadius: 12, padding: '10px 12px', marginBottom: 7 }}>
-            <span style={{ fontSize: 16 }}>☕</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{c.other_cafe_name}</div>
-              <div style={{ fontSize: 10, color: C.sub }}>{c.other_district}</div>
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: C.accent }}>{fa(c.shared_customers)} مشترک</div>
-          </div>
-        ))}
-      </div>
-    )}
-    {(!d.clans || !d.clans.length) && (!d.covisit || !d.covisit.length) && <NoData C={C} />}
-  </>
-}
-
-// ── تب کمپین‌ها: Quest دوطرفه + نگارخانه ─────────────────────────────────────
-const RARITY_LABEL = { common: 'معمولی', rare: 'کمیاب', epic: 'حماسی', legendary: 'افسانه‌ای' }
-const RARITY_COLOR = { common: '#94a3b8', rare: '#3b82f6', epic: '#8b5cf6', legendary: '#f59e0b' }
-const COLLECTIBLE_ICONS = ['💎','🏆','🥇','🥈','🥉','⚔️','🛡️','📖','👑','🔮','🎖️','🪙','🍵','☕','🍰','🧁','🍫','🎁','🌟','⭐','🔥','❄️','🌙','☀️','🍀','🎯','🎪','🎨','🗝️','⚡','💰','🏅','🧿','🎗️','🍯','🥂']
-const CATEGORY_LABEL = { general: 'عمومی', drink: 'نوشیدنی', food: 'غذا', discount: 'تخفیف', event: 'رویداد', collectible: 'کالکشن' }
-const CATEGORY_ICON = { general: '🎯', drink: '☕', food: '🍰', discount: '🏷️', event: '🎉', collectible: '💎' }
-
-function TabCampaigns({ C, d, biz, isPending, onReload }) {
-  const [showForm, setShowForm] = useState(false)
-  const [redeemInput, setRedeemInput] = useState('')
-  const [redeemMsg, setRedeemMsg] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const statsMap = {}
-  ;(d.qstats || []).forEach(s => { statsMap[s.quest_id] = s })
-
-  async function toggleActive(q) {
-    const s = getSession()
-    if (!s || !s.access_token) return
-    setBusy(true)
-    const res = await fetch(SB_URL + '/rest/v1/rpc/set_quest_active', {
-      method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_quest_id: q.id, p_active: !q.active }),
-    }).then(r => r.json()).catch(() => null)
-    setBusy(false)
-    if (res && res.ok === false && res.error === 'not_verified') {
-      setRedeemMsg({ ok: false, text: 'اول باید کافه‌ت تأیید بشه تا بتونی رویداد رو فعال کنی' })
-    }
-    onReload && onReload()
-  }
-
-  async function doRedeem() {
-    if (!redeemInput.trim()) return
-    const s = getSession()
-    if (!s || !s.access_token) return
-    setBusy(true)
-    const res = await fetch(SB_URL + '/rest/v1/rpc/redeem_code', {
-      method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_code: redeemInput.trim() }),
-    }).then(r => r.json()).catch(() => null)
-    setBusy(false)
-    if (res && res.ok) { setRedeemMsg({ ok: true, text: 'تأیید شد ✅ ' + res.reward }); setRedeemInput('') }
-    else {
-      const errMap = { not_found: 'کد پیدا نشد', already_used: 'قبلاً مصرف شده', expired: 'منقضی شده', not_authorized: 'این کد مال کافه‌ی تو نیست' }
-      setRedeemMsg({ ok: false, text: errMap[res && res.error] || 'خطا' })
-    }
-  }
-
-  return <>
-    {/* جعبه‌ی تأیید کد مشتری */}
-    <div style={{ background: C.chip, borderRadius: 14, padding: 14, marginBottom: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🎟️ تأیید کد جایزه‌ی مشتری</div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={redeemInput} onChange={e => setRedeemInput(e.target.value.toUpperCase())} placeholder="مثلاً A1B2C3D4"
-          style={{ flex: 1, background: C.card, border: '1px solid ' + C.border, borderRadius: 10, padding: '10px 12px', fontSize: 13, color: C.text, fontFamily: 'inherit' }} />
-        <button disabled={busy} onClick={doRedeem} style={{ background: C.accent, color: '#fff', border: 'none', borderRadius: 10, padding: '0 16px', fontWeight: 700, fontSize: 13 }}>تأیید</button>
-      </div>
-      {redeemMsg && <div style={{ fontSize: 12, marginTop: 8, color: redeemMsg.ok ? '#10b981' : '#ef4444', fontWeight: 700 }}>{redeemMsg.text}</div>}
-    </div>
-
-    {/* لیست رویدادها/کمپین‌ها */}
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-      <div style={{ fontSize: 13, fontWeight: 700 }}>رویدادها و آیتم‌های تو</div>
-      <button onClick={() => setShowForm(v => !v)} style={{ background: showForm ? C.chip : C.accent, color: showForm ? C.text : '#fff', border: 'none', borderRadius: 10, padding: '7px 14px', fontSize: 12, fontWeight: 700 }}>{showForm ? 'بستن' : '+ ساخت پیش‌نویس'}</button>
-    </div>
-
-    {isPending && <div style={{ fontSize: 11, color: '#b45309', marginBottom: 10 }}>الان به‌صورت پیش‌نویس (غیرفعال) ذخیره می‌شه. بعد از تأیید ادمین، از همین لیست دکمه‌ی «فعال» رو بزن تا برای کاربرها زنده بشه.</div>}
-
-    {showForm && <NewQuestForm C={C} biz={biz} onDone={() => { setShowForm(false); onReload && onReload() }} />}
-
-    {(!d.quests || d.quests.length === 0) && !showForm && (
-      <div style={{ textAlign: 'center', color: C.sub, fontSize: 12, padding: '24px 0' }}>هنوز کمپینی نساختی. با «+ کمپین جدید» شروع کن.</div>
-    )}
-
-    {(d.quests || []).map(q => {
-      const st = statsMap[q.id] || {}
-      return (
-        <div key={q.id} style={{ background: C.chip, borderRadius: 14, padding: 14, marginBottom: 10, opacity: q.active ? 1 : 0.55 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div style={{ fontSize: 22 }}>{q.icon || '🎯'}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 800 }}>{q.title}</div>
-              <div style={{ fontSize: 11, color: C.sub }}>{q.reward_label}{q.reward_xp > 0 ? ' · +' + fa(q.reward_xp) + ' XP' : ''}</div>
-            </div>
-            <button disabled={busy} onClick={() => toggleActive(q)} style={{ fontSize: 10, fontWeight: 700, border: 'none', borderRadius: 8, padding: '6px 10px', background: q.active ? '#10b98122' : C.border, color: q.active ? '#10b981' : C.sub }}>{q.active ? 'فعال' : 'غیرفعال'}</button>
-          </div>
-          {q.reward_collectible_code && (
-            <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>🎁 جایزه‌ی کلکسیونی متصل به این کمپینه</div>
-          )}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, background: C.border, borderRadius: 99, padding: '3px 9px', color: C.sub }}>{CATEGORY_ICON[q.category] || '🎯'} {CATEGORY_LABEL[q.category] || 'عمومی'}</span>
-            {q.discount_pct > 0 && <span style={{ fontSize: 10, background: '#10b98122', borderRadius: 99, padding: '3px 9px', color: '#10b981', fontWeight: 700 }}>🏷️ {fa(q.discount_pct)}٪ تخفیف</span>}
-          </div>
-          <div style={{ display: 'flex', gap: 14, fontSize: 11, color: C.sub }}>
-            <span>✅ {fa(st.completions || 0)} تکمیل</span>
-            <span>🎟️ {fa(st.codes_issued || 0)} کد صادرشده</span>
-            <span>🏁 {fa(st.redemptions_used || 0)} مصرف‌شده</span>
-          </div>
-        </div>
-      )
-    })}
-  </>
-}
-
-function NewQuestForm({ C, biz, onDone }) {
-  const [f, setF] = useState({
-    title: '', description: '', icon: '🎯', condition_type: 'checkin', target_count: 1,
-    reward_label: '', reward_xp: 0, collectible_title: '', collectible_icon: '💎', collectible_rarity: 'common',
-    category: 'general', discount_pct: '',
+  const visible = defs.filter(d => {
+    if (filter === 'owned') return !!owned[d.code]
+    if (filter === 'locked') return !owned[d.code]
+    if (filter === 'platform') return d.source === 'platform'
+    if (filter === 'business') return d.source === 'business'
+    return true
   })
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState(null)
-  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }))
+  const ownedCount = defs.filter(d => owned[d.code]).length
+  const pct = defs.length ? Math.round(ownedCount / defs.length * 100) : 0
 
-  async function submit() {
-    if (!f.title.trim() || !f.reward_label.trim()) { setErr('عنوان و جایزه رو پر کن'); return }
-    const s = getSession()
-    if (!s || !s.access_token) return
-    setBusy(true); setErr(null)
-    const res = await fetch(SB_URL + '/rest/v1/rpc/create_quest', {
-      method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        p_business_id: biz.id, p_cafe_id: biz.cafe_id, p_title: f.title.trim(), p_description: f.description.trim() || null,
-        p_icon: f.icon, p_condition_type: f.condition_type, p_target_count: Number(f.target_count) || 1,
-        p_reward_type: 'discount', p_reward_label: f.reward_label.trim(), p_reward_xp: Number(f.reward_xp) || 0,
-        p_collectible_title: f.collectible_title.trim() || null, p_collectible_icon: f.collectible_icon, p_collectible_rarity: f.collectible_rarity,
-        p_category: f.category, p_discount_pct: f.discount_pct ? Number(f.discount_pct) : null,
-      }),
-    }).then(r => r.json()).catch(() => null)
-    setBusy(false)
-    if (res && res.ok) onDone && onDone()
-    else setErr('ساخت کمپین شکست خورد')
+  // ── از کدوم کافه گرفتیش؟ ────────────────────────────────────────────────
+  // فقط از داده‌ی واقعی خونده می‌شه. اگه ردیف award ستون cafe_id نداشته باشه،
+  // سراغ خودِ تعریف آیتم می‌ریم (آیتم‌های کمپینی cafe_id دارن). اگه هیچ‌کدوم
+  // نبود، چیزی نشون نمی‌دیم — به‌جای اینکه اسم الکی بسازیم.
+  function originOf(def) {
+    const aw = owned[def.code]
+    // مسیر واقعی: awards.business_id → businesses.cafe_id → cafes.name
+    const viaBiz = aw && aw.business_id ? bizMap[aw.business_id] : null
+    const cid = viaBiz || (aw && aw.cafe_id) || def.cafe_id || null
+    return cid ? cafeMap[cid] : null
   }
 
-  const inputStyle = { width: '100%', background: C.card, border: '1px solid ' + C.border, borderRadius: 10, padding: '10px 12px', fontSize: 13, color: C.text, fontFamily: 'inherit', marginBottom: 10 }
-  const labelStyle = { fontSize: 11, color: C.sub, marginBottom: 4, display: 'block' }
+  function openCard(d) { setFlipped(false); setSelected(d) }
 
   return (
-    <div style={{ background: C.card, border: '1px solid ' + C.border, borderRadius: 14, padding: 14, marginBottom: 14 }}>
-      <label style={labelStyle}>عنوان کمپین</label>
-      <input style={inputStyle} value={f.title} onChange={e => set('title', e.target.value)} placeholder="مثلاً: قهوه پنج‌شنبه‌ها" />
+    <div style={S.page}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes glFadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes glShine{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+        @keyframes glFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        .gl-cell{animation:glFadeUp .4s ease both}
+        .gl-flip{transition:transform .65s cubic-bezier(.4,.2,.2,1);transform-style:preserve-3d}
+        .gl-flip.on{transform:rotateY(180deg)}
+        .gl-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+        .gl-back{transform:rotateY(180deg)}
+      `}} />
 
-      <label style={labelStyle}>توضیح (اختیاری)</label>
-      <input style={inputStyle} value={f.description} onChange={e => set('description', e.target.value)} placeholder="جزئیات بیشتر برای مشتری" />
-
-      <label style={labelStyle}>دسته‌بندی (برای فیلتر در صفحه‌ی رویدادها)</label>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        {Object.keys(CATEGORY_LABEL).map(k => (
-          <button key={k} onClick={() => set('category', k)} style={{ padding: '7px 12px', borderRadius: 9, border: 'none', background: f.category === k ? C.accent : C.chip, color: f.category === k ? '#fff' : C.sub, fontSize: 11.5, fontWeight: 700 }}>{CATEGORY_ICON[k]} {CATEGORY_LABEL[k]}</button>
-        ))}
+      <div style={S.topbar}>
+        <a href="/" style={S.backBtn}>‹ {L.map}</a>
+        <div style={S.brand}>{ICON.gallery} {L.gallery}</div>
+        <div style={{ width: 64 }} />
       </div>
 
-      <label style={labelStyle}>درصد تخفیف (اختیاری — اگه رویداد تخفیفیه)</label>
-      <input style={inputStyle} type="number" min={0} max={100} value={f.discount_pct} onChange={e => set('discount_pct', e.target.value)} placeholder="مثلاً ۱۰" />
-
-      <label style={labelStyle}>شرط انجام</label>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-        <button onClick={() => set('condition_type', 'checkin')} style={{ flex: 1, padding: '9px', borderRadius: 10, border: 'none', background: f.condition_type === 'checkin' ? C.accent : C.chip, color: f.condition_type === 'checkin' ? '#fff' : C.sub, fontSize: 12, fontWeight: 700 }}>یک چک‌این</button>
-        <button onClick={() => set('condition_type', 'loyalty')} style={{ flex: 1, padding: '9px', borderRadius: 10, border: 'none', background: f.condition_type === 'loyalty' ? C.accent : C.chip, color: f.condition_type === 'loyalty' ? '#fff' : C.sub, fontSize: 12, fontWeight: 700 }}>چند بار (وفاداری)</button>
-      </div>
-
-      {f.condition_type === 'loyalty' && <>
-        <label style={labelStyle}>چند بار چک‌این لازمه؟</label>
-        <input style={inputStyle} type="number" min={2} value={f.target_count} onChange={e => set('target_count', e.target.value)} />
-      </>}
-
-      <label style={labelStyle}>متن جایزه (چیزی که مشتری می‌گیره)</label>
-      <input style={inputStyle} value={f.reward_label} onChange={e => set('reward_label', e.target.value)} placeholder="مثلاً: یک قهوه رایگان" />
-
-      <label style={labelStyle}>XP اضافه (اختیاری)</label>
-      <input style={inputStyle} type="number" min={0} value={f.reward_xp} onChange={e => set('reward_xp', e.target.value)} />
-
-      <div style={{ borderTop: '1px dashed ' + C.border, margin: '4px 0 12px', paddingTop: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🎁 آیتم کلکسیونی (اختیاری — برای نگارخانه)</div>
-        <label style={labelStyle}>اسم آیتم (خالی بذار = بدون آیتم)</label>
-        <input style={inputStyle} value={f.collectible_title} onChange={e => set('collectible_title', e.target.value)} placeholder="مثلاً: الماس پنج‌شنبه" />
-        {f.collectible_title.trim() && <>
-          <label style={labelStyle}>آیکون</label>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-            {COLLECTIBLE_ICONS.map(ic => (
-              <button key={ic} onClick={() => set('collectible_icon', ic)} style={{ width: 36, height: 36, borderRadius: 10, border: f.collectible_icon === ic ? '2px solid ' + C.accent : '1px solid ' + C.border, background: C.chip, fontSize: 17 }}>{ic}</button>
-            ))}
+      <div style={S.container}>
+        {/* هدر قهرمان با نوار پیشرفت */}
+        <div style={S.heroCard}>
+          <div style={S.heroShine} />
+          <div style={{ fontSize: 12, color: C.sub, position: 'relative' }}>{L.gallerySub}</div>
+          <div style={{ fontSize: 30, fontWeight: 900, color: C.text, marginTop: 2, position: 'relative' }}>
+            {fa(ownedCount)}<span style={{ fontSize: 15, color: C.sub, fontWeight: 500 }}> از {fa(defs.length)}</span>
           </div>
-          <label style={labelStyle}>کمیابی</label>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-            {Object.keys(RARITY_LABEL).map(r => (
-              <button key={r} onClick={() => set('collectible_rarity', r)} style={{ flex: 1, padding: '8px', borderRadius: 9, border: 'none', background: f.collectible_rarity === r ? RARITY_COLOR[r] : C.chip, color: f.collectible_rarity === r ? '#fff' : C.sub, fontSize: 11, fontWeight: 700 }}>{RARITY_LABEL[r]}</button>
-            ))}
+          <div style={S.heroTrack}>
+            <div style={{ ...S.heroFill, width: pct + '%' }} />
           </div>
-        </>}
+          <div style={{ fontSize: 10.5, color: C.sub, marginTop: 6, position: 'relative' }}>
+            {pct === 100 ? '🏆 کاملش کردی!' : fa(pct) + '٪ کامل — ' + fa(defs.length - ownedCount) + ' تا مونده'}
+          </div>
+        </div>
+
+        <div style={S.filterRow}>
+          {[['all', 'همه'], ['owned', 'مال من'], ['locked', 'قفل'], ['platform', 'اکتشافی'], ['business', 'کمپینی']].map(([k, label]) => (
+            <button key={k} onClick={() => setFilter(k)} style={filter === k ? S.filterActive : S.filter}>{label}</button>
+          ))}
+        </div>
+
+        {loading ? <div style={{ textAlign: 'center', color: C.sub, padding: '50px 0' }}>در حال بارگذاری…</div> : (
+          visible.length === 0
+            ? <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '40px 0' }}>چیزی اینجا نیست.</div>
+            : <div style={S.grid}>
+                {visible.map((d, i) => {
+                  const isOwned = !!owned[d.code]
+                  const R = rarityOf(d.rarity)
+                  return (
+                    <button key={d.code} className="gl-cell" onClick={() => openCard(d)}
+                      style={{ ...S.cell, background: isOwned ? R.grad : RARITY_LOCKED, animationDelay: Math.min(i * 28, 600) + 'ms', boxShadow: isOwned ? '0 4px 14px ' + R.color + '55' : 'none' }}>
+                      <div style={{ fontSize: 38, filter: isOwned ? 'none' : 'grayscale(1) opacity(.65)' }}>{isOwned ? d.icon : '🔒'}</div>
+                      {isOwned && <div style={S.cellTitle}>{d.title}</div>}
+                      {isOwned && <div style={S.cellCorner} />}
+                    </button>
+                  )
+                })}
+              </div>
+        )}
       </div>
 
-      {err && <div style={{ color: '#ef4444', fontSize: 12, marginBottom: 8 }}>{err}</div>}
-      <button disabled={busy} onClick={submit} style={{ width: '100%', background: C.accent, color: '#fff', border: 'none', borderRadius: 12, padding: '12px', fontWeight: 700, fontSize: 13.5 }}>{busy ? '...' : 'ساخت کمپین'}</button>
+      {/* ── کارت چرخان ─────────────────────────────────────────────────── */}
+      {selected && (() => {
+        const isOwned = !!owned[selected.code]
+        const aw = owned[selected.code]
+        const R = rarityOf(selected.rarity)
+        const origin = originOf(selected)
+        return (
+          <div onClick={() => setSelected(null)} style={S.overlay}>
+            <div onClick={e => e.stopPropagation()} style={{ perspective: 1400, width: '100%', maxWidth: 330 }}>
+              <div className={'gl-flip' + (flipped ? ' on' : '')}
+                onClick={() => isOwned && setFlipped(f => !f)}
+                style={{ position: 'relative', width: '100%', aspectRatio: '3/4', cursor: isOwned ? 'pointer' : 'default' }}>
+
+                {/* ── روی کارت ── */}
+                <div className="gl-face" style={{ background: isOwned ? R.grad : RARITY_LOCKED, boxShadow: '0 20px 60px rgba(0,0,0,.45)', border: '2px solid rgba(255,255,255,.35)' }}>
+                  <div style={{ fontSize: 78, animation: isOwned ? 'glFloat 3s ease-in-out infinite' : 'none', filter: isOwned ? 'drop-shadow(0 6px 14px rgba(0,0,0,.3))' : 'grayscale(1) opacity(.7)' }}>
+                    {isOwned ? selected.icon : '🔒'}
+                  </div>
+                  <div style={{ fontSize: 19, fontWeight: 900, color: '#fff', textAlign: 'center', marginTop: 14, textShadow: '0 2px 8px rgba(0,0,0,.35)' }}>
+                    {isOwned ? selected.title : '؟؟؟'}
+                  </div>
+                  <span style={{ marginTop: 10, fontSize: 11, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.28)', borderRadius: 99, padding: '4px 13px', border: '1px solid rgba(255,255,255,.3)' }}>
+                    {R.label}
+                  </span>
+                  {isOwned
+                    ? <div style={{ position: 'absolute', bottom: 16, fontSize: 10.5, color: 'rgba(255,255,255,.9)', fontWeight: 700 }}>👆 بزن تا برگرده</div>
+                    : <div style={{ position: 'absolute', bottom: 16, fontSize: 10.5, color: C.sub, textAlign: 'center', padding: '0 20px' }}>هنوز نگرفتیش</div>}
+                </div>
+
+                {/* ── پشت کارت: جزئیات واقعی ── */}
+                <div className="gl-face gl-back" style={{ background: C.card, border: '2px solid ' + R.color, boxShadow: '0 20px 60px rgba(0,0,0,.45)', justifyContent: 'flex-start', gap: 0 }}>
+                  <div style={{ fontSize: 34, marginBottom: 4 }}>{selected.icon}</div>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: C.text, textAlign: 'center' }}>{selected.title}</div>
+                  <span style={{ marginTop: 7, fontSize: 10, fontWeight: 800, color: '#fff', background: R.color, borderRadius: 99, padding: '3px 11px' }}>{R.label}</span>
+
+                  <div style={{ width: '100%', marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <Row C={C} k="از کجا" v={origin ? '☕ ' + origin.name + (origin.district ? ' · منطقه ' + origin.district : '') : (SOURCE_LABEL[selected.source] || '—')} />
+                    {aw && aw.earned_at && <Row C={C} k="کِی" v={'📅 ' + new Date(aw.earned_at).toLocaleDateString('fa-IR') + ' · ' + new Date(aw.earned_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran' })} />}
+                    <Row C={C} k="نوع" v={SOURCE_LABEL[selected.source] || selected.source || '—'} />
+                    {aw && aw.code && <Row C={C} k="کد" v={aw.code} mono />}
+                  </div>
+
+                  {selected.description && (
+                    <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.8, textAlign: 'center', marginTop: 12, padding: '0 4px' }}>{selected.description}</div>
+                  )}
+                  <div style={{ position: 'absolute', bottom: 14, fontSize: 10, color: C.sub }}>👆 بزن تا برگرده</div>
+                </div>
+              </div>
+
+              <button onClick={() => setSelected(null)} style={S.closeBtn}>بستن</button>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
 
-// بینش‌های عملی («اگه این، پس آن») — قلب حرفه‌ای‌بودن
-function buildInsights(C, d) {
-  const out = []
-  const p = d.periods || {}, co = d.cohort || {}, hourly = d.hourly || [], weekday = d.weekday || []
-  // رشد/افت هفتگی
-  if (p.last_week > 0) {
-    const ch = Math.round(((p.this_week - p.last_week) / p.last_week) * 100)
-    if (ch <= -15) out.push({ icon: '📉', color: '#ef4444', text: 'چک‌این این هفته ' + fa(Math.abs(ch)) + '٪ کمتر از هفته‌ی قبله. یه کمپین یا quest کوتاه‌مدت می‌تونه برش گردونه.' })
-    else if (ch >= 20) out.push({ icon: '🚀', color: '#10b981', text: 'رشد ' + fa(ch) + '٪ نسبت به هفته‌ی قبل! هرکاری این هفته کردی جواب داده — ادامه بده.' })
-  }
-  // ریزش
-  if (co.churned > 0 && (co.churned > (co.active_7d || 0))) {
-    out.push({ icon: '⚠️', color: '#f59e0b', text: fa(co.churned) + ' مشتری بیش از ۹۰ روزه نیومدن. یه quest «دلتنگتیم» با پاداش ویژه برای برگردوندنشون بذار.' })
-  }
-  // ساعت خلوت
-  if (hourly.length > 3) {
-    const sorted = [...hourly].sort((a, b) => a.checkins - b.checkins)
-    const quiet = sorted[0]
-    if (quiet && quiet.hour >= 8 && quiet.hour <= 20) out.push({ icon: '⏰', color: '#8b5cf6', text: 'ساعت ' + fa(quiet.hour) + ' خلوت‌ترین زمانته. یه quest «ساعت طلایی» بذار تا این ساعت پر شه.' })
-  }
-  // روز خلوت
-  if (weekday.length > 3) {
-    const map = {}; weekday.forEach(w => map[w.weekday] = w.checkins)
-    let minDay = 0, minVal = Infinity
-    for (let i = 0; i < 7; i++) { const v = map[i] || 0; if (v < minVal) { minVal = v; minDay = i } }
-    out.push({ icon: '📅', color: '#3b82f6', text: WEEKDAYS[minDay] + '‌ها خلوت‌ترین روزته. کمپین مخصوص ' + WEEKDAYS[minDay] + ' می‌تونه فروش رو متعادل کنه.' })
-  }
-  return out.slice(0, 3)
-}
-
-function BigStat({ C, label, value, suffix, accent, hint }) {
+function Row({ C, k, v, mono }) {
   return (
-    <div style={{ background: C.chip, borderRadius: 14, padding: '14px 12px' }}>
-      <div style={{ fontSize: 11, color: C.sub, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 900, color: accent }}>{fa(value)} <span style={{ fontSize: 12, color: C.sub, fontWeight: 500 }}>{suffix}</span></div>
-      {hint && <div style={{ fontSize: 10, color: C.sub, marginTop: 3 }}>{hint}</div>}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.chip, borderRadius: 10, padding: '7px 11px' }}>
+      <span style={{ fontSize: 10, color: C.sub, flexShrink: 0, minWidth: 38 }}>{k}</span>
+      <span style={{ fontSize: 11.5, fontWeight: 700, color: C.text, flex: 1, textAlign: 'left', direction: mono ? 'ltr' : 'rtl', letterSpacing: mono ? 1 : 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
     </div>
   )
 }
 
-function NoData({ C }) {
-  return <div style={{ textAlign: 'center', color: C.sub, fontSize: 12, padding: '30px 0' }}>هنوز داده‌ی کافی نیست. با چک‌این بیشتر، این بخش پر می‌شه.</div>
-}
-
-function hourBuckets(hourly) {
-  const map = {}; hourly.forEach(h => map[h.hour] = h.checkins)
-  return Array.from({ length: 24 }, (_, i) => ({ label: fa(i), y: map[i] || 0 }))
-}
-function weekdayBuckets(weekday) {
-  const map = {}; weekday.forEach(w => map[w.weekday] = w.checkins)
-  return WEEKDAYS.map((name, i) => ({ label: name, y: map[i] || 0 }))
-}
-
-function ChartBox({ C, title, children }) {
-  return <div style={{ marginBottom: 16 }}><div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>{title}</div><div style={{ background: C.chip, borderRadius: 14, padding: '14px 10px 8px' }}>{children}</div></div>
-}
-
-function LineChart({ C, data, color }) {
-  const W = 300, H = 90, pad = 6
-  if (!data.length) return null
-  const ys = data.map(d => d.y)
-  const max = Math.max.apply(null, ys.concat([1]))
-  const step = data.length > 1 ? (W - pad * 2) / (data.length - 1) : 0
-  const pts = data.map((d, i) => [pad + i * step, H - pad - (d.y / max) * (H - pad * 2)])
-  const path = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ')
-  const area = path + ' L' + pts[pts.length - 1][0].toFixed(1) + ' ' + (H - pad) + ' L' + pts[0][0].toFixed(1) + ' ' + (H - pad) + ' Z'
-  return (
-    <svg viewBox={'0 0 ' + W + ' ' + H} style={{ width: '100%', height: 'auto', display: 'block' }}>
-      <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity="0.25" /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
-      <path d={area} fill="url(#lg)" /><path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="1.6" fill={color} />)}
-    </svg>
-  )
-}
-
-function BarChart({ C, data, color, labelEvery = 1 }) {
-  const W = 300, H = 100, pad = 6, labelH = 16
-  const max = Math.max.apply(null, data.map(d => d.y).concat([1]))
-  const bw = (W - pad * 2) / data.length
-  return (
-    <svg viewBox={'0 0 ' + W + ' ' + H} style={{ width: '100%', height: 'auto', display: 'block' }}>
-      {data.map((d, i) => {
-        const h = (d.y / max) * (H - pad - labelH); const x = pad + i * bw; const y = H - labelH - h
-        return <g key={i}>
-          <rect x={x + bw * 0.15} y={y} width={bw * 0.7} height={Math.max(h, 0.5)} rx="1.5" fill={color} opacity={d.y > 0 ? 0.9 : 0.25} />
-          {i % labelEvery === 0 && <text x={x + bw / 2} y={H - 4} fontSize="7" fill={C.sub} textAnchor="middle" fontFamily="Estedad">{d.label}</text>}
-        </g>
-      })}
-    </svg>
-  )
-}
-
-function DonutChart({ C, pct: pctVal, color }) {
-  const r = 26, sw = 7, cx = 32, cy = 32
-  const circ = 2 * Math.PI * r; const off = circ * (1 - (pctVal || 0) / 100)
-  return (
-    <svg width="64" height="64" viewBox="0 0 64 64" style={{ flexShrink: 0 }}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.border} strokeWidth={sw} />
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={off} transform={'rotate(-90 ' + cx + ' ' + cy + ')'} />
-      <text x={cx} y={cy + 4} fontSize="14" fontWeight="800" fill={C.text} textAnchor="middle" fontFamily="Estedad">{fa(pctVal)}٪</text>
-    </svg>
-  )
-}
+const mkS = (C) => ({
+  page: { minHeight: '100vh', background: C.bg, fontFamily: 'inherit', direction: 'rtl', color: C.text, paddingBottom: 40 },
+  topbar: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: C.glassDark, backdropFilter: 'blur(20px)', borderBottom: '1px solid ' + C.border },
+  backBtn: { width: 64, fontSize: 15, color: C.accent, textDecoration: 'none', fontWeight: 700 },
+  brand: { fontWeight: 800, fontSize: 17, color: C.text },
+  container: { maxWidth: 480, margin: '0 auto', padding: '16px' },
+  heroCard: { position: 'relative', overflow: 'hidden', background: 'linear-gradient(140deg,' + C.accent + '22, ' + C.card + ' 62%)', border: '1.5px solid ' + C.accent + '44', borderRadius: 22, padding: '18px 16px', marginBottom: 14, textAlign: 'center' },
+  heroShine: { position: 'absolute', top: 0, bottom: 0, width: '55%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent)', animation: 'glShine 3.4s ease-in-out infinite' },
+  heroTrack: { position: 'relative', height: 8, background: C.border, borderRadius: 99, overflow: 'hidden', marginTop: 12 },
+  heroFill: { height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,' + C.accent + ',#FFD60A)', transition: 'width .9s cubic-bezier(.2,.9,.3,1)' },
+  filterRow: { display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto', scrollbarWidth: 'none' },
+  filter: { flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: '1px solid ' + C.border, background: C.chip, color: C.sub, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' },
+  filterActive: { flexShrink: 0, padding: '8px 14px', borderRadius: 99, border: 'none', background: C.accent, color: C.accentText, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 },
+  cell: { position: 'relative', aspectRatio: '1', border: 'none', borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontFamily: 'inherit', overflow: 'hidden', padding: '6px 4px' },
+  cellTitle: { fontSize: 9.5, fontWeight: 800, color: '#fff', textAlign: 'center', textShadow: '0 1px 4px rgba(0,0,0,.45)', lineHeight: 1.3, paddingTop: 2 },
+  cellCorner: { position: 'absolute', top: 0, right: 0, width: 0, height: 0, borderTop: '18px solid rgba(255,255,255,.35)', borderLeft: '18px solid transparent' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 },
+  closeBtn: { width: '100%', marginTop: 16, padding: '12px', borderRadius: 14, border: 'none', background: 'rgba(255,255,255,.92)', color: '#111', fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
+})
