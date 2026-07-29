@@ -160,6 +160,7 @@ function TwinLand({ session, onLogout }) {
   const [tab,        setTab]        = useState('map')
   const [panelOpen,  setPanelOpen]  = useState(false)
   const [panelTab,   setPanelTab]   = useState('dashboard')
+  const panelTabsRef = useRef(null)   // نوار تب‌های ساید بار — برای اسکرول افقی با چرخ ماوس
   const [showMenu,   setShowMenu]   = useState(false)
   const [showCity,   setShowCity]   = useState(false)
   const [showMode,   setShowMode]   = useState(false)
@@ -881,6 +882,21 @@ function TwinLand({ session, onLogout }) {
         @keyframes tlCelebGlow{0%,100%{box-shadow:0 0 40px 4px rgba(255,255,255,.06)}50%{box-shadow:0 0 70px 10px rgba(255,255,255,.14)}}
         @keyframes tlShuttle{from{transform:translateX(0)}to{transform:translateX(var(--shift,0px))}}
         .tl-shuttle{animation:tlShuttle var(--dur,8s) ease-in-out 1s infinite alternate}
+        /* ── تعامل: hover و press ملایم و مدرن، بدون افراط ───────────── */
+        @keyframes cpZoom{from{opacity:0;transform:translate(-50%,-50%) scale(.94)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+        .tl-press{transition:transform .16s cubic-bezier(.2,.9,.3,1), box-shadow .2s ease, background .2s ease, border-color .2s ease}
+        .tl-press:active{transform:scale(.975)}
+        @media (hover:hover){
+          .tl-press:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.13)}
+          .tl-row:hover{background:rgba(127,127,127,.10)}
+          .tl-tile:hover{transform:translateY(-3px) scale(1.012);box-shadow:0 12px 28px rgba(0,0,0,.16)}
+        }
+        .tl-row{transition:background .18s ease, transform .16s ease}
+        .tl-row:active{transform:scale(.99)}
+        .tl-tile{transition:transform .2s cubic-bezier(.2,.9,.3,1), box-shadow .25s ease}
+        .tl-tile:active{transform:scale(.98)}
+        .tl-hscroll{overscroll-behavior-x:contain}
+        .tl-hscroll::-webkit-scrollbar{height:0}
         @keyframes tlSpotPulse{0%,100%{box-shadow:0 0 0 100vmax rgba(0,0,0,.62),0 0 0 3px #CCFF00,0 0 18px 3px #CCFF0088}50%{box-shadow:0 0 0 100vmax rgba(0,0,0,.62),0 0 0 3px #CCFF00,0 0 30px 8px #CCFF00cc}}
         @keyframes tlRingPulse{0%{transform:scale(.4);opacity:.9}70%{transform:scale(2.1);opacity:0}100%{transform:scale(2.1);opacity:0}}
         .tl-event-pulse-ring{width:30px;height:30px;border-radius:50%;border:5px solid var(--pulse-color,#1a1a1a);box-shadow:0 0 4px 1px var(--pulse-color,#1a1a1a);animation:tlRingPulse 1.3s ease-out infinite}
@@ -1064,10 +1080,16 @@ function TwinLand({ session, onLogout }) {
               <div onClick={()=>setPanelOpen(false)} style={{position:'absolute',inset:0,zIndex:19,background:'rgba(0,0,0,.25)',backdropFilter:'blur(2px)',WebkitBackdropFilter:'blur(2px)'}}/>
             )}
             <div style={{position:'absolute',top:0,right:0,bottom:0,width:PANEL_W,zIndex:20,background:'linear-gradient(165deg, '+C.accent+'26, transparent 55%), '+C.glassDark,backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderLeft:'1px solid '+C.border,boxShadow:'-4px 0 32px rgba(0,0,0,.12)',display:'flex',flexDirection:'column',animation:panelIsOverlay?'slideUp .3s ease':'fadeIn .2s ease'}}>
-              {/* tabs */}
-              <div style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid '+C.border,overflowX:'auto',scrollbarWidth:'none'}}>
+              {/* tabs — روی ویندوز چرخ ماوس عمودیه و نوار افقی اسکرول نمی‌شد؛
+                   حالا چرخ ماوس به اسکرول افقی ترجمه می‌شه و دو طرفش fade داره
+                   تا معلوم باشه هنوز تب هست. با درگ هم می‌شه کشیدش. */}
+              <div
+                ref={panelTabsRef}
+                onWheel={(e)=>{ if(panelTabsRef.current && Math.abs(e.deltaY)>Math.abs(e.deltaX)){ panelTabsRef.current.scrollLeft -= e.deltaY } }}
+                className="tl-hscroll"
+                style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid '+C.border,overflowX:'auto',scrollbarWidth:'none',cursor:'grab'}}>
                 {[{key:'dashboard',icon:'📊',img:null,imgActive:'/dashboard@256.png',imgInactive:'/dashboard@256_disabled.png',label:'داشبورد'},{key:'missions',icon:'📋',img:'icon_mission',label:'ماموریت'},{key:'rank',icon:'🏆',img:'icon_rank',label:'رتبه'},{key:'clan',icon:'🛡',img:'icon_clan',label:'کلن'},{key:'profile',icon:'👤',img:'icon_profile',label:'پروفایل'}].map(t=>(
-                  <button key={t.key} onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:C.chip,border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?C.accentText:C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
+                  <button key={t.key} className="tl-press" onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:C.chip,border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?C.accentText:C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
                     {t.imgActive
                       ? <img src={panelTab===t.key?t.imgActive:t.imgInactive} alt={t.label} width={19} height={19} style={{objectFit:'contain',display:'block'}}/>
                       : t.img
@@ -1136,15 +1158,15 @@ function TwinLand({ session, onLogout }) {
               {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
               {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
               {key:'logout',icon:ICON.logout,label:L.logout,href:null},
-            ].filter(item=>(!item.adminOnly||isAdmin)&&(!item.smeOnly||accountType==='sme')).map((item,i,arr)=>{
+            ].filter(item=>(!item.adminOnly||isAdmin)&&(!item.smeOnly||accountType==='sme'||isAdmin)).map((item,i,arr)=>{
               const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
               if(item.href){
-                return <a key={item.key} href={item.href} style={style}>
+                return <a key={item.key} className="tl-row" href={item.href} style={style}>
                   {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.label}
                   <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
                 </a>
               }
-              return <button key={item.key} onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='tutorial'){setTutorialReplay(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+              return <button key={item.key} className="tl-row" onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='tutorial'){setTutorialReplay(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
                 {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.key==='backfill'&&backfilling?'در حال پردازش…':item.label}
               </button>
             })}
@@ -1754,14 +1776,21 @@ function MissionsTab({C, cafes, setSelCafe, showToast}) {
   if(quests.length===0){
     return <div style={{padding:'50px 16px',textAlign:'center'}}>
       <div style={{fontSize:40,marginBottom:10}}>🎯</div>
-      <div style={{fontWeight:800,color:C.text,marginBottom:4}}>الان ماموریت/رویداد فعالی نیست</div>
-      <div style={{fontSize:12,color:C.sub}}>کافه‌دارها به‌زودی چیزی منتشر می‌کنن — همین‌جا لحظه‌ای میاد.</div>
+      <div style={{fontWeight:800,color:C.text,marginBottom:4}}>الان {L.questsShort}/رویداد فعالی نیست</div>
+      <div style={{fontSize:12,color:C.sub,marginBottom:14}}>کافه‌دارها به‌زودی چیزی منتشر می‌کنن — همین‌جا لحظه‌ای میاد.</div>
+      <a href={ROUTE.quests} className="tl-press" style={{display:'inline-flex',alignItems:'center',gap:6,background:C.chip,color:C.text,borderRadius:12,padding:'9px 16px',fontSize:12,fontWeight:800,textDecoration:'none'}}>
+        {ICON.quests} مشاهده‌ی کامل {L.quests} ‹
+      </a>
     </div>
   }
 
   return <div style={{padding:'12px 12px 32px'}}>
-    <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>ماموریت‌ها و رویدادهای فعال</div>
-    <div style={{fontSize:11,color:C.sub,marginBottom:14}}>واقعی و لحظه‌ای — همین الان کافه‌دارها منتشرشون کردن</div>
+    <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>{L.quests} و {L.events} فعال</div>
+    <div style={{fontSize:11,color:C.sub,marginBottom:10}}>واقعی و لحظه‌ای — همین الان کافه‌دارها منتشرشون کردن</div>
+    {/* راه مستقیم به صفحه‌ی کامل — قبلاً فقط از ته «رویدادهای داغ» داشبورد پیدا می‌شد */}
+    <a href={ROUTE.quests} className="tl-press" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,background:C.accent,color:C.accentText,borderRadius:12,padding:'10px',fontSize:12.5,fontWeight:800,textDecoration:'none',marginBottom:14}}>
+      {ICON.quests} مشاهده‌ی کامل {L.quests} و {L.events} ‹
+    </a>
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
       {quests.map(q=>{
         const prog=progress[q.id]
@@ -2404,6 +2433,13 @@ async function claimCafe(cafe, showToast){
 
 function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin,showToast}) {
   const color=getColor(cafe.name); const isChecked=checkedIn.has(cafe.id); const isFav=favs.has(cafe.id)
+  // صفحه‌ی پهن (دسکتاپ/مانیتور) → مودال وسط‌چین به‌جای شیتِ تمام‌عرض
+  const [isWide,setIsWide]=useState(false)
+  useEffect(()=>{
+    const check=()=>setIsWide(typeof window!=='undefined' && window.innerWidth>=760)
+    check(); window.addEventListener('resize',check)
+    return ()=>window.removeEventListener('resize',check)
+  },[])
   const xpAmount=cafe.is_top?XP_CONFIG.checkin_top:XP_CONFIG.checkin
   const [cafeEvents,setCafeEvents]=useState([])
   const [evLoading,setEvLoading]=useState(true)
@@ -2456,9 +2492,19 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
       showToast(em[res&&res.error]||'خطا در شرکت','warn')
     }
   }
+  // ── ابعاد ─────────────────────────────────────────────────────────────
+  // موبایل: شیت از پایین (مثل قبل).
+  // دسکتاپ/مانیتور بزرگ: مودال وسط‌چین با عرض ثابت — قبلاً تمام عرض صفحه رو
+  // می‌گرفت و روی مانیتور بزرگ بی‌قواره می‌شد.
+  const sheetStyle = isWide
+    ? {position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'min(92vw,440px)',maxHeight:'86dvh',overflowY:'auto',background:C.card,borderRadius:24,border:'1px solid '+C.border,boxShadow:'0 24px 70px rgba(0,0,0,.4)',animation:'cpZoom .28s cubic-bezier(.2,.9,.3,1)'}
+    : {position:'absolute',bottom:0,left:0,right:0,maxHeight:'88dvh',overflowY:'auto',background:C.card,borderRadius:'24px 24px 0 0',border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}
+
   return <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)'}} onClick={onClose}>
-    <div onClick={(e)=>e.stopPropagation()} style={{position:'absolute',bottom:0,left:0,right:0,maxHeight:'88dvh',overflowY:'auto',background:C.card,borderRadius:'24px 24px 0 0',border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
-      <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'14px auto'}}/>
+    <div onClick={(e)=>e.stopPropagation()} style={sheetStyle}>
+      {isWide
+        ? <button onClick={onClose} style={{position:'sticky',top:10,float:'left',marginRight:10,marginTop:10,zIndex:5,background:C.chip,border:'none',borderRadius:99,width:32,height:32,fontSize:15,color:C.text,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+        : <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'14px auto'}}/>}
       <div style={{padding:'0 18px 16px',display:'flex',alignItems:'center',gap:14,borderBottom:'1px solid '+C.border}}>
         <div style={{width:60,height:60,borderRadius:18,background:color+'18',border:'2.5px solid '+(isChecked?C.green:color)+'66',display:'flex',alignItems:'center',justifyContent:'center',fontSize:30,flexShrink:0}}>{isChecked?'✅':'☕'}</div>
         <div style={{flex:1}}>
