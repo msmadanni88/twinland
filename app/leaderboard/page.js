@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 import { SB_URL, SB_KEY, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile } from '../gameSystem'
 import { L, ICON, fa } from '../labels'
+import { UIStyles, useDragScroll, hscroll, onColor } from '../ui'
 
 export default function LeaderboardPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
@@ -48,6 +49,7 @@ export default function LeaderboardPage() {
 
   return (
     <div style={S.page}>
+      <UIStyles/>
       <style dangerouslySetInnerHTML={{ __html: `
         .lb-row{transition:transform .18s cubic-bezier(.2,.9,.3,1), box-shadow .22s ease, background .2s ease;cursor:default}
         .lb-row:active{transform:scale(.99)}
@@ -101,7 +103,7 @@ export default function LeaderboardPage() {
           {rest.map((p) => {
             const lv = getLevelInfo(p.xp).current
             return (
-              <div key={p.id} className="lb-row" style={{ ...S.row, ...(p.me ? S.rowMe : {}) }}>
+              <div key={p.id} className="lb-row tl-row" style={{ ...S.row, ...(p.me ? S.rowMe : {}) }}>
                 <div style={S.rank}>{p.rank.toLocaleString('fa')}</div>
                 <div style={{ ...S.rowAvatar, borderColor: lv.color }}>{p.avatar}</div>
                 <div style={{ flex: 1 }}>
