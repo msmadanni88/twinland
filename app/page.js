@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { PALETTES, PALETTE_ORDER, DEFAULT_PALETTE, DEFAULT_MODE, buildC, loadPrefs, savePalette, saveMode } from './palettes'
 import AuthGate from './AuthGate'
 import { L, ICON, ROUTE } from './labels'
+import { UIStyles, useDragScroll, hscroll, onColor, isDarkC } from './ui'
 import { LEVELS, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile, subscribeToTables, subscribeToChanges, sortEventsByDistance, fetchMyClans, fetchClanStandings, fetchClanMembers, clanLevel, fetchRegionLeaderboard, fetchRegionClans } from './gameSystem'
 
 const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
@@ -160,7 +161,7 @@ function TwinLand({ session, onLogout }) {
   const [tab,        setTab]        = useState('map')
   const [panelOpen,  setPanelOpen]  = useState(false)
   const [panelTab,   setPanelTab]   = useState('dashboard')
-  const panelTabsRef = useRef(null)   // نوار تب‌های ساید بار — برای اسکرول افقی با چرخ ماوس
+  const panelTabsRef = useDragScroll()   // نوار تب‌های ساید بار: چرخ ماوس + کشیدن با کلیک
   const [showMenu,   setShowMenu]   = useState(false)
   const [showCity,   setShowCity]   = useState(false)
   const [showMode,   setShowMode]   = useState(false)
@@ -182,6 +183,13 @@ function TwinLand({ session, onLogout }) {
   const [coins,      setCoins]      = useState(0)
   const [userName,   setUserName]   = useState('')
   const [isAdmin,    setIsAdmin]    = useState(false)
+  // ── حالت نمایش مالک اپ ─────────────────────────────────────────────────
+  // isOwner: فقط برای نمایشِ سوییچ در منو (امنیت واقعی سمت سروره — RPC
+  // set_view_mode ایمیل رو از auth.users چک می‌کنه، نه از کلاینت).
+  // viewAsUser: وقتی روشنه، سایت دقیقاً مثل یه کاربر عادی رفتار می‌کنه.
+  const [isOwner,    setIsOwner]    = useState(false)
+  const [viewAsUser, setViewAsUser] = useState(false)
+  const effAdmin = isAdmin && !viewAsUser
   const [accountType, setAccountType] = useState('user')
   const [navOpen,    setNavOpen]    = useState(false)
   const [xpAnim,     setXpAnim]     = useState(null)
@@ -267,7 +275,8 @@ function TwinLand({ session, onLogout }) {
     const uid=session.user.id
     const h={'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token}
     fetch(SB_URL+'/rest/v1/profiles?id=eq.'+uid+'&select=*',{headers:h})
-      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin); setAccountType(p.account_type||'user'); setTutorialSeen(p.tutorial_seen||{}) } setTutorialLoaded(true) }).catch(()=>setTutorialLoaded(true))
+      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin); setViewAsUser(!!p.view_as_user); setAccountType(p.account_type||'user'); setTutorialSeen(p.tutorial_seen||{}) } setTutorialLoaded(true) }).catch(()=>setTutorialLoaded(true))
+    setIsOwner(!!(sess.user.email && sess.user.email.toLowerCase()==='msmadani88@gmail.com'))
     // علاقه‌مندی‌ها (قلب‌ها) — حالا واقعی و سمت سرور ذخیره می‌شن
     fetch(SB_URL+'/rest/v1/favorites?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
       .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setFavs(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
@@ -791,6 +800,25 @@ function TwinLand({ session, onLogout }) {
     }).catch(()=>{})
   }
 
+  async function toggleViewMode(){
+    const next=!viewAsUser
+    setViewAsUser(next)   // فوری اعمال شه، سرور پشتش تایید می‌کنه
+    try{
+      const sess=getSession()
+      const r=await fetch(SB_URL+'/rest/v1/rpc/set_view_mode',{
+        method:'POST',
+        headers:{apikey:SB_KEY,Authorization:'Bearer '+((sess&&sess.access_token)||SB_KEY),'Content-Type':'application/json'},
+        body:JSON.stringify({p_user_view:next})
+      }).then(x=>x.json())
+      if(!(r&&r.ok)){
+        setViewAsUser(!next)   // سرور قبول نکرد → برگرد
+        showToast(r&&r.error==='not_owner'?'این قابلیت فقط برای مالک اپه':'ثبت نشد','warn')
+      }else{
+        showToast(next?'👤 حالا سایت رو مثل یه کاربر عادی می‌بینی':'👑 برگشتی به حالت مالک')
+      }
+    }catch(e){ setViewAsUser(!next); showToast('خطا در ارتباط','warn') }
+  }
+
   async function resetMe(){
     if(!session||!session.access_token) return
     if(typeof window!=='undefined' && !window.confirm('کل پروفایلت به حالت تازه‌وارد برمی‌گرده و همه‌ی XP، مدال، کلکسیون، رویداد، نوتیف و تاریخچه‌ات پاک می‌شه. مطمئنی؟')) return
@@ -807,7 +835,7 @@ function TwinLand({ session, onLogout }) {
   }
 
   async function doCheckin(cafe){
-    if(!isAdmin && checkedIn.has(cafe.id)){ showToast('قبلاً اینجا بودی!','warn'); return }
+    if(!effAdmin && checkedIn.has(cafe.id)){ showToast('قبلاً اینجا بودی!','warn'); return }
     if(!session||!session.access_token){ showToast('اول وارد شو','warn'); return }
     setSelCafe(null)
     const prevLevel=getLevelInfo(xp).current.level
@@ -882,21 +910,8 @@ function TwinLand({ session, onLogout }) {
         @keyframes tlCelebGlow{0%,100%{box-shadow:0 0 40px 4px rgba(255,255,255,.06)}50%{box-shadow:0 0 70px 10px rgba(255,255,255,.14)}}
         @keyframes tlShuttle{from{transform:translateX(0)}to{transform:translateX(var(--shift,0px))}}
         .tl-shuttle{animation:tlShuttle var(--dur,8s) ease-in-out 1s infinite alternate}
-        /* ── تعامل: hover و press ملایم و مدرن، بدون افراط ───────────── */
+        /* انیمیشن مودالِ کافه در دسکتاپ — بقیه‌ی کلاس‌های tl-* در app/ui.js */
         @keyframes cpZoom{from{opacity:0;transform:translate(-50%,-50%) scale(.94)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
-        .tl-press{transition:transform .16s cubic-bezier(.2,.9,.3,1), box-shadow .2s ease, background .2s ease, border-color .2s ease}
-        .tl-press:active{transform:scale(.975)}
-        @media (hover:hover){
-          .tl-press:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.13)}
-          .tl-row:hover{background:rgba(127,127,127,.10)}
-          .tl-tile:hover{transform:translateY(-3px) scale(1.012);box-shadow:0 12px 28px rgba(0,0,0,.16)}
-        }
-        .tl-row{transition:background .18s ease, transform .16s ease}
-        .tl-row:active{transform:scale(.99)}
-        .tl-tile{transition:transform .2s cubic-bezier(.2,.9,.3,1), box-shadow .25s ease}
-        .tl-tile:active{transform:scale(.98)}
-        .tl-hscroll{overscroll-behavior-x:contain}
-        .tl-hscroll::-webkit-scrollbar{height:0}
         @keyframes tlSpotPulse{0%,100%{box-shadow:0 0 0 100vmax rgba(0,0,0,.62),0 0 0 3px #CCFF00,0 0 18px 3px #CCFF0088}50%{box-shadow:0 0 0 100vmax rgba(0,0,0,.62),0 0 0 3px #CCFF00,0 0 30px 8px #CCFF00cc}}
         @keyframes tlRingPulse{0%{transform:scale(.4);opacity:.9}70%{transform:scale(2.1);opacity:0}100%{transform:scale(2.1);opacity:0}}
         .tl-event-pulse-ring{width:30px;height:30px;border-radius:50%;border:5px solid var(--pulse-color,#1a1a1a);box-shadow:0 0 4px 1px var(--pulse-color,#1a1a1a);animation:tlRingPulse 1.3s ease-out infinite}
@@ -924,14 +939,14 @@ function TwinLand({ session, onLogout }) {
         )}
         {isMobile&&<div style={{flex:1}}/>}
 
-        <button data-tut="notif-btn" onClick={()=>setShowNotif(v=>!v)} style={{position:'relative',background:showNotif?C.accent:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:showNotif?C.accentText:C.text}}>
+        <button data-tut="notif-btn" onClick={()=>setShowNotif(v=>!v)} style={{position:'relative',background:showNotif?C.accent:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:showNotif?onColor(C.accent):C.text}}>
           🔔
           {notifications.some(n=>!n.read) && (
             <span style={{position:'absolute',top:4,left:4,width:8,height:8,borderRadius:'50%',background:'#ef4444',border:'1.5px solid '+C.bg}}/>
           )}
         </button>
 
-        <button onClick={()=>setPanelOpen(v=>!v)} style={{background:panelOpen?C.accent:C.chip,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:panelOpen?C.accentText:C.sub,fontFamily:'inherit',fontWeight:700,flexShrink:0,display:'flex',alignItems:'center',gap:5}}>
+        <button onClick={()=>setPanelOpen(v=>!v)} style={{background:panelOpen?C.accent:C.chip,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:panelOpen?onColor(C.accent):C.sub,fontFamily:'inherit',fontWeight:700,flexShrink:0,display:'flex',alignItems:'center',gap:5}}>
           {panelOpen?<span style={{fontSize:15,fontWeight:800}}>✕</span>:<img src="/dashboard@256.png" alt="داشبورد" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>}{!isMobile&&<span>{panelOpen?'بستن':'پنل'}</span>}
         </button>
         <button onClick={()=>setShowMode(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.accent,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center'}}>
@@ -943,7 +958,7 @@ function TwinLand({ session, onLogout }) {
         <button onClick={()=>setShowPalette(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:14,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
           <img src="/theme@256.png" alt="پالت" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>{!isMobile&&<span style={{fontSize:12}}> پالت</span>}
         </button>
-        <button onClick={()=>setShowCity(true)} style={{background:C.accent,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:C.accentText,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
+        <button onClick={()=>setShowCity(true)} style={{background:C.accent,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:onColor(C.accent),fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
           {CITIES[city].name} ▾
         </button>
       </div>
@@ -951,7 +966,7 @@ function TwinLand({ session, onLogout }) {
       {/* FILTER BAR */}
       <div style={{height:46,flexShrink:0,display:'flex',alignItems:'center',gap:7,padding:'0 12px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',background:C.glassDark,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
         {ZONES.map(z=>(
-          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'8px 17px',fontSize:13.5,fontWeight:zone===z.key?800:600,color:zone===z.key?C.accentText:C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
+          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'8px 17px',fontSize:13.5,fontWeight:zone===z.key?800:600,color:zone===z.key?onColor(C.accent):C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
         ))}
         <div style={{width:1,height:24,background:C.border,flexShrink:0,margin:'0 2px'}}/>
         <div style={{position:'relative',display:'flex',alignItems:'center',flexShrink:0}}>
@@ -1018,7 +1033,7 @@ function TwinLand({ session, onLogout }) {
           {checkedIn.size>0&&<><span style={{color:C.border}}>|</span><span style={{color:C.green,fontWeight:700}}>✓ {checkedIn.size}</span></>}
         </div>
         <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe} onActiveCafeChange={setActiveEventCafeId}/>
-        {streak>=2&&<div style={{position:'absolute',top:52,left:10,zIndex:18,height:25,boxSizing:'border-box',display:'flex',alignItems:'center',background:streak>=5?C.gold:C.accent,borderRadius:99,padding:'0 10px',fontSize:11,fontWeight:700,color:streak>=5?'#fff':C.accentText,boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
+        {streak>=2&&<div style={{position:'absolute',top:52,left:10,zIndex:18,height:25,boxSizing:'border-box',display:'flex',alignItems:'center',background:streak>=5?C.gold:C.accent,borderRadius:99,padding:'0 10px',fontSize:11,fontWeight:700,color:streak>=5?'#fff':onColor(C.accent),boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
 
         {/* دکمه‌های فیلتر منطقه — بیرون از لایه‌ی نقشه و «زیرِ» نوار رویدادها، تا دیگه پشتش گم نشن */}
         {selectedRegions.length>0 && !showRegionFilter && (
@@ -1083,13 +1098,10 @@ function TwinLand({ session, onLogout }) {
               {/* tabs — روی ویندوز چرخ ماوس عمودیه و نوار افقی اسکرول نمی‌شد؛
                    حالا چرخ ماوس به اسکرول افقی ترجمه می‌شه و دو طرفش fade داره
                    تا معلوم باشه هنوز تب هست. با درگ هم می‌شه کشیدش. */}
-              <div
-                ref={panelTabsRef}
-                onWheel={(e)=>{ if(panelTabsRef.current && Math.abs(e.deltaY)>Math.abs(e.deltaX)){ panelTabsRef.current.scrollLeft -= e.deltaY } }}
-                className="tl-hscroll"
-                style={{padding:'14px 12px 10px',display:'flex',gap:6,flexShrink:0,borderBottom:'1px solid '+C.border,overflowX:'auto',scrollbarWidth:'none',cursor:'grab'}}>
+              <div ref={panelTabsRef} className="tl-hscroll"
+                style={{...hscroll,gap:6,padding:'14px 12px 10px',flexShrink:0,borderBottom:'1px solid '+C.border}}>
                 {[{key:'dashboard',icon:'📊',img:null,imgActive:'/dashboard@256.png',imgInactive:'/dashboard@256_disabled.png',label:'داشبورد'},{key:'missions',icon:'📋',img:'icon_mission',label:'ماموریت'},{key:'rank',icon:'🏆',img:'icon_rank',label:'رتبه'},{key:'clan',icon:'🛡',img:'icon_clan',label:'کلن'},{key:'profile',icon:'👤',img:'icon_profile',label:'پروفایل'}].map(t=>(
-                  <button key={t.key} className="tl-press" onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:C.chip,border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?C.accentText:C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
+                  <button key={t.key} className="tl-press" onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:C.chip,border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?onColor(C.accent):C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
                     {t.imgActive
                       ? <img src={panelTab===t.key?t.imgActive:t.imgInactive} alt={t.label} width={19} height={19} style={{objectFit:'contain',display:'block'}}/>
                       : t.img
@@ -1099,7 +1111,7 @@ function TwinLand({ session, onLogout }) {
                   </button>
                 ))}
               </div>
-              <div style={{flex:1,overflowY:'auto',scrollbarWidth:'none'}}>
+              <div className="tl-vscroll" style={{flex:1,overflowY:'auto'}}>
                 {panelTab==='dashboard'&&<DashboardTab C={C} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP}/>}
                 {panelTab==='missions'&&<MissionsTab C={C} cafes={cafes} setSelCafe={setSelCafe} showToast={showToast}/>}
                 {panelTab==='rank'&&<RankTab C={C}/>}
@@ -1133,15 +1145,36 @@ function TwinLand({ session, onLogout }) {
         })}
       </div>
 
-      {selCafe&&<CafePopup C={C} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={isAdmin} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
+      {selCafe&&<CafePopup C={C} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
       {showXP&&<XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={()=>setShowXP(false)}/>}
       {showNotif&&<NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={()=>setShowNotif(false)}/>}
+      <UIStyles/>
       <TutorialCoach C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} tutorialLoaded={tutorialLoaded} replay={tutorialReplay} onReplayEnd={()=>setTutorialReplay(false)} isMobile={isMobile}/>
       {celebration&&<CelebrationOverlay C={C} data={celebration} onClose={()=>setCelebration(null)}/>}
 
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
           <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:TH+8,right:14,left:14,maxHeight:'calc(100dvh - '+(TH+28)+'px)',overflowY:'auto',WebkitOverflowScrolling:'touch',background:'linear-gradient(165deg, '+C.accent+'26, transparent 55%), '+C.glassDark,backdropFilter:'blur(24px)',borderRadius:18,border:'1px solid '+C.border,boxShadow:'0 8px 40px rgba(0,0,0,.15)',animation:'fadeIn .2s ease'}}>
+            {/* ── سوییچ حالت نمایش — فقط مالک اپ می‌بیندش ───────────────
+                امنیت سمت سرور: RPC set_view_mode ایمیل واقعی رو از auth
+                چک می‌کنه، پس حتی اگه کسی این UI رو دستکاری کنه، سرور رد
+                می‌کنه. سوییچ هم فقط «کم» می‌کنه، قدرتی اضافه نمی‌کنه. */}
+            {isOwner&&(
+              <div style={{padding:'12px 16px',borderBottom:'1px solid '+C.border,background:viewAsUser?'#10b98114':C.accent+'12'}}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontSize:19,width:28,textAlign:'center'}}>{viewAsUser?'👤':'👑'}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:800,color:C.text}}>{viewAsUser?'حالت کاربر عادی':'حالت مالک'}</div>
+                    <div style={{fontSize:10,color:C.sub,marginTop:1}}>{viewAsUser?'داری سایت رو مثل یه کاربر معمولی می‌بینی':'همه‌چیز بدون محدودیت'}</div>
+                  </div>
+                  <button onClick={toggleViewMode} className="tl-press"
+                    style={{position:'relative',width:46,height:26,borderRadius:99,border:'none',cursor:'pointer',flexShrink:0,
+                      background:viewAsUser?'#10b981':C.chip,transition:'background .25s ease'}}>
+                    <span style={{position:'absolute',top:3,right:viewAsUser?23:3,width:20,height:20,borderRadius:'50%',background:'#fff',boxShadow:'0 1px 4px rgba(0,0,0,.3)',transition:'right .25s cubic-bezier(.2,.9,.3,1)'}}/>
+                  </button>
+                </div>
+              </div>
+            )}
             {[
               {key:'map',icon:'🗺',img:'/icon_map_active@2x.png',label:'نقشه',href:null},
               {key:'missions',icon:'📋',img:'/icon_mission_active@2x.png',label:'ماموریت‌ها',href:null},
@@ -1150,7 +1183,11 @@ function TwinLand({ session, onLogout }) {
               {key:'clans',icon:ICON.clans,img:'/icon_clan_active@2x.png',label:L.clans,href:ROUTE.clans},
               {key:'quests',icon:ICON.quests,label:L.quests,href:ROUTE.quests},
               {key:'gallery',icon:ICON.gallery,label:L.gallery,href:ROUTE.gallery},
-              {key:'business',icon:ICON.business,label:L.business,href:ROUTE.business,smeOnly:true},
+              {/* قبلاً smeOnly بود و چون حساب تو 'sme' نیست اصلاً رندر نمی‌شد —
+                  آیتم پایینی جاش می‌اومد و با همون ضربه می‌رفتی گنجینه.
+                  حالا برای همه هست: هر کسی ممکنه کافه‌دار باشه و باید بتونه
+                  کافه‌ش رو claim کنه. خودِ صفحه اگه کافه‌ای نداشتی راهنمایی می‌کنه. */}
+              {key:'business',icon:ICON.business,label:L.business,href:ROUTE.business},
               {key:'admin',icon:'🛡️',label:'پنل ادمین',href:'/admin',adminOnly:true},
               {key:'xp',icon:ICON.xpSystem,img:'/xp_coin@256-1.png',label:L.xpSystem,href:null},
               {key:'tutorial',icon:ICON.tutorial,label:L.tutorial,href:null},
@@ -1158,7 +1195,7 @@ function TwinLand({ session, onLogout }) {
               {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
               {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
               {key:'logout',icon:ICON.logout,label:L.logout,href:null},
-            ].filter(item=>(!item.adminOnly||isAdmin)&&(!item.smeOnly||accountType==='sme'||isAdmin)).map((item,i,arr)=>{
+            ].filter(item=>(!item.adminOnly||effAdmin)).map((item,i,arr)=>{
               const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
               if(item.href){
                 return <a key={item.key} className="tl-row" href={item.href} style={style}>
@@ -1181,7 +1218,7 @@ function TwinLand({ session, onLogout }) {
             <div style={{fontSize:17,fontWeight:800,color:C.text,textAlign:'center',marginBottom:16}}>🏙️ انتخاب شهر</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
               {Object.entries(CITIES).map(([k,v])=>(
-                <button key={k} onClick={()=>{setCity(k);setShowCity(false);showToast('✈️ '+v.name)}} style={{background:city===k?C.accent:C.chip,border:'none',borderRadius:12,padding:'12px 6px',fontSize:12,fontWeight:city===k?800:500,color:city===k?C.accentText:C.text,fontFamily:'inherit'}}>{v.name}</button>
+                <button key={k} onClick={()=>{setCity(k);setShowCity(false);showToast('✈️ '+v.name)}} style={{background:city===k?C.accent:C.chip,border:'none',borderRadius:12,padding:'12px 6px',fontSize:12,fontWeight:city===k?800:500,color:city===k?onColor(C.accent):C.text,fontFamily:'inherit'}}>{v.name}</button>
               ))}
             </div>
           </div>
@@ -1197,8 +1234,8 @@ function TwinLand({ session, onLogout }) {
 
             {/* سوییچ روز / شب */}
             <div style={{display:'flex',background:C.chip,borderRadius:12,padding:4,marginBottom:18}}>
-              <button onClick={()=>themeMode!=='light'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='light'?C.accent:'transparent',color:themeMode==='light'?C.accentText:C.sub}}>☀️ روز</button>
-              <button onClick={()=>themeMode!=='dark'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='dark'?C.accent:'transparent',color:themeMode==='dark'?C.accentText:C.sub}}>🌙 شب</button>
+              <button onClick={()=>themeMode!=='light'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='light'?C.accent:'transparent',color:themeMode==='light'?onColor(C.accent):C.sub}}>☀️ روز</button>
+              <button onClick={()=>themeMode!=='dark'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='dark'?C.accent:'transparent',color:themeMode==='dark'?onColor(C.accent):C.sub}}>🌙 شب</button>
             </div>
 
             {/* لیست پالت‌ها */}
@@ -1235,7 +1272,7 @@ function TwinLand({ session, onLogout }) {
             <div style={{fontSize:11,color:C.sub,textAlign:'center',marginBottom:16,lineHeight:1.6}}>روی هر منطقه روی نقشه بزن تا رنگش عوض بشه یا خاموش شه</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {[{key:'off',label:'❌ خاموش'},{key:'province',label:'🇮🇷 استان‌های ایران'},{key:'district',label:'🏙️ مناطق ۲۲گانه تهران'}].map(o=>(
-                <button key={o.key} onClick={()=>{setBoundaryMode(o.key);setShowBoundary(false);if(o.key!=='off')showToast(BOUNDARY_SOURCES[o.key]?.label+' فعال شد')}} style={{background:boundaryMode===o.key?C.accent:C.chip,border:boundaryMode===o.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'14px',fontSize:14,fontWeight:boundaryMode===o.key?800:500,color:boundaryMode===o.key?C.accentText:C.text,fontFamily:'inherit',textAlign:'right'}}>{o.label}</button>
+                <button key={o.key} onClick={()=>{setBoundaryMode(o.key);setShowBoundary(false);if(o.key!=='off')showToast(BOUNDARY_SOURCES[o.key]?.label+' فعال شد')}} style={{background:boundaryMode===o.key?C.accent:C.chip,border:boundaryMode===o.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'14px',fontSize:14,fontWeight:boundaryMode===o.key?800:500,color:boundaryMode===o.key?onColor(C.accent):C.text,fontFamily:'inherit',textAlign:'right'}}>{o.label}</button>
               ))}
             </div>
           </div>
@@ -1249,7 +1286,7 @@ function TwinLand({ session, onLogout }) {
             <div style={{fontSize:17,fontWeight:800,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:16}}><img src="/map_style@256.png" alt="" width={30} height={30} style={{objectFit:'contain'}}/>استایل نقشه</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               {MAP_MODES.map(m=>(
-                <button key={m.key} onClick={()=>{setMapMode(m.key);setShowMode(false);showToast(m.label+' فعال شد')}} style={{background:mapMode===m.key?C.accent:C.chip,border:mapMode===m.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'16px',fontSize:14,fontWeight:mapMode===m.key?800:500,color:mapMode===m.key?C.accentText:C.text,fontFamily:'inherit'}}>{m.label}</button>
+                <button key={m.key} onClick={()=>{setMapMode(m.key);setShowMode(false);showToast(m.label+' فعال شد')}} style={{background:mapMode===m.key?C.accent:C.chip,border:mapMode===m.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'16px',fontSize:14,fontWeight:mapMode===m.key?800:500,color:mapMode===m.key?onColor(C.accent):C.text,fontFamily:'inherit'}}>{m.label}</button>
               ))}
             </div>
           </div>
@@ -1260,7 +1297,7 @@ function TwinLand({ session, onLogout }) {
 
       {toast&&(()=>{
         const bg = toast.type==='xp'?C.accent:toast.type==='level'?C.gold:toast.type==='warn'?'#FF9500':(C.isDarkBg?C.card:C.text)
-        const fg = toast.type==='xp'?C.accentText:(toast.type==='level'||toast.type==='warn')?'#1a1a1a':(C.isDarkBg?C.text:'#fff')
+        const fg = toast.type==='xp'?onColor(C.accent):(toast.type==='level'||toast.type==='warn')?'#1a1a1a':(C.isDarkBg?C.text:'#fff')
         return <div style={{position:'fixed',bottom:BH+14,left:'50%',transform:'translateX(-50%)',zIndex:4000,background:bg,color:fg,border:'1px solid '+C.border,borderRadius:99,padding:'10px 22px',fontSize:13,fontWeight:600,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,.2)',animation:'fadeUp .2s ease'}}>{toast.msg}</div>
       })()}
     </div>
@@ -1331,7 +1368,7 @@ function RegionFilterPopup({ C, regions, value, setValue, onApply, onClose }) {
         </div>
 
         <button onClick={onApply}
-          style={{width:'100%',padding:15,borderRadius:14,border:'none',background:C.accent,color:C.accentText,
+          style={{width:'100%',padding:15,borderRadius:14,border:'none',background:C.accent,color:onColor(C.accent),
             fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer',boxShadow:'0 6px 20px '+C.accent+'55'}}>
           نمایش نتایج
         </button>
@@ -1386,8 +1423,8 @@ function RegionResultsPanel({ C, pages, onClose }) {
 
         {hasLb&&hasClan&&(
           <div style={{display:'flex',gap:8,marginBottom:14}}>
-            <button onClick={()=>setTab('lb')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='lb'?C.accent:C.chip,color:tab==='lb'?C.accentText:C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🏆 برترین‌ها</button>
-            <button onClick={()=>setTab('clan')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='clan'?C.accent:C.chip,color:tab==='clan'?C.accentText:C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🛡️ کلن‌ها</button>
+            <button onClick={()=>setTab('lb')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='lb'?C.accent:C.chip,color:tab==='lb'?onColor(C.accent):C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🏆 برترین‌ها</button>
+            <button onClick={()=>setTab('clan')} style={{flex:1,padding:10,borderRadius:12,border:'none',background:tab==='clan'?C.accent:C.chip,color:tab==='clan'?onColor(C.accent):C.sub,fontWeight:700,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>🛡️ کلن‌ها</button>
           </div>
         )}
 
@@ -1398,7 +1435,7 @@ function RegionResultsPanel({ C, pages, onClose }) {
                 <div style={{width:26,textAlign:'center',fontSize:u.rank<=3?18:14,fontWeight:800,color:u.rank<=3?C.text:C.sub}}>{medals[u.rank]||u.rank.toLocaleString('fa')}</div>
                 <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+C.accent+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{u.avatar}</div>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:14,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{u.name}{u.me&&<span style={{fontSize:9,background:C.accent,color:C.accentText,borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{u.name}{u.me&&<span style={{fontSize:9,background:C.accent,color:onColor(C.accent),borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
                   <div style={{fontSize:11,color:C.sub}}>{u.checkins.toLocaleString('fa')} چک‌این در منطقه</div>
                 </div>
                 <div style={{fontSize:13,fontWeight:800,color:C.accent}}>{u.xp.toLocaleString('fa')} XP</div>
@@ -1448,7 +1485,7 @@ function MapSettingsPopup({ C, value, setValue, onClose }) {
       <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:8}}>{label}</div>
       <div style={{display:'flex',gap:6}}>
         {options.map(o=>(
-          <button key={o.k} onClick={()=>onPick(o.k)} style={{flex:1,padding:'9px 4px',borderRadius:11,border:'2px solid '+(val===o.k?C.accent:C.border),background:val===o.k?C.accent:C.card,color:val===o.k?C.accentText:C.text,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>{o.l}</button>
+          <button key={o.k} onClick={()=>onPick(o.k)} style={{flex:1,padding:'9px 4px',borderRadius:11,border:'2px solid '+(val===o.k?C.accent:C.border),background:val===o.k?C.accent:C.card,color:val===o.k?onColor(C.accent):C.text,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>{o.l}</button>
         ))}
       </div>
     </div>
@@ -1482,7 +1519,7 @@ function MapSettingsPopup({ C, value, setValue, onClose }) {
           </>
         )}
 
-        <button onClick={onClose} style={{width:'100%',padding:14,borderRadius:14,border:'none',background:C.accent,color:C.accentText,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>تمام</button>
+        <button onClick={onClose} style={{width:'100%',padding:14,borderRadius:14,border:'none',background:C.accent,color:onColor(C.accent),fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>تمام</button>
       </div>
     </div>
   )
@@ -1623,6 +1660,10 @@ function LedAdBarInner({ C }) {
 function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,checkedIn,xp,levelInfo,streak,setShowXP}) {
   const [topPlayers,setTopPlayers]=useState([])
   const [hotEvents,setHotEvents]=useState([])
+  const [newIds,setNewIds]=useState(new Set())   // رویدادهایی که همین الان اضافه شدن → درخشش «جدید»
+  const seenRef=useRef(null)
+  const tilesRef=useDragScroll()                 // نوار کاشی‌ها — قابل کشیدن با ماوس
+  const dark=isDarkC(C)
   useEffect(()=>{
     const sess=getSession()
     let alive=true
@@ -1633,8 +1674,20 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
   },[])
   useEffect(()=>{
     let alive=true
-    const loadEvents=()=>fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,cafes(name,district),collectible_defs(icon,rarity)&order=created_at.desc&limit=5',
-      {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}}).then(r=>r.json()).then(rows=>{ if(alive) setHotEvents(Array.isArray(rows)?rows:[]) }).catch(()=>{})
+    // فید زنده: با هر تغییر، رویدادهای تازه علامت «جدید» می‌گیرن و با
+    // انیمیشن وارد می‌شن. seenRef اولین بار null‌ه تا لودِ اولیه کل لیست رو
+    // «جدید» علامت نزنه.
+    const loadEvents=()=>fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,cafes(name,district),collectible_defs(icon,rarity)&order=created_at.desc&limit=6',
+      {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}}).then(r=>r.json()).then(rows=>{
+        if(!alive) return
+        const list=Array.isArray(rows)?rows:[]
+        if(seenRef.current){
+          const fresh=new Set(list.filter(x=>!seenRef.current.has(x.id)).map(x=>x.id))
+          if(fresh.size){ setNewIds(fresh); setTimeout(()=>{ if(alive) setNewIds(new Set()) },4000) }
+        }
+        seenRef.current=new Set(list.map(x=>x.id))
+        setHotEvents(list)
+      }).catch(()=>{})
     loadEvents()
     const unsub=subscribeToChanges(['quests'],()=>loadEvents())
     return ()=>{ alive=false; unsub() }
@@ -1668,7 +1721,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
       <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>آمار زنده</div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
         {[{icon:'☕',val:cafes.length,lbl:'کافه'},{icon:'👥',val:totalLive,lbl:'آنلاین'},{icon:'⭐',val:cafes.filter((c)=>c.is_top).length,lbl:'برتر'},{icon:'✅',val:checkedIn.size,lbl:'رفتم'}].map((item)=>(
-          <div key={item.lbl} style={{background:'rgba(0,0,0,.04)',borderRadius:12,padding:'10px'}}>
+          <div key={item.lbl} className="tl-tile" style={{background:C.chip,border:'1px solid '+C.border,borderRadius:12,padding:'10px'}}>
             <div style={{fontSize:16}}>{item.icon}</div>
             <div style={{fontSize:18,fontWeight:800,color:C.text,marginTop:2}}>{item.val}</div>
             <div style={{fontSize:9,color:C.sub,marginTop:1}}>{item.lbl}</div>
@@ -1679,7 +1732,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
     <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)',marginTop:12}}>
       <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>فیلتر سریع</div>
       {QUICK_FILTERS.map(f=>(
-        <button key={f.tag} onClick={()=>{setSearch(f.tag);showToast('🔍 '+f.tag)}} style={{width:'100%',display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',padding:'8px 4px',borderRadius:8,color:C.text,fontSize:13,fontFamily:'inherit',fontWeight:500}}>
+        <button key={f.tag} className="tl-row" onClick={()=>{setSearch(f.tag);showToast('🔍 '+f.tag)}} style={{width:'100%',borderRadius:10,display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',padding:'8px 4px',borderRadius:8,color:C.text,fontSize:13,fontFamily:'inherit',fontWeight:500}}>
           <span style={{fontSize:17,width:24,textAlign:'center'}}>{f.icon}</span>{f.tag}
         </button>
       ))}
@@ -1687,34 +1740,46 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
     <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
         <div style={{fontSize:10,color:C.sub,letterSpacing:.7,fontWeight:600}}>🎉 رویدادهای داغ<span style={{color:C.green}}> ●</span></div>
-        <a href="/quests" style={{fontSize:10,color:C.accent,fontWeight:700,textDecoration:'none'}}>همه ›</a>
+        <a href={ROUTE.quests} className="tl-press" style={{fontSize:10,color:C.accent,fontWeight:700,textDecoration:'none'}}>همه ›</a>
       </div>
       {hotEvents.length===0
         ? <div style={{fontSize:11,color:C.sub,padding:'8px 2px'}}>الان رویداد فعالی نیست. کافه‌دارها به‌زودی چیزی منتشر می‌کنن.</div>
-        : hotEvents.map(ev=>{
-            const cd=ev.collectible_defs
-            const cafeName=ev.cafes?ev.cafes.name:''
-            return <a key={ev.id} href="/quests" style={{display:'block',textDecoration:'none',background:'#FFF9F0',border:'1px solid #FFE0B2',borderRadius:14,padding:'11px 12px',marginBottom:8}}>
-              <div style={{display:'flex',alignItems:'center',gap:9}}>
-                <span style={{fontSize:20}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{ev.title}</div>
-                  <div style={{fontSize:10,color:C.sub,marginTop:2}}>{cafeName}{ev.cafes&&ev.cafes.district?' · '+ev.cafes.district:''}</div>
+        : <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {hotEvents.map((ev,i)=>{
+              const cd=ev.collectible_defs
+              const cafeName=ev.cafes?ev.cafes.name:''
+              // 🐞 قبلاً رنگ‌ها ثابت بودن (#FFF9F0 و #E65100) و توی تم تیره
+              // متنِ روشن روی کارتِ کِرِمی می‌افتاد و اصلاً دیده نمی‌شد.
+              // حالا رنگ از پالت میاد و متن با onColor خودکار خوانا می‌شه.
+              const warm = C.gold || '#FF9F0A'
+              const cardBg = warm + (dark?'1c':'12')
+              const isNew = newIds.has(ev.id)
+              return <a key={ev.id} href={ROUTE.quests} className={'tl-tile '+(isNew?'tl-new':'tl-in')}
+                style={{display:'block',textDecoration:'none',background:cardBg,border:'1px solid '+warm+'55',borderRadius:14,padding:'11px 12px',animationDelay:Math.min(i*60,400)+'ms'}}>
+                <div style={{display:'flex',alignItems:'center',gap:9}}>
+                  <span style={{fontSize:20,flexShrink:0}}>{(cd&&cd.icon)||ev.icon||'🎉'}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{ev.title}</div>
+                    <div style={{fontSize:10,color:C.sub,marginTop:2}}>{cafeName}{ev.cafes&&ev.cafes.district?' · '+ev.cafes.district:''}</div>
+                  </div>
+                  {isNew&&<span style={{fontSize:8.5,fontWeight:900,background:warm,color:onColor(warm),borderRadius:99,padding:'2px 7px',flexShrink:0}}>جدید</span>}
                 </div>
-              </div>
-              <div style={{fontSize:11,color:'#E65100',fontWeight:700,marginTop:6}}>🎁 {ev.reward_label}{ev.reward_xp>0?' · +'+ev.reward_xp+' XP':''}</div>
-            </a>
-          })}
-      <div style={{display:'flex',gap:8,overflowX:'auto',scrollbarWidth:'none',marginTop:4,paddingBottom:2}}>
+                <div style={{fontSize:11,color:warm,fontWeight:800,marginTop:6}}>🎁 {ev.reward_label}{ev.reward_xp>0?' · +'+ev.reward_xp+' XP':''}</div>
+              </a>
+            })}
+          </div>}
+      <div ref={tilesRef} className="tl-hscroll" style={{...hscroll,marginTop:4,paddingBottom:2}}>
         {[
-          {icon:'💎',label:'نگارخانه',href:'/gallery',color:'#8b5cf6'},
-          {icon:'🏆',label:'رتبه‌بندی',href:'/leaderboard',color:'#f59e0b'},
-          {icon:'🛡️',label:'کلن‌ها',href:'/clan',color:'#3b82f6'},
-        ].map(s=>(
-          <a key={s.href} href={s.href} style={{flexShrink:0,textDecoration:'none',background:s.color+'14',border:'1px solid '+s.color+'33',borderRadius:14,padding:'10px 12px',minWidth:110,display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
-            <span style={{fontSize:20}}>{s.icon}</span>
-            <span style={{fontSize:11,fontWeight:800,color:C.text}}>{s.label}</span>
-            <span style={{fontSize:9,color:s.color,fontWeight:700}}>مشاهده کامل ›</span>
+          {icon:ICON.gallery,label:L.gallery,href:ROUTE.gallery,color:'#8b5cf6'},
+          {icon:ICON.leaderboard,label:L.leaderboard,href:ROUTE.leaderboard,color:'#f59e0b'},
+          {icon:ICON.clans,label:L.clans,href:ROUTE.clans,color:'#3b82f6'},
+          {icon:ICON.quests,label:L.quests,href:ROUTE.quests,color:'#10b981'},
+          {icon:ICON.profile,label:L.profile,href:ROUTE.profile,color:'#ec4899'},
+        ].map(t=>(
+          <a key={t.href} href={t.href} className="tl-tile" style={{textDecoration:'none',background:t.color+(dark?'22':'14'),border:'1px solid '+t.color+'44',borderRadius:14,padding:'10px 12px',minWidth:112,display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
+            <span style={{fontSize:20}}>{t.icon}</span>
+            <span style={{fontSize:11,fontWeight:800,color:C.text}}>{t.label}</span>
+            <span style={{fontSize:9,color:t.color,fontWeight:700}}>مشاهده کامل ›</span>
           </a>
         ))}
       </div>
@@ -1724,7 +1789,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
       {topPlayers.map(p=>(
         <div key={p.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid '+C.border}}>
           <span style={{fontSize:18}}>{medals[p.rank]}</span>
-          <div style={{flex:1}}><div style={{fontSize:12,color:C.text,fontWeight:700,display:'flex',alignItems:'center',gap:5}}>{p.name}{p.me&&<span style={{fontSize:8,background:C.accent,color:C.accentText,borderRadius:99,padding:'0 6px'}}>تو</span>}</div></div>
+          <div style={{flex:1}}><div style={{fontSize:12,color:C.text,fontWeight:700,display:'flex',alignItems:'center',gap:5}}>{p.name}{p.me&&<span style={{fontSize:8,background:C.accent,color:onColor(C.accent),borderRadius:99,padding:'0 6px'}}>تو</span>}</div></div>
           <div style={{fontSize:12,color:C.accent,fontWeight:800}}>{p.xp.toLocaleString('fa')} XP</div>
         </div>
       ))}
@@ -1788,7 +1853,7 @@ function MissionsTab({C, cafes, setSelCafe, showToast}) {
     <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>{L.quests} و {L.events} فعال</div>
     <div style={{fontSize:11,color:C.sub,marginBottom:10}}>واقعی و لحظه‌ای — همین الان کافه‌دارها منتشرشون کردن</div>
     {/* راه مستقیم به صفحه‌ی کامل — قبلاً فقط از ته «رویدادهای داغ» داشبورد پیدا می‌شد */}
-    <a href={ROUTE.quests} className="tl-press" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,background:C.accent,color:C.accentText,borderRadius:12,padding:'10px',fontSize:12.5,fontWeight:800,textDecoration:'none',marginBottom:14}}>
+    <a href={ROUTE.quests} className="tl-press" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,background:C.accent,color:onColor(C.accent),borderRadius:12,padding:'10px',fontSize:12.5,fontWeight:800,textDecoration:'none',marginBottom:14}}>
       {ICON.quests} مشاهده‌ی کامل {L.quests} و {L.events} ‹
     </a>
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -1823,7 +1888,7 @@ function MissionsTab({C, cafes, setSelCafe, showToast}) {
             ? <div style={{marginTop:10,background:C.green+'15',border:'1px dashed '+C.green,borderRadius:10,padding:'8px 10px',textAlign:'center'}}>
                 <span style={{fontSize:11.5,color:C.green,fontWeight:800}}>🎁 {q.reward_label}{red?' — کد: '+red.code:''}</span>
               </div>
-            : <button onClick={()=>openCafe(q)} style={{marginTop:10,width:'100%',background:C.accent,border:'none',borderRadius:10,padding:'8px',fontSize:12,color:C.accentText,fontWeight:700,fontFamily:'inherit'}}>📍 برو به {cafeName} و چک‌این کن</button>}
+            : <button onClick={()=>openCafe(q)} style={{marginTop:10,width:'100%',background:C.accent,border:'none',borderRadius:10,padding:'8px',fontSize:12,color:onColor(C.accent),fontWeight:700,fontFamily:'inherit'}}>📍 برو به {cafeName} و چک‌این کن</button>}
         </div>
       })}
     </div>
@@ -1853,13 +1918,13 @@ function RankTab({C}) {
           <div style={{width:24,textAlign:'center',fontSize:rank<=3?18:14,fontWeight:800,color:rank<=3?C.text:C.sub}}>{medals[rank]||rank.toLocaleString('fa')}</div>
           <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+C.accent+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{p.avatar}</div>
           <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.name}{p.me&&<span style={{fontSize:9,background:C.accent,color:C.accentText,borderRadius:99,padding:'1px 7px'}}>تو</span>}{p.sample&&<span style={{fontSize:9,background:C.chip,color:C.sub,border:'1px solid '+C.border,borderRadius:99,padding:'1px 6px'}}>نمونه</span>}</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.name}{p.me&&<span style={{fontSize:9,background:C.accent,color:onColor(C.accent),borderRadius:99,padding:'1px 7px'}}>تو</span>}{p.sample&&<span style={{fontSize:9,background:C.chip,color:C.sub,border:'1px solid '+C.border,borderRadius:99,padding:'1px 6px'}}>نمونه</span>}</div>
           </div>
           <div style={{fontSize:12,fontWeight:800,color:C.accent}}>{p.xp.toLocaleString('fa')} XP</div>
         </div>
       })}
     </div>
-    <a href="/leaderboard" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:C.accentText,borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده جدول کامل ›</a>
+    <a href="/leaderboard" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:onColor(C.accent),borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده جدول کامل ›</a>
   </div>
 }
 
@@ -1893,7 +1958,7 @@ function ClanTab({C}) {
     <div style={{fontSize:40,marginBottom:8}}>🛡️</div>
     <div style={{fontWeight:800,color:C.text,marginBottom:4}}>هنوز عضو کلنی نیستی</div>
     <div style={{fontSize:12,color:C.sub,marginBottom:14}}>یه کلن بساز یا به یکی بپیوند</div>
-    <a href="/clan" style={{display:'inline-block',background:C.accent,color:C.accentText,borderRadius:12,padding:'10px 20px',fontSize:13,fontWeight:700,textDecoration:'none'}}>رفتن به کلن‌ها ›</a>
+    <a href="/clan" style={{display:'inline-block',background:C.accent,color:onColor(C.accent),borderRadius:12,padding:'10px 20px',fontSize:13,fontWeight:700,textDecoration:'none'}}>رفتن به کلن‌ها ›</a>
   </div>
 
   const c=clan.clans
@@ -1910,14 +1975,14 @@ function ClanTab({C}) {
           <div style={{width:22,textAlign:'center',fontWeight:800,color:C.sub,fontSize:14}}>{(i+1).toLocaleString('fa')}</div>
           <div style={{width:38,height:38,borderRadius:'50%',background:C.card,border:'2px solid '+c.color+'55',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19}}>{m.avatar}</div>
           <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{m.name}{m.me&&<span style={{fontSize:9,background:C.accent,color:C.accentText,borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{m.name}{m.me&&<span style={{fontSize:9,background:C.accent,color:onColor(C.accent),borderRadius:99,padding:'1px 7px'}}>تو</span>}</div>
             <div style={{fontSize:11,color:C.sub}}>{m.role==='leader'?'رهبر':m.role==='officer'?'افسر':'عضو'}</div>
           </div>
           <div style={{fontSize:12,fontWeight:800,color:C.accent}}>{m.xp.toLocaleString('fa')} XP</div>
         </div>
       ))}
     </div>
-    <a href="/clan" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:C.accentText,borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده کامل کلن ›</a>
+    <a href={ROUTE.clans} className="tl-press" style={{display:'block',marginTop:16,textAlign:'center',background:C.accent,color:onColor(C.accent),borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده کامل کلن ›</a>
   </div>
 }
 
@@ -1944,7 +2009,7 @@ function ProfileTab({C,xp,levelInfo,streak,checkedIn,userName,coins}) {
         </div>
       ))}
     </div>
-    <a href="/profile" style={{display:'block',textAlign:'center',background:C.accent,color:C.accentText,borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده پروفایل کامل ›</a>
+    <a href="/profile" style={{display:'block',textAlign:'center',background:C.accent,color:onColor(C.accent),borderRadius:12,padding:'12px',fontSize:13,fontWeight:700,textDecoration:'none'}}>مشاهده پروفایل کامل ›</a>
   </div>
 }
 
@@ -2536,7 +2601,7 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
                     <div style={{fontSize:11,color:C.sub,marginTop:2}}>🎁 {ev.reward_label}{ev.reward_xp>0?' · +'+ev.reward_xp+' XP':''}{ev.discount_pct>0?' · 🏷️'+ev.discount_pct+'٪':''}</div>
                   </div>
                 </div>
-                <button onClick={()=>joinEvent(ev)} disabled={joined||busy} style={{width:'100%',marginTop:9,background:joined?C.green:C.accent,color:joined?'#fff':C.accentText,border:'none',borderRadius:10,padding:'8px',fontSize:12,fontWeight:800,fontFamily:'inherit',opacity:busy?.6:1}}>
+                <button onClick={()=>joinEvent(ev)} disabled={joined||busy} style={{width:'100%',marginTop:9,background:joined?C.green:C.accent,color:joined?'#fff':onColor(C.accent),border:'none',borderRadius:10,padding:'8px',fontSize:12,fontWeight:800,fontFamily:'inherit',opacity:busy?.6:1}}>
                   {joined?'✅ شرکت کردی':busy?'...':'🎯 شرکت در رویداد'}
                 </button>
               </div>
@@ -2582,7 +2647,7 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
             </button>
           ))}
         </div>
-        <button onClick={onCheckin} disabled={isChecked} style={{width:'100%',background:isChecked?C.green:C.accent,color:isChecked?'#fff':C.accentText,border:'none',borderRadius:14,padding:15,fontSize:15,fontWeight:700,fontFamily:'inherit',boxShadow:'0 4px 18px '+(isChecked?C.green:C.accent)+'44',opacity:isChecked?.85:1,transition:'all .3s'}}>
+        <button onClick={onCheckin} disabled={isChecked} style={{width:'100%',background:isChecked?C.green:C.accent,color:isChecked?'#fff':onColor(C.accent),border:'none',borderRadius:14,padding:15,fontSize:15,fontWeight:700,fontFamily:'inherit',boxShadow:'0 4px 18px '+(isChecked?C.green:C.accent)+'44',opacity:isChecked?.85:1,transition:'all .3s'}}>
           {isChecked?'✅ چک‌این شد!':'📍 چک‌این — +'+xpAmount+' XP'}
         </button>
         <button onClick={()=>isAdmin?ownerClaimDirect(cafe,showToast):claimCafe(cafe,showToast)} style={{width:'100%',marginTop:10,background:'transparent',color:C.sub,border:'1.5px dashed '+C.border,borderRadius:14,padding:12,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
