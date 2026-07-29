@@ -7,6 +7,7 @@ import {
   fetchMyProfile, fetchXpHistory, fetchAwards, subscribeToTables, REASON_LABELS,
 } from '../gameSystem'
 import { L, ICON, fa as faNum } from '../labels'
+import { UIStyles, useDragScroll, hscroll, onColor, isDarkC } from '../ui'
 
 // مدال‌های محاسبه‌شده از آمار واقعی (fallback وقتی جدول awards هنوز پر نشده)
 const BADGE_DEFS = [
@@ -149,6 +150,7 @@ export default function ProfilePage() {
 
   const C = buildC(pal.palette, pal.mode)
   const S = mkS(C)
+  const histRef = useDragScroll()   // نوار فیلترهای تاریخچه — کشیدن با ماوس در ویندوز
 
   const xp = profile?.xp || 0
   const { current, next, progress } = getLevelInfo(xp)
@@ -257,6 +259,7 @@ export default function ProfilePage() {
 
   return (
     <div style={S.page}>
+      <UIStyles/>
       <div style={S.topbar}>
         <a href="/" style={S.backBtn}>‹ {L.map}</a>
         <div style={S.brand}>{ICON.profile} {L.profile}</div>
@@ -310,7 +313,7 @@ export default function ProfilePage() {
         </div>
 
         {/* پیش‌نمایش نگارخانه */}
-        <a href="/gallery" style={S.galleryStrip}>
+        <a href="/gallery" className="tl-tile" style={S.galleryStrip}>
           <div style={{ display: 'flex', gap: 6 }}>
             {(collectibles.length > 0 ? collectibles.slice(0, 4) : [{ icon: '💎' }, { icon: '🏆' }, { icon: '🔒' }]).map((c, i) => (
               <div key={i} style={S.galleryIcon}>{c.icon || '🔒'}</div>
@@ -325,8 +328,8 @@ export default function ProfilePage() {
 
         {/* تب‌ها */}
         <div style={S.tabs}>
-          <button style={tab === 'badges' ? S.tabActive : S.tab} onClick={() => setTab('badges')}>{ICON.badges} {L.badges}</button>
-          <button style={tab === 'history' ? S.tabActive : S.tab} onClick={() => setTab('history')}>{ICON.history} {L.history}</button>
+          <button className="tl-press" style={tab === 'badges' ? S.tabActive : S.tab} onClick={() => setTab('badges')}>{ICON.badges} {L.badges}</button>
+          <button className="tl-press" style={tab === 'history' ? S.tabActive : S.tab} onClick={() => setTab('history')}>{ICON.history} {L.history}</button>
         </div>
 
         {tab === 'badges' && (
@@ -355,14 +358,17 @@ export default function ProfilePage() {
         {tab === 'history' && (
           <>
             {/* چیپ‌های فیلتر */}
-            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2 }}>
+            {/* اسکرول‌بار خاکستریِ پیش‌فرضِ ویندوز حذف شد — حالا با کشیدنِ
+                ماوس یا چرخ ماوس جابه‌جا می‌شه، مثل سایت‌های مدرن. */}
+            <div ref={histRef} className="tl-hscroll" style={{ ...hscroll, gap: 6, marginBottom: 12, paddingBottom: 2 }}>
               {HIST_FILTERS.map(([k, icon, label]) => (
-                <button key={k} onClick={() => setHistFilter(k)}
+                <button key={k} className="tl-press" onClick={() => setHistFilter(k)}
                   style={{
-                    flexShrink: 0, padding: '7px 12px', borderRadius: 10, border: 'none',
+                    padding: '8px 14px', borderRadius: 99,
+                    border: '1px solid ' + (histFilter === k ? 'transparent' : C.border),
                     background: histFilter === k ? C.accent : C.chip,
-                    color: histFilter === k ? C.accentText : C.sub,
-                    fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
+                    color: histFilter === k ? onColor(C.accent) : C.sub,
+                    fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
                   }}>{icon} {label}</button>
               ))}
             </div>
@@ -373,7 +379,7 @@ export default function ProfilePage() {
                   {histFilter === 'all' ? 'هنوز فعالیتی نداری. برو روی نقشه یه کافه رو بزن! ☕' : 'در این دسته فعالیتی نیست.'}
                 </div>
               ) : filteredTimeline.map((it, i) => (
-                <div key={i} style={S.historyItem}>
+                <div key={i} className="tl-row" style={S.historyItem}>
                   <div style={S.historyIcon}>{it.icon}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={S.historyCafe}>{it.title}</div>
@@ -398,7 +404,7 @@ export default function ProfilePage() {
 
 function Stat({ icon, value, label, S, accent }) {
   return (
-    <div style={{ ...S.statCard, borderColor: accent ? accent + '44' : S.statCard.borderColor }}>
+    <div className="tl-tile" style={{ ...S.statCard, borderColor: accent ? accent + '44' : S.statCard.borderColor }}>
       <div style={S.statIcon}>{icon}</div>
       <div style={S.statValue}>{Number(value).toLocaleString('fa')}</div>
       <div style={S.statLabel}>{label}</div>
@@ -419,7 +425,7 @@ const mkS = (C) => ({
   },
   backBtn: { width: 64, fontSize: 15, color: C.accent, textDecoration: 'none', fontWeight: 700 },
   brand: { fontWeight: 800, fontSize: 17, color: C.text },
-  container: { maxWidth: 480, margin: '0 auto', padding: '16px' },
+  container: { maxWidth: 560, margin: '0 auto', padding: '16px' },
   card: {
     background: 'linear-gradient(150deg,' + C.accent + '18, ' + C.card + ' 58%)', backdropFilter: 'blur(28px)',
     border: '1px solid ' + C.border, borderRadius: 20, padding: 18,
@@ -476,7 +482,8 @@ const mkS = (C) => ({
     fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
   },
 
-  badgeGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 },
+  // در ویندوز/مانیتور بزرگ ستون‌ها خودکار زیاد می‌شن به‌جای اینکه کشیده بشن
+  badgeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(104px,1fr))', gap: 10 },
   badge: {
     background: C.card, border: '1px solid ' + C.border,
     borderRadius: 16, padding: '12px 4px', textAlign: 'center', position: 'relative',
@@ -487,7 +494,8 @@ const mkS = (C) => ({
   badgeLock: { fontSize: 9, color: C.sub, marginTop: 2 },
   badgeWhen: { fontSize: 8, color: C.accent, marginTop: 2 },
 
-  historyList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  historyList: {
+    maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   historyItem: {
     display: 'flex', alignItems: 'center', gap: 12,
     background: C.card, border: '1px solid ' + C.border,
