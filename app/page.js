@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { PALETTES, PALETTE_ORDER, DEFAULT_PALETTE, DEFAULT_MODE, buildC, loadPrefs, savePalette, saveMode } from './palettes'
 import AuthGate from './AuthGate'
+import { L, ICON, ROUTE } from './labels'
 import { LEVELS, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile, subscribeToTables, subscribeToChanges, sortEventsByDistance, fetchMyClans, fetchClanStandings, fetchClanMembers, clanLevel, fetchRegionLeaderboard, fetchRegionClans } from './gameSystem'
 
 const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
@@ -907,7 +908,7 @@ function TwinLand({ session, onLogout }) {
         )}
         {isMobile&&<div style={{flex:1}}/>}
 
-        <button onClick={()=>setShowNotif(v=>!v)} style={{position:'relative',background:showNotif?C.accent:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:showNotif?C.accentText:C.text}}>
+        <button data-tut="notif-btn" onClick={()=>setShowNotif(v=>!v)} style={{position:'relative',background:showNotif?C.accent:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:showNotif?C.accentText:C.text}}>
           🔔
           {notifications.some(n=>!n.read) && (
             <span style={{position:'absolute',top:4,left:4,width:8,height:8,borderRadius:'50%',background:'#ef4444',border:'1.5px solid '+C.bg}}/>
@@ -920,7 +921,7 @@ function TwinLand({ session, onLogout }) {
         <button onClick={()=>setShowMode(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.accent,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center'}}>
           <img src="/map_style@256.png" alt="استایل نقشه" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>
         </button>
-        <button onClick={()=>setShowBoundary(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
+        <button data-tut="boundary-btn" onClick={()=>setShowBoundary(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
           <img src="/boundaries@256.png" alt="مرزبندی" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>{!isMobile&&<span> مرزها</span>}
         </button>
         <button onClick={()=>setShowPalette(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:14,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
@@ -994,7 +995,7 @@ function TwinLand({ session, onLogout }) {
         </div>
 
         {/* live pill + streak — بیرون از لایه‌ی نقشه تا همیشه بالای نقشه دیده بشن */}
-        <div style={{position:'absolute',top:10,right:(isDesktop&&panelOpen)?PANEL_W+14:10,zIndex:18,transition:'right .35s ease',height:25,boxSizing:'border-box',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'0 13px',display:'flex',gap:8,alignItems:'center',fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
+        <div data-tut="live-pill" style={{position:'absolute',top:10,right:(isDesktop&&panelOpen)?PANEL_W+14:10,zIndex:18,transition:'right .35s ease',height:25,boxSizing:'border-box',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'0 13px',display:'flex',gap:8,alignItems:'center',fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
           <span style={{color:C.text,fontWeight:700}}>☕ {filtered.length}</span>
           <span style={{color:C.border}}>|</span>
           <span><span style={{color:C.green,fontSize:8}}>●</span> {totalLive}</span>
@@ -1050,7 +1051,7 @@ function TwinLand({ session, onLogout }) {
               ))}
             </div>
           </div>
-          <button onClick={()=>setNavOpen(v=>!v)} title={navOpen?'مخفی کردن کنترل‌ها':'نمایش کنترل‌ها'} style={{width:32,height:32,borderRadius:9,border:navOpen?'1px solid '+C.border:'none',cursor:'pointer',fontFamily:'inherit',background:navOpen?C.glass:C.grad,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',boxShadow:navOpen?'0 2px 6px rgba(0,0,0,.08)':'0 6px 22px '+C.accent+'99',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .3s ease, box-shadow .3s ease, transform .18s cubic-bezier(.34,1.6,.5,1)',animation:navOpen?'none':'tlNavPulse 2s ease-in-out infinite'}} onMouseDown={e=>e.currentTarget.style.transform='scale(.86)'} onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
+          <button data-tut="map-nav" onClick={()=>setNavOpen(v=>!v)} title={navOpen?'مخفی کردن کنترل‌ها':'نمایش کنترل‌ها'} style={{width:32,height:32,borderRadius:9,border:navOpen?'1px solid '+C.border:'none',cursor:'pointer',fontFamily:'inherit',background:navOpen?C.glass:C.grad,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',boxShadow:navOpen?'0 2px 6px rgba(0,0,0,.08)':'0 6px 22px '+C.accent+'99',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .3s ease, box-shadow .3s ease, transform .18s cubic-bezier(.34,1.6,.5,1)',animation:navOpen?'none':'tlNavPulse 2s ease-in-out infinite'}} onMouseDown={e=>e.currentTarget.style.transform='scale(.86)'} onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
             <span style={{display:'inline-block',fontSize:16,fontWeight:900,lineHeight:1,color:navOpen?C.text:'#fff',transition:'transform .4s cubic-bezier(.34,1.7,.4,1)',transform:navOpen?'rotate(0deg)':'rotate(180deg)'}}>▾</span>
           </button>
         </div>
@@ -1090,7 +1091,7 @@ function TwinLand({ session, onLogout }) {
       </div>
 
       {/* BOTTOM NAV */}
-      <div style={{height:BH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'stretch'}}>
+      <div data-tut="bottom-nav" style={{height:BH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'stretch'}}>
         {NAV.map(item=>{
           const active=tab===item.key
           const isz=isMobile?26:30
@@ -1122,19 +1123,19 @@ function TwinLand({ session, onLogout }) {
             {[
               {key:'map',icon:'🗺',img:'/icon_map_active@2x.png',label:'نقشه',href:null},
               {key:'missions',icon:'📋',img:'/icon_mission_active@2x.png',label:'ماموریت‌ها',href:null},
-              {key:'profile',icon:'👤',img:'/icon_profile_active@2x.png',label:'پروفایل',href:'/profile'},
-              {key:'rank',icon:'🏆',img:'/icon_rank_active@2x.png',label:'رتبه‌بندی',href:'/leaderboard'},
-              {key:'clans',icon:'🛡',img:'/icon_clan_active@2x.png',label:'کلن‌ها',href:'/clan'},
-              {key:'quests',icon:'🎯',label:'رویدادها',href:'/quests'},
-              {key:'gallery',icon:'💎',label:'گنجینه',href:'/gallery'},
-              {key:'business',icon:'🏪',label:'پنل کافه‌دار',href:'/business',smeOnly:true},
+              {key:'profile',icon:ICON.profile,img:'/icon_profile_active@2x.png',label:L.profile,href:ROUTE.profile},
+              {key:'rank',icon:ICON.leaderboard,img:'/icon_rank_active@2x.png',label:L.leaderboard,href:ROUTE.leaderboard},
+              {key:'clans',icon:ICON.clans,img:'/icon_clan_active@2x.png',label:L.clans,href:ROUTE.clans},
+              {key:'quests',icon:ICON.quests,label:L.quests,href:ROUTE.quests},
+              {key:'gallery',icon:ICON.gallery,label:L.gallery,href:ROUTE.gallery},
+              {key:'business',icon:ICON.business,label:L.business,href:ROUTE.business,smeOnly:true},
               {key:'admin',icon:'🛡️',label:'پنل ادمین',href:'/admin',adminOnly:true},
-              {key:'xp',icon:'⭐',img:'/xp_coin@256-1.png',label:'سیستم XP',href:null},
-              {key:'tutorial',icon:'🎓',label:'آموزش',href:null},
-              {key:'settings',icon:'⚙️',img:'/settings@256.png',label:'تنظیمات',href:null},
+              {key:'xp',icon:ICON.xpSystem,img:'/xp_coin@256-1.png',label:L.xpSystem,href:null},
+              {key:'tutorial',icon:ICON.tutorial,label:L.tutorial,href:null},
+              {key:'settings',icon:ICON.settings,img:'/settings@256.png',label:L.settings,href:null},
               {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
               {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
-              {key:'logout',icon:'🚪',label:'خروج',href:null},
+              {key:'logout',icon:ICON.logout,label:L.logout,href:null},
             ].filter(item=>(!item.adminOnly||isAdmin)&&(!item.smeOnly||accountType==='sme')).map((item,i,arr)=>{
               const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
               if(item.href){
@@ -2072,21 +2073,80 @@ function NotificationPanel({C, notifications, onMark, onMarkAll, onClose}) {
 // فقط بار اول برای هر تازه‌وارد (وضعیت سمت سرور در profiles.tutorial_seen).
 // از منو → «آموزش» هم می‌شه دوباره دیدش (replay، بدون ثبت مجدد).
 const TUT_NEON='#CCFF00'
+// مسیر آموزش: از «اینجا کجاست» شروع می‌شه، کاربر رو قدم‌به‌قدم تا اولین
+// چک‌این و بعد بقیه‌ی بخش‌ها می‌بره. هر مرحله به المان واقعیِ خودش می‌چسبه.
+// اسم بخش‌ها از labels.js میاد تا اگه اسمی عوض شد اینجا هم خودکار درست بشه.
 const TUTORIAL_STEPS = [
-  { key:'welcome_map',    forRole:'any', target:null,                        title:'به TwinLand خوش اومدی! ☕', text:'روی هر کافه‌ی نقشه بزن تا چک‌این کنی و XP بگیری.' },
-  { key:'event_banner',   forRole:'any', target:'[data-tut="event-banner"]', title:'رویدادهای زنده 🎉', text:'این نوار هر چیزی که کافه‌دارها همین الان منتشر می‌کنن رو نشون می‌ده — روش بزن تا بری به کافه‌ش.' },
-  { key:'gallery_intro',  forRole:'any', target:'[data-tut="menu-btn"]',     title:'گنجینه 💎', text:'با چک‌این و شرکت در رویدادها آیتم‌های کمیاب جمع می‌کنی. از همین منو برو «گنجینه» تا ببینیشون.' },
-  { key:'business_intro', forRole:'sme', target:'[data-tut="menu-btn"]',     title:'پنل کافه‌دار 🏪', text:'از منو → «پنل کافه‌دار» می‌تونی رویداد/تخفیف/آیتم کلکسیونی منتشر کنی تا همون لحظه رو نقشه‌ی همه بیاد.' },
+  { key:'welcome', forRole:'any', target:null, emoji:'👋',
+    title:'خوش اومدی به '+L.app+'!',
+    text:'اینجا کافه‌گردی تبدیل می‌شه به بازی. هر بار که به یه کافه سر می‌زنی، امتیاز و جایزه‌ی واقعی می‌گیری. ۳۰ ثانیه وقت بده تا کل مسیر رو نشونت بدم.' },
+
+  { key:'map_intro', forRole:'any', target:null, emoji:'🗺️',
+    title:'این نقشه‌ی توئه',
+    text:'هر نشان روی نقشه یه کافه‌ی واقعی توی شهره. با انگشت بکش و بزرگ‌نمایی کن تا کافه‌های اطرافت رو ببینی.' },
+
+  { key:'map_controls', forRole:'any', target:'[data-tut="map-nav"]', emoji:'🎮',
+    title:'کنترل نقشه',
+    text:'اگه نمی‌خوای با انگشت جابه‌جا کنی، این دکمه رو بزن: کلیدهای بالا/پایین/چپ/راست و بزرگ‌نمایی باز می‌شن. دکمه‌ی وسط (⌖) هم برت می‌گردونه به مرکز شهر.' },
+
+  { key:'first_checkin', forRole:'any', target:null, emoji:'☕',
+    title:'قدم اول: یه کافه رو بزن',
+    text:'روی هر کافه‌ی نقشه بزن تا پنجره‌ش باز بشه. اونجا دکمه‌ی بزرگ «'+ICON.checkin+' چک‌این» رو می‌زنی — همین کار بهت XP می‌ده و اسمت رو وارد جدول رتبه‌بندی می‌کنه. مهم: هر کافه روزی یک‌بار.' },
+
+  { key:'cafe_actions', forRole:'any', target:null, emoji:'❤️',
+    title:'داخل پنجره‌ی کافه چی هست؟',
+    text:'کنار دکمه‌ی چک‌این چهار تا دکمه داری: «'+L.hearts+'» کافه رو ذخیره می‌کنه (کافه‌دار می‌بینه چندتا قلب گرفته)، «مسیر» مسیریابی باز می‌کنه، «اشتراک» و «نظر». اگه اون کافه رویداد فعال داشته باشه، همون بالا دکمه‌ی «شرکت در رویداد» رو می‌بینی.' },
+
+  { key:'live_pill', forRole:'any', target:'[data-tut="live-pill"]', emoji:'📊',
+    title:'آمار زنده',
+    text:'اینجا لحظه‌ای می‌بینی چندتا کافه روی نقشه‌ست، چند نفر همین الان جایی چک‌این کردن، و خودت تا حالا چندتا کافه رفتی.' },
+
+  { key:'event_banner', forRole:'any', target:'[data-tut="event-banner"]', emoji:'🎉',
+    title:L.events+' زنده',
+    text:'هر تخفیف یا رویدادی که کافه‌دارها همین الان منتشر می‌کنن اینجا می‌چرخه. روش بزنی مستقیم می‌ری به همون کافه. با کشیدن چپ/راست هم می‌تونی بعدی رو ببینی.' },
+
+  { key:'boundary', forRole:'any', target:'[data-tut="boundary-btn"]', emoji:'📍',
+    title:'مرزها و مناطق',
+    text:'با این دکمه می‌تونی مرز مناطق شهر رو روی نقشه بیاری، منطقه‌ی دلخواهت رو انتخاب کنی و فقط کافه‌های همون‌جا رو ببینی. رتبه‌بندی همون منطقه هم برات باز می‌شه.' },
+
+  { key:'bottom_nav', forRole:'any', target:'[data-tut="bottom-nav"]', emoji:'🧭',
+    title:'پنج بخش اصلی',
+    text:'از این نوار همه‌جا می‌ری: «'+L.map+'» · «'+L.questsShort+'» (کارهایی که جایزه دارن) · «'+L.clanShort+'» (با دوستات تیم بزن) · «'+L.leaderboardShort+'» (جایگاهت بین بقیه) · «'+L.profile+'».' },
+
+  { key:'quests_intro', forRole:'any', target:'[data-tut="bottom-nav"]', emoji:ICON.quests,
+    title:L.quests+' چطور کار می‌کنن؟',
+    text:'کافه‌دارها ماموریت می‌سازن؛ مثلاً «۳ بار بیا، قهوه‌ی چهارم مهمون ما». هر چک‌این پیشرفتت رو جلو می‌بره و آخرش یه کد تخفیف واقعی می‌گیری که توی کافه نشونش می‌دی.' },
+
+  { key:'gallery_intro', forRole:'any', target:'[data-tut="menu-btn"]', emoji:ICON.gallery,
+    title:L.gallery,
+    text:'با هر چک‌این و ماموریت، آیتم‌های کلکسیونی کمیاب جمع می‌کنی — از معمولی تا افسانه‌ای. از این منو برو «'+L.gallery+'» و روی هر کارت بزن تا بچرخه و بگه از کدوم کافه و کِی گرفتیش.' },
+
+  { key:'notif_intro', forRole:'any', target:'[data-tut="notif-btn"]', emoji:'🔔',
+    title:L.notifications,
+    text:'هر وقت جایزه‌ای بگیری، رویداد جدیدی نزدیکت منتشر بشه یا رتبه‌ت عوض بشه، اینجا خبردار می‌شی. نقطه‌ی قرمز یعنی چیز جدیدی داری.' },
+
+  { key:'menu_intro', forRole:'any', target:'[data-tut="menu-btn"]', emoji:'☰',
+    title:'منوی کامل',
+    text:'همه‌چیز از اینجا در دسترسه: '+L.gallery+'، '+L.leaderboard+'، '+L.clans+'، '+L.xpSystem+'، تم و پالت رنگی، و همین «'+L.tutorial+'» که هر وقت خواستی دوباره ببینیش.' },
+
+  { key:'business_intro', forRole:'sme', target:'[data-tut="menu-btn"]', emoji:ICON.business,
+    title:L.business,
+    text:'تو حساب کافه‌داری داری! از منو → «'+L.business+'» می‌تونی رویداد، تخفیف و آیتم کلکسیونی منتشر کنی که همون لحظه روی نقشه‌ی همه‌ی کاربرها بیاد، و آمار مشتری‌هات رو ببینی.' },
+
+  { key:'go', forRole:'any', target:null, emoji:'🚀',
+    title:'آماده‌ای!',
+    text:'حالا برو روی نقشه، نزدیک‌ترین کافه رو بزن و اولین چک‌اینت رو ثبت کن. اگه چیزی یادت رفت، از منو → «'+L.tutorial+'» دوباره همین راهنما رو باز کن.' },
 ]
 function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, tutorialLoaded, replay, onReplayEnd, isMobile}) {
   const [replayIdx, setReplayIdx] = useState(0)
   const [rect, setRect] = useState(null)
   const roleSteps = TUTORIAL_STEPS.filter(s => s.forRole==='any' || s.forRole===accountType)
 
-  // مرحله‌ی فعلی: در حالت عادی اولین دیده‌نشده؛ در حالت replay بر اساس ایندکس
-  const step = replay
-    ? (roleSteps[replayIdx] || null)
-    : (tutorialLoaded ? roleSteps.find(s => !tutorialSeen[s.key]) : null)
+  // مرحله‌ی فعلی — یک ایندکس واحد برای هر دو حالت (اولین‌بار و replay)
+  const firstUnseen = tutorialLoaded ? roleSteps.findIndex(s => !tutorialSeen[s.key]) : -1
+  const stepIdx = replay ? replayIdx : firstUnseen
+  const step = stepIdx >= 0 ? (roleSteps[stepIdx] || null) : null
+  const stepNum = stepIdx + 1
 
   // موقعیت المان هدف رو پیدا کن (و با تغییر سایز صفحه به‌روز نگه دار)
   useEffect(()=>{
@@ -2094,7 +2154,12 @@ function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, 
     function measure(){
       if(!step.target){ setRect(null); return }
       const el = typeof document!=='undefined' ? document.querySelector(step.target) : null
-      if(el){ const r=el.getBoundingClientRect(); setRect({top:r.top,left:r.left,width:r.width,height:r.height}) }
+      if(el){
+        const r=el.getBoundingClientRect()
+        // اگه المان بیرون از دیده، نرم بیارش تو
+        if(r.top<0 || r.bottom>window.innerHeight){ try{ el.scrollIntoView({block:'center',behavior:'smooth'}) }catch(e){} }
+        setRect({top:r.top,left:r.left,width:r.width,height:r.height})
+      }
       else setRect(null)
     }
     measure()
@@ -2111,9 +2176,16 @@ function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, 
   if(!session || !session.user) return null
   if(!step) return null
 
-  const isLast = replay
-    ? replayIdx >= roleSteps.length-1
-    : roleSteps.filter(s=>!tutorialSeen[s.key]).length<=1
+  const isLast = stepIdx >= roleSteps.length - 1
+
+  // «قبلی»: در replay فقط ایندکس عقب می‌ره؛ در حالت اولین‌بار، مرحله‌ی قبلی
+  // رو دوباره ندیده علامت می‌زنیم تا کاربر بتونه برگرده و مرور کنه.
+  function prev(){
+    if(stepIdx<=0) return
+    if(replay){ setReplayIdx(i=>Math.max(0,i-1)); return }
+    const pk = roleSteps[stepIdx-1].key
+    setTutorialSeen(prevSeen=>{ const n={...prevSeen}; delete n[pk]; return n })
+  }
 
   function next(){
     if(replay){
@@ -2159,17 +2231,25 @@ function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, 
         <div style={{position:'fixed',top:rect.top-7,left:rect.left-7,width:rect.width+14,height:rect.height+14,zIndex:4001,borderRadius:16,pointerEvents:'none',animation:'tlSpotPulse 1.6s ease-in-out infinite'}}/>
       )}
       <div style={{...cardStyle,animation:'coachPop .32s ease'}}>
-        <div style={{background:'rgba(18,18,22,.96)',border:'2px solid '+TUT_NEON,borderRadius:20,padding:'16px 18px',boxShadow:'0 0 26px '+TUT_NEON+'55, 0 12px 40px rgba(0,0,0,.4)',maxWidth:420,margin:'0 auto'}}>
-          <div style={{fontSize:15,fontWeight:900,color:TUT_NEON,marginBottom:5}}>{step.title}</div>
-          <div style={{fontSize:12.5,color:'#EDEDEF',lineHeight:1.8}}>{step.text}</div>
-          <div style={{display:'flex',gap:8,marginTop:13,alignItems:'center'}}>
-            <button onClick={next} style={{flex:1,background:TUT_NEON,color:'#111',border:'none',borderRadius:12,padding:'9px 16px',fontSize:13,fontWeight:900,fontFamily:'inherit'}}>{isLast?'شروع کن! 🚀':'بعدی ←'}</button>
-            <button onClick={skipAll} style={{background:'none',border:'1px solid rgba(255,255,255,.25)',color:'#bbb',borderRadius:12,padding:'9px 14px',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>رد شو</button>
+        <div style={{background:'rgba(18,18,22,.97)',border:'2px solid '+TUT_NEON,borderRadius:20,padding:'15px 17px',boxShadow:'0 0 26px '+TUT_NEON+'55, 0 12px 40px rgba(0,0,0,.45)',maxWidth:430,margin:'0 auto'}}>
+          <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
+            <span style={{fontSize:24,flexShrink:0}}>{step.emoji||'💡'}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:900,color:TUT_NEON,lineHeight:1.4}}>{step.title}</div>
+              <div style={{fontSize:9.5,color:'rgba(255,255,255,.45)',marginTop:1}}>قدم {(stepNum).toLocaleString('fa')} از {roleSteps.length.toLocaleString('fa')}</div>
+            </div>
           </div>
-          <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:11}}>
-            {roleSteps.map((s,i)=>{
-              const active = replay ? i===replayIdx : s.key===step.key
-              return <span key={s.key} style={{width:active?16:5,height:5,borderRadius:99,background:active?TUT_NEON:'rgba(255,255,255,.25)',transition:'all .3s'}}/>
+          <div style={{fontSize:12.5,color:'#EDEDEF',lineHeight:1.85}}>{step.text}</div>
+          <div style={{display:'flex',gap:7,marginTop:14,alignItems:'center'}}>
+            {stepNum>1 && <button onClick={prev} style={{background:'none',border:'1px solid rgba(255,255,255,.25)',color:'#ccc',borderRadius:12,padding:'9px 13px',fontSize:12,fontWeight:800,fontFamily:'inherit',flexShrink:0}}>→ قبلی</button>}
+            <button onClick={next} style={{flex:1,background:TUT_NEON,color:'#111',border:'none',borderRadius:12,padding:'10px 16px',fontSize:13,fontWeight:900,fontFamily:'inherit'}}>{isLast?'بزن بریم! 🚀':'بعدی ←'}</button>
+            <button onClick={skipAll} style={{background:'none',border:'1px solid rgba(255,255,255,.2)',color:'#999',borderRadius:12,padding:'9px 12px',fontSize:11.5,fontWeight:700,fontFamily:'inherit',flexShrink:0}}>رد شو</button>
+          </div>
+          <div style={{display:'flex',gap:3,justifyContent:'center',marginTop:12,flexWrap:'wrap'}}>
+            {roleSteps.map((st,i)=>{
+              const active = i===stepIdx
+              const done = i<stepIdx
+              return <span key={st.key} style={{width:active?14:4,height:4,borderRadius:99,background:active?TUT_NEON:done?TUT_NEON+'66':'rgba(255,255,255,.2)',transition:'all .3s'}}/>
             })}
           </div>
         </div>
