@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
 import { SB_URL, SB_KEY, getSession, subscribeToTables } from '../gameSystem'
 import { L, ICON, fa } from '../labels'
+import { UIStyles, useDragScroll, hscroll, onColor } from '../ui'
 
 // «عمومی» عمداً حذف شد — دیگه ماموریت/رویداد بدون دسته نداریم.
 // اگه ماموریت قدیمی‌ای هنوز category='general' داشته باشه، به‌جای اینکه ناپدید
@@ -80,6 +81,7 @@ export default function QuestsPage() {
 
   const C = buildC(pal.palette, pal.mode)
   const S = mkS(C)
+  const catRef = useDragScroll()
 
   // ── تغییر مهم: ماموریت‌های تکمیل‌شده دیگه حذف نمی‌شن ─────────────────────
   // قبلاً با فیلتر از لیست بیرون می‌رفتن، برای همین کاربر نمی‌فهمید چی رو تموم
@@ -94,6 +96,7 @@ export default function QuestsPage() {
 
   return (
     <div style={S.page}>
+      <UIStyles/>
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes qFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
         @keyframes qPulse{0%,100%{opacity:1}50%{opacity:.55}}
@@ -121,10 +124,9 @@ export default function QuestsPage() {
 
         {tab === 'active' && (
           <>
-            <div onWheel={(e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft -= e.deltaY }}
-              style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none', overscrollBehaviorX: 'contain' }}>
+            <div ref={catRef} className="tl-hscroll" style={{ ...hscroll, gap: 6, marginBottom: 12 }}>
               {[['all', '🎯', 'همه'], ...Object.keys(CATEGORY_LABEL).map(k => [k, CATEGORY_ICON[k], CATEGORY_LABEL[k]])].map(([k, icon, label]) => (
-                <button key={k} className="q-chip" onClick={() => setCatFilter(k)} style={{ flexShrink: 0, padding: '7px 13px', borderRadius: 99, border: '1px solid ' + C.border, background: catFilter === k ? C.accent : C.chip, color: catFilter === k ? C.accentText : C.sub, fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>{icon} {label}</button>
+                <button key={k} className="q-chip" onClick={() => setCatFilter(k)} style={{ flexShrink: 0, padding: '7px 13px', borderRadius: 99, border: '1px solid ' + C.border, background: catFilter === k ? C.accent : C.chip, color: catFilter === k ? onColor(C.accent) : C.sub, fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>{icon} {label}</button>
               ))}
             </div>
             {doneCount > 0 && (
@@ -187,7 +189,7 @@ function QuestCard({ C, q, prog, done, idx, tick }) {
     : { background: 'linear-gradient(145deg,' + C.accent + '14, ' + C.card + ' 55%)', border: '1.5px solid ' + C.border }
 
   return (
-    <div className={'q-card' + (done ? '' : ' live')} style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, padding: 16, marginBottom: 12, boxShadow: done ? 'none' : '0 6px 20px rgba(0,0,0,.07)', animationDelay: Math.min(idx * 45, 500) + 'ms', ...cardStyle }}>
+    <div className={'q-card tl-tile' + (done ? ' tl-off' : '')} style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, padding: 16, marginBottom: 12, boxShadow: done ? 'none' : '0 6px 20px rgba(0,0,0,.07)', animationDelay: Math.min(idx * 45, 500) + 'ms', ...cardStyle }}>
       {!done && <div style={{ position: 'absolute', top: 0, bottom: 0, width: '45%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.10),transparent)', animation: 'qShine 4s ease-in-out infinite', pointerEvents: 'none' }} />}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, position: 'relative' }}>
@@ -264,5 +266,5 @@ const mkS = (C) => ({
   container: { maxWidth: 480, margin: '0 auto', padding: '16px' },
   tabs: { display: 'flex', gap: 8, marginBottom: 14 },
   tab: { flex: 1, padding: '11px', borderRadius: 14, border: 'none', background: C.chip, color: C.sub, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
-  tabActive: { flex: 1, padding: '11px', borderRadius: 14, border: 'none', background: C.accent, color: C.accentText, fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
+  tabActive: { flex: 1, padding: '11px', borderRadius: 14, border: 'none', background: C.accent, color: onColor(C.accent), fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
 })
