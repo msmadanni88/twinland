@@ -12,6 +12,7 @@ export default function GalleryPage() {
   const [defs, setDefs] = useState([])        // کاتالوگ کامل
   const [owned, setOwned] = useState({})      // code -> ردیف کامل award
   const [cafeMap, setCafeMap] = useState({})  // cafe_id -> {name, district}
+  const [bizMap, setBizMap] = useState({})    // business_id -> cafe_id
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [selected, setSelected] = useState(null)
@@ -28,16 +29,21 @@ export default function GalleryPage() {
     const h = H(s)
     // select=* می‌گیریم تا هر ستون اضافه‌ای (مثل cafe_id/quest_id) که وجود داره
     // خودکار استفاده بشه، بدون اینکه لازم باشه این فایل عوض بشه.
-    const [allDefs, myAwards, allCafes] = await Promise.all([
+    const [allDefs, myAwards, allCafes, allBiz] = await Promise.all([
       get('collectible_defs?select=*&order=rarity.asc,created_at.asc', h),
       get('awards?user_id=eq.' + s.user.id + '&select=*', h),
       get('cafes?select=id,name,district', h),
+      // awards ستون business_id داره (نه cafe_id) — پس اول باید business رو
+      // به cafe نگاشت کنیم تا بفهمیم جایزه از کدوم کافه اومده.
+      get('businesses?select=id,cafe_id', h),
     ])
     setDefs(Array.isArray(allDefs) ? allDefs : [])
     const om = {}; (Array.isArray(myAwards) ? myAwards : []).forEach(a => { if (a.code) om[a.code] = a })
     setOwned(om)
     const cm = {}; (Array.isArray(allCafes) ? allCafes : []).forEach(c => { cm[c.id] = c })
     setCafeMap(cm)
+    const bm = {}; (Array.isArray(allBiz) ? allBiz : []).forEach(b => { bm[b.id] = b.cafe_id })
+    setBizMap(bm)
     setLoading(false)
   }, [])
 
@@ -71,7 +77,9 @@ export default function GalleryPage() {
   // نبود، چیزی نشون نمی‌دیم — به‌جای اینکه اسم الکی بسازیم.
   function originOf(def) {
     const aw = owned[def.code]
-    const cid = (aw && (aw.cafe_id || aw.ref_cafe_id)) || def.cafe_id || null
+    // مسیر واقعی: awards.business_id → businesses.cafe_id → cafes.name
+    const viaBiz = aw && aw.business_id ? bizMap[aw.business_id] : null
+    const cid = viaBiz || (aw && aw.cafe_id) || def.cafe_id || null
     return cid ? cafeMap[cid] : null
   }
 
