@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
-import { getSession, subscribeToTables, SB_URL, SB_KEY } from '../gameSystem'
+import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '@/lib/theme/palettes'
+import { SB_URL, SB_KEY } from '@/lib/config'
+import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
 
 export default function AdminPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })

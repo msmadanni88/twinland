@@ -1,8 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-
-const SB_URL = 'https://pkkdepecbzrnmejnseqg.supabase.co'
-const SB_KEY = 'sb_publishable_g2Qy4sXwgvYPchIU3aB4ew_JTvP1PId'
+import { SB_URL, SB_KEY } from '@/lib/config'
 
 // --- Supabase Auth (GoTrue) REST helper ---
 async function gotrue(path, body){

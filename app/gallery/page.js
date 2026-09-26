@@ -3,10 +3,11 @@
 // اسم صفحه از app/labels.js میاد — اینجا دستی ننویس.
 
 import { useState, useEffect, useCallback } from 'react'
-import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
-import { SB_URL, SB_KEY, getSession, subscribeToTables } from '../gameSystem'
-import { L, ICON, RARITY_LOCKED, rarityOf, fa, SOURCE_LABEL } from '../labels'
-import { UIStyles, useDragScroll, hscroll, onColor } from '../ui'
+import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '@/lib/theme/palettes'
+import { SB_URL, SB_KEY } from '@/lib/config'
+import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
+import { L, ICON, RARITY_LOCKED, rarityOf, fa, SOURCE_LABEL } from '@/lib/theme/labels'
+import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
 
 export default function GalleryPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })

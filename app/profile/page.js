@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
+import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '@/lib/theme/palettes'
+import { SB_URL, SB_KEY } from '@/lib/config'
 import {
-  SB_URL, SB_KEY, getLevelInfo, getSession,
-  fetchMyProfile, fetchXpHistory, fetchAwards, subscribeToTables, REASON_LABELS,
-} from '../gameSystem'
-import { L, ICON, fa as faNum } from '../labels'
-import { UIStyles, useDragScroll, hscroll, onColor, isDarkC } from '../ui'
+  getLevelInfo, getSession, fetchMyProfile, fetchXpHistory, fetchAwards, subscribeToTables, REASON_LABELS,
+} from '@/lib/game/gameSystem'
+import { L, ICON, fa as faNum } from '@/lib/theme/labels'
+import { UIStyles, useDragScroll, hscroll, onColor, isDarkC } from '@/lib/theme/ui'
 
 // مدال‌های محاسبه‌شده از آمار واقعی (fallback وقتی جدول awards هنوز پر نشده)
 const BADGE_DEFS = [

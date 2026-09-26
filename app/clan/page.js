@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
-import { L, ICON } from '../labels'
-import { UIStyles, onColor } from '../ui'
+import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '@/lib/theme/palettes'
+import { L, ICON } from '@/lib/theme/labels'
+import { UIStyles, onColor } from '@/lib/theme/ui'
 import {
   getSession, getLevelInfo, clanLevel,
   fetchMyClans, fetchClanStandings, fetchClanMembers, fetchClanMissions, subscribeToTables,
   clanCreate, clanJoin, clanLeave, clanSetActive,
-} from '../gameSystem'
+} from '@/lib/game/gameSystem'
 
 const EMBLEMS = ['⚔️', '🌙', '☕', '⛰️', '🔥', '🐺', '🦊', '🦁', '👑', '💎']
 const COLORS  = ['#8b5cf6', '#3b82f6', '#ec4899', '#10b981', '#f97316', '#ef4444', '#eab308']

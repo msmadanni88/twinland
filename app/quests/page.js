@@ -3,10 +3,11 @@
 // اسم صفحه از app/labels.js میاد — اینجا دستی ننویس.
 
 import { useState, useEffect, useCallback } from 'react'
-import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
-import { SB_URL, SB_KEY, getSession, subscribeToTables } from '../gameSystem'
-import { L, ICON, fa } from '../labels'
-import { UIStyles, useDragScroll, hscroll, onColor } from '../ui'
+import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '@/lib/theme/palettes'
+import { SB_URL, SB_KEY } from '@/lib/config'
+import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
+import { L, ICON, fa } from '@/lib/theme/labels'
+import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
 
 // «عمومی» عمداً حذف شد — دیگه ماموریت/رویداد بدون دسته نداریم.
 // اگه ماموریت قدیمی‌ای هنوز category='general' داشته باشه، به‌جای اینکه ناپدید

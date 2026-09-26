@@ -1,0 +1,1185 @@
+'use client'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { SB_KEY, SB_URL } from '@/lib/config'
+import { DEFAULT_MODE, DEFAULT_PALETTE, PALETTES, PALETTE_ORDER, buildC, loadPrefs, saveMode, savePalette } from '@/lib/theme/palettes'
+import { ICON, L, ROUTE } from '@/lib/theme/labels'
+import { UIStyles, hscroll, onColor, useDragScroll } from '@/lib/theme/ui'
+import { fetchRegionClans, fetchRegionLeaderboard, getLevelInfo, getSession, subscribeToTables } from '@/lib/game/gameSystem'
+import { CafePopup } from '@/components/cafe/CafePopup'
+import { EventBanner } from '@/components/map/EventBanner'
+import { MapSettingsPopup } from '@/components/map/MapSettingsPopup'
+import { RegionFilterPopup } from '@/components/map/RegionFilterPopup'
+import { RegionResultsPanel } from '@/components/map/RegionResultsPanel'
+import { BOUNDARY_SOURCES, MAP_MODES, clusterRadiusOf, makeClusterGroup } from '@/components/map/mapLayers'
+import { CelebrationOverlay } from '@/components/overlays/CelebrationOverlay'
+import { LedAdBar } from '@/components/overlays/LedAdBar'
+import { NotificationPanel } from '@/components/overlays/NotificationPanel'
+import { TutorialCoach } from '@/components/overlays/TutorialCoach'
+import { XPPanel } from '@/components/overlays/XPPanel'
+import { ClanTab } from '@/components/panels/ClanTab'
+import { DashboardTab } from '@/components/panels/DashboardTab'
+import { MissionsTab } from '@/components/panels/MissionsTab'
+import { ProfileTab } from '@/components/panels/ProfileTab'
+import { RankTab } from '@/components/panels/RankTab'
+import { BP, CITIES, NAV, ZONES, getColor } from '@/lib/constants'
+import { cafeInLayer, digitsOnly } from '@/lib/geo'
+
+export function TwinLand({ session, onLogout }) {
+  const mapRef   = useRef(null)
+  const mapInst  = useRef(null)
+  const mapCenterRef = useRef(null)
+  const mksRef   = useRef({})
+  const clusterRef = useRef(null)   // گروه خوشه‌بندی مارکرها
+
+  const [cafes,      setCafes]      = useState([])
+  const [city,       setCity]       = useState('tehran')
+  const [mapMode,    setMapMode]    = useState('normal')
+  const [zone,       setZone]       = useState('all')
+  const [search,     setSearch]     = useState('')
+  const logoTapRef = useRef({count:0,timer:null})
+  const [selCafe,    setSelCafe]    = useState(null)
+  const [activeEventCafeId, setActiveEventCafeId] = useState(null)
+  const [tab,        setTab]        = useState('map')
+  const [panelOpen,  setPanelOpen]  = useState(false)
+  const [panelTab,   setPanelTab]   = useState('dashboard')
+  const panelTabsRef = useDragScroll()   // نوار تب‌های ساید بار: چرخ ماوس + کشیدن با کلیک
+  const [showMenu,   setShowMenu]   = useState(false)
+  const [showCity,   setShowCity]   = useState(false)
+  const [showMode,   setShowMode]   = useState(false)
+  const [showXP,     setShowXP]     = useState(false)
+  const [showNotif,  setShowNotif]  = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [tutorialSeen, setTutorialSeen] = useState({})
+  const [tutorialLoaded, setTutorialLoaded] = useState(false)   // تا پروفایل نیومده، تیوتوریال نشون نده (رفع فلشِ هر لاگین)
+  const [tutorialReplay, setTutorialReplay] = useState(false)   // پخش دوباره از منوی «آموزش»
+  const [celebration, setCelebration] = useState(null)          // دیتای انیمیشن جشن بعد از چک‌این
+  const [toast,      setToast]      = useState(null)
+  const [mapReady,   setMapReady]   = useState(false)
+  const [mapLoading, setMapLoading] = useState(true)
+  const [live,       setLive]       = useState({})
+  const [checkedIn,  setCheckedIn]  = useState(new Set())
+  const [favs,       setFavs]       = useState(new Set())
+  const [xp,         setXp]         = useState(0)
+  const [streak,     setStreak]     = useState(0)
+  const [coins,      setCoins]      = useState(0)
+  const [userName,   setUserName]   = useState('')
+  const [isAdmin,    setIsAdmin]    = useState(false)
+  // ── حالت نمایش مالک اپ ─────────────────────────────────────────────────
+  // isOwner: فقط برای نمایشِ سوییچ در منو (امنیت واقعی سمت سروره — RPC
+  // set_view_mode ایمیل رو از auth.users چک می‌کنه، نه از کلاینت).
+  // viewAsUser: وقتی روشنه، سایت دقیقاً مثل یه کاربر عادی رفتار می‌کنه.
+  const [isOwner,    setIsOwner]    = useState(false)
+  const [viewAsUser, setViewAsUser] = useState(false)
+  const effAdmin = isAdmin && !viewAsUser
+  const [accountType, setAccountType] = useState('user')
+  const [navOpen,    setNavOpen]    = useState(false)
+  const [xpAnim,     setXpAnim]     = useState(null)
+  const [vw,         setVw]         = useState(800)
+  const [boundaryMode, setBoundaryMode] = useState('off') // 'off' | 'province' | 'district'
+  const [showBoundary, setShowBoundary] = useState(false)
+  const [showMapSettings, setShowMapSettings] = useState(false)
+  // تنظیمات نمایش نقشه (ذخیره در localStorage)
+  const [mapDisplay, setMapDisplay] = useState(()=>{
+    if(typeof window==='undefined') return {markerMode:'pin',cluster:'auto',regionCluster:'off',dotColor:'#3b82f6',dotSize:8}
+    try{ const s=JSON.parse(localStorage.getItem('tl_mapDisplay')||'{}')
+      return {markerMode:s.markerMode||'pin',cluster:s.cluster||'auto',regionCluster:s.regionCluster||'off',dotColor:s.dotColor||'#3b82f6',dotSize:s.dotSize||8}
+    }catch(e){ return {markerMode:'pin',cluster:'auto',regionCluster:'off',dotColor:'#3b82f6',dotSize:8} }
+  })
+  useEffect(()=>{ try{ localStorage.setItem('tl_mapDisplay',JSON.stringify(mapDisplay)) }catch(e){} },[mapDisplay])
+  // ── فیلتر منطقه‌ای ──
+  const [selectedRegions, setSelectedRegions] = useState([])   // نام مناطق انتخاب‌شده روی نقشه
+  const [showRegionFilter, setShowRegionFilter] = useState(false) // پاپ‌آپ فیلتر
+  const [regionFilter, setRegionFilter] = useState({            // انتخاب‌های کاربر در پاپ‌آپ
+    categories: ['cafe','restaurant'], showClans:false, showLeaderboard:false, showHeatmap:false,
+  })
+  const [filterApplied, setFilterApplied] = useState(false)
+  const regionLayersRef = useRef({})   // نگاشت نام منطقه → لایه Leaflet (برای زوم)
+  const [regionResults, setRegionResults] = useState(null) // {leaderboard:[], clans:[], region:'1'} یا null
+  const [showRegionResults, setShowRegionResults] = useState(false)
+  const [paletteKey, setPaletteKey] = useState(DEFAULT_PALETTE)
+  const [themeMode,  setThemeMode]  = useState(DEFAULT_MODE)
+  const [showPalette, setShowPalette] = useState(false)
+
+  // ساخت آبجکت رنگ از پالت فعال (هر بار که پالت یا حالت روز/شب عوض شه)
+  const C = useMemo(()=>buildC(paletteKey, themeMode), [paletteKey, themeMode])
+
+  // خواندن انتخاب ذخیره‌شده کاربر هنگام بازشدن
+  useEffect(()=>{
+    const p = loadPrefs()
+    setPaletteKey(p.palette)
+    setThemeMode(p.mode)
+  },[])
+
+  function pickPalette(key){ setPaletteKey(key); savePalette(key) }
+  function toggleMode(){ const next = themeMode==='dark'?'light':'dark'; setThemeMode(next); saveMode(next) }
+  const boundaryLayerRef = useRef(null)
+  const boundaryDataRef  = useRef({})
+
+  useEffect(()=>{
+    const check=()=>setVw(window.innerWidth)
+    check()
+    window.addEventListener('resize',check)
+    return ()=>window.removeEventListener('resize',check)
+  },[])
+
+  const isMobile  = vw < BP.mobile
+  const isDesktop = vw >= BP.tablet
+  const levelInfo = getLevelInfo(xp)
+
+  // فقط روی دسکتاپ واقعی (با ماوس) پنل auto-open بشه
+  useEffect(()=>{
+    if(typeof window==='undefined') return
+    const hasMouse = window.matchMedia('(pointer:fine)').matches
+    if(isDesktop && hasMouse) setPanelOpen(true)
+  },[isDesktop])
+
+  const showToast = useCallback((msg,type='info')=>{
+    setToast({msg,type}); setTimeout(()=>setToast(null),2800)
+  },[])
+
+  const gainXP = useCallback((amount)=>{
+    setXp(prev=>prev+amount); setXpAnim({amount}); setTimeout(()=>setXpAnim(null),1800)
+  },[])
+
+  // کافه‌ها فقط از دیتابیس — بدون دادهٔ ساختگی. اگه لود نشد، پیام واقعی + تلاش دوباره.
+  useEffect(()=>{
+    let alive=true, retry=null
+    const load=(attempt=0)=>{
+      fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true',{
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      }).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json() }).then(d=>{
+        if(alive && Array.isArray(d)) setCafes(d)
+      }).catch(()=>{
+        if(!alive) return
+        if(attempt===0) showToast('کافه‌ها لود نشدن — دوباره تلاش می‌کنم…','warn')
+        retry=setTimeout(()=>load(attempt+1), Math.min(30000, 3000*(attempt+1)))
+      })
+    }
+    load()
+    return ()=>{ alive=false; clearTimeout(retry) }
+  },[])
+
+  // پروفایل واقعی کاربر + چک‌این‌های قبلی رو از دیتابیس بخون
+  useEffect(()=>{
+    if(!session||!session.user||!session.access_token) return
+    const uid=session.user.id
+    const h={'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token}
+    fetch(SB_URL+'/rest/v1/profiles?id=eq.'+uid+'&select=*',{headers:h})
+      .then(r=>r.json()).then(rows=>{ const p=Array.isArray(rows)&&rows[0]; if(p){ setXp(p.xp||0); setStreak(p.streak||0); setCoins(p.coins||0); setUserName(p.display_name||''); setIsAdmin(!!p.is_admin); setViewAsUser(!!p.view_as_user); setAccountType(p.account_type||'user'); setTutorialSeen(p.tutorial_seen||{}) } setTutorialLoaded(true) }).catch(()=>setTutorialLoaded(true))
+    setIsOwner(!!(session.user.email && session.user.email.toLowerCase()==='msmadani88@gmail.com'))
+    // علاقه‌مندی‌ها (قلب‌ها) — حالا واقعی و سمت سرور ذخیره می‌شن
+    fetch(SB_URL+'/rest/v1/favorites?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setFavs(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
+    fetch(SB_URL+'/rest/v1/checkins?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setCheckedIn(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
+    fetch(SB_URL+'/rest/v1/notifications?user_id=eq.'+uid+'&select=*&order=created_at.desc&limit=40',{headers:h})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setNotifications(rows) }).catch(()=>{})
+  },[session])
+
+  // realtime: تغییرات لحظه‌ای پروفایل خودم + چک‌این‌های خودم (بدون رفرش)
+  useEffect(()=>{
+    if(!session||!session.user||!session.user.id) return
+    const uid=session.user.id
+    const unsub = subscribeToTables([
+      { table:'profiles', event:'UPDATE', filter:'id=eq.'+uid },
+      { table:'checkins', event:'INSERT', filter:'user_id=eq.'+uid },
+      { table:'notifications', event:'INSERT', filter:'user_id=eq.'+uid },
+    ],(p)=>{
+      if(p.table==='profiles' && p.record){
+        const r=p.record
+        if(r.xp!=null) setXp(r.xp)
+        if(r.streak!=null) setStreak(r.streak)
+        if(r.coins!=null) setCoins(r.coins)
+      }
+      if(p.table==='checkins' && p.record && p.record.cafe_id){
+        setCheckedIn(prev=>{ const s=new Set(prev); s.add(p.record.cafe_id); return s })
+      }
+      if(p.table==='notifications' && p.record){
+        setNotifications(prev=>[p.record, ...prev].slice(0,60))
+      }
+    })
+    return ()=>unsub()
+  },[session])
+
+  // «الان اینجا»: تعداد واقعی آدم‌هایی که در ۲ ساعت اخیر در هر کافه چک‌این کردن
+  // (ویوی cafe_live_counts — فقط عدد، بدون هویت). هر ۶۰ ثانیه تازه می‌شه.
+  useEffect(()=>{
+    if(!cafes.length) return
+    let alive=true
+    const update=()=>{
+      fetch(SB_URL+'/rest/v1/cafe_live_counts?select=cafe_id,live_count',{
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      }).then(r=>r.ok?r.json():[]).then(rows=>{
+        if(!alive||!Array.isArray(rows)) return
+        const c={}; rows.forEach(r=>{ c[r.cafe_id]=r.live_count||0 }); setLive(c)
+      }).catch(()=>{})
+    }
+    update(); const t=setInterval(update,60000)
+    return ()=>{ alive=false; clearInterval(t) }
+  },[cafes])
+
+  useEffect(()=>{
+    cafes.forEach(cafe=>{
+      const el=document.getElementById('lv-'+cafe.id); if(!el) return
+      const n=live[cafe.id]||0; el.textContent=n>0?String(n):''; el.style.display=n>0?'flex':'none'
+    })
+  },[live,cafes])
+
+  // ── MAP INIT با proxy tile ──
+  useEffect(()=>{
+    if(mapInst.current||!mapRef.current) return
+    let mounted=true
+
+    const onResize=()=>{ try{ mapInst.current&&mapInst.current.invalidateSize() }catch(e){} }
+    window.addEventListener('resize',onResize)
+    window.addEventListener('orientationchange',onResize)
+
+    const timer=setTimeout(()=>{
+      if(!mounted||!mapRef.current) return
+
+      const loadLeaflet=(cb)=>{
+        if(window.L&&window.L.markerClusterGroup){ cb(); return }
+        const loadCluster=()=>{
+          if(window.L&&window.L.markerClusterGroup){ cb(); return }
+          // CSS خوشه‌بندی
+          const cc=document.createElement('link'); cc.rel='stylesheet'
+          cc.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css'
+          document.head.appendChild(cc)
+          const cjs=document.createElement('script')
+          cjs.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js'
+          cjs.onload=cb
+          cjs.onerror=cb  // اگه نشد، بدون خوشه‌بندی ادامه بده
+          document.head.appendChild(cjs)
+        }
+        if(window.L){ loadCluster(); return }
+        const css=document.createElement('link'); css.rel='stylesheet'
+        css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
+        document.head.appendChild(css)
+        const js=document.createElement('script')
+        js.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
+        js.onload=loadCluster
+        js.onerror=()=>{
+          const js2=document.createElement('script')
+          js2.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+          js2.onload=loadCluster; document.head.appendChild(js2)
+        }
+        document.head.appendChild(js)
+      }
+
+      loadLeaflet(()=>{
+        if(!mounted||!mapRef.current||mapInst.current) return
+        try {
+          const L=window.L
+          const c=CITIES.tehran
+          const m=L.map(mapRef.current,{
+            center:[c.lat,c.lng],zoom:c.zoom,
+            zoomControl:false,attributionControl:false,preferCanvas:true
+          })
+          // نام منبع نقشه طبق شرایط OpenStreetMap و CARTO باید دیده شود — کوچک، پایین سمت چپ
+          L.control.attribution({position:'bottomleft',prefix:false}).addTo(m)
+          const TILE_ATTR='© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
+          const OSM_URL='https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+
+          // ── TILE از proxy خودمون ──
+          // روی Vercel کاشی‌ها از /api/tiles می‌آیند تا کلید CARTO در مرورگر دیده نشود
+          // و CDN کش کند؛ روی localhost مستقیم از OpenStreetMap.
+          // v=2: کاشی‌های واترمارک‌دار قدیمی را که مرورگرها کش کرده‌اند دور می‌زند.
+          const isLocal = typeof window!=='undefined' && (window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1')
+
+          const tileUrl = isLocal ? OSM_URL : '/api/tiles/{z}/{x}/{y}.png?v=2'
+          const tileOpts = { maxZoom:19, attribution:TILE_ATTR }
+
+          const mainLayer = L.tileLayer(tileUrl, tileOpts)
+          let tileLoaded=false
+
+          mainLayer.on('tileload',()=>{
+            if(!tileLoaded){ tileLoaded=true; setMapLoading(false) }
+          })
+          mainLayer.on('tileerror',()=>{
+            // اگر proxy اصلاً جواب نداد، مستقیم از OpenStreetMap — CARTO بدون کلید واترمارک می‌گذارد
+            if(!tileLoaded && !isLocal) {
+              mainLayer.remove()
+              L.tileLayer(OSM_URL,{maxZoom:19,attribution:TILE_ATTR}).addTo(m)
+              setMapLoading(false)
+            }
+          })
+          mainLayer.addTo(m)
+
+          // اگه ۸ ثانیه tile نیومد loading رو ببند
+          setTimeout(()=>{ if(!tileLoaded) setMapLoading(false) },8000)
+
+          mapInst.current=m
+          setMapReady(true)
+
+          // مرکز فعلی نقشه را ثبت کن تا نوار رویدادها «نزدیک‌ترین اول» را درست مرتب کند
+          try{ const c=m.getCenter(); mapCenterRef.current={lat:c.lat,lng:c.lng} }catch(e){}
+          m.on('moveend',()=>{ try{ const c=m.getCenter(); mapCenterRef.current={lat:c.lat,lng:c.lng} }catch(e){} })
+
+          // ── گروه خوشه‌بندی: پین‌های نزدیک رو جمع می‌کنه (برای مقیاس ده‌ها هزار) ──
+          if(L.markerClusterGroup){
+            const radius=clusterRadiusOf(mapDisplay.cluster==='auto'?'medium':mapDisplay.cluster)
+            clusterRef.current=makeClusterGroup(L,radius)
+            m.addLayer(clusterRef.current)
+          }
+
+          // iOS Safari fix: نقشه اول با ارتفاع اشتباه ساخته میشه؛ بعد از settle شدن layout چند بار اصلاح کن
+          ;[120,350,700,1300].forEach(d=>setTimeout(()=>{ if(mounted&&mapInst.current){ try{ mapInst.current.invalidateSize() }catch(e){} } },d))
+          setTimeout(()=>{ if(mounted&&mapInst.current){ try{ mapInst.current.invalidateSize(); mapInst.current.setView([c.lat,c.lng],c.zoom) }catch(e){} } },500)
+        } catch(e){ setMapLoading(false) }
+      })
+    },150)
+
+    return ()=>{ mounted=false; clearTimeout(timer) }
+  },[])
+
+  useEffect(()=>{
+    const pane=document.querySelector('.leaflet-tile-pane') 
+    if(pane){ const mode=MAP_MODES.find(m=>m.key===mapMode); pane.style.filter=mode?mode.filter:'none'; pane.style.transition='filter .5s' }
+  })
+
+  useEffect(()=>{
+    if(!mapInst.current) return
+    const c=CITIES[city]; mapInst.current.flyTo([c.lat,c.lng],c.zoom,{duration:1.2})
+  },[city])
+
+  useEffect(()=>{
+    if(!mapReady||!cafes.length||!window.L||!mapInst.current) return
+    const L=window.L
+    const mode=mapDisplay.markerMode  // 'pin' | 'dot' | 'auto'
+    // اگه حالت نمایش عوض شده، همه‌ی مارکرهای قبلی رو پاک کن و از نو بساز
+    Object.values(mksRef.current).forEach(mk=>{
+      try{ if(clusterRef.current) clusterRef.current.removeLayer(mk); else mapInst.current.removeLayer(mk) }catch(e){}
+    })
+    mksRef.current={}
+
+    cafes.forEach(cafe=>{
+      const color=getColor(cafe.name); const n=live[cafe.id]||0; const isChecked=checkedIn.has(cafe.id)
+      let mk
+      if(mode==='dot'){
+        // حالت نقطه: circleMarker روی canvas — خیلی سبک برای تعداد زیاد
+        mk=L.circleMarker([cafe.lat,cafe.lng],{
+          radius:mapDisplay.dotSize||8,
+          fillColor:isChecked?C.green:mapDisplay.dotColor||'#3b82f6',
+          color:(mapDisplay.dotColor==='#ffffff'||mapDisplay.dotColor==='#9ca3af')?'#374151':'#fff',
+          weight:1.5,fillOpacity:0.9,
+        })
+      }else{
+        // حالت پین (default) — آیکون کامل فنجان
+        const html=`<div style="position:relative;width:44px;height:52px;cursor:pointer;filter:drop-shadow(0 4px 8px ${color}55)">
+          <div style="background:${isChecked?C.green:color};border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);width:40px;height:40px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+            <span style="transform:rotate(45deg);font-size:18px">${isChecked?'✓':'☕'}</span>
+          </div>
+          ${cafe.is_top?'<div style="position:absolute;top:-10px;right:-4px;font-size:14px">⭐</div>':''}
+          <div id="lv-${cafe.id}" style="position:absolute;top:-6px;left:-4px;background:#FF3B30;color:white;border:2px solid white;border-radius:99px;font-size:9px;font-weight:800;min-width:18px;height:18px;display:${n>0?'flex':'none'};align-items:center;justify-content:center;padding:0 3px">${n>0?n:''}</div>
+        </div>`
+        const icon=L.divIcon({html,iconSize:[44,52],iconAnchor:[22,52],className:''})
+        mk=L.marker([cafe.lat,cafe.lng],{icon})
+      }
+      mk.on('click',()=>setSelCafe(cafe))
+      if(clusterRef.current) clusterRef.current.addLayer(mk)
+      else mk.addTo(mapInst.current)
+      mksRef.current[cafe.id]=mk
+    })
+  },[mapReady,cafes,checkedIn,mapDisplay.markerMode,mapDisplay.dotColor,mapDisplay.dotSize])
+
+  // هایلایت کافه‌ای که الان توی اسلایدشوی رویدادها نشون داده می‌شه — دوربین حرکت نمی‌کنه
+  // برای هر دو حالت (پین/نقطه) یه حلقه‌ی پالس مستقل (divIcon واقعی) دقیقاً روی مختصات کافه اضافه می‌کنیم؛
+  // این کار مستقل از نوع رندر مارکر زیرینه (پین=DOM، نقطه=canvas مشترک با preferCanvas) و همیشه کار می‌کنه.
+  useEffect(()=>{
+    if(!activeEventCafeId || !mapReady || !window.L || !mapInst.current) return
+    const L=window.L
+    const cafe = cafes.find(c=>c.id===activeEventCafeId)
+    if(!cafe) return
+    const ringColor = themeMode==='night' ? '#ffffff' : '#1a1a1a'
+    const icon=L.divIcon({html:'<div class="tl-event-pulse-ring" style="--pulse-color:'+ringColor+'"></div>',iconSize:[36,36],iconAnchor:[18,18],className:''})
+    const ghost=L.marker([cafe.lat,cafe.lng],{icon,interactive:false,zIndexOffset:9999})
+    try{ ghost.addTo(mapInst.current) }catch(e){}
+    return ()=>{ try{ mapInst.current.removeLayer(ghost) }catch(e){} }
+  },[activeEventCafeId, mapReady, cafes, themeMode])
+
+  // بازسازی گروه خوشه‌بندی وقتی شدت cluster یا حالت فیلتر منطقه عوض شه
+  useEffect(()=>{
+    if(!mapReady||!window.L||!window.L.markerClusterGroup||!mapInst.current) return
+    const L=window.L
+    // در حالت فیلتر منطقه از regionCluster، وگرنه از cluster استفاده کن
+    const level = filterApplied
+      ? (mapDisplay.regionCluster==='auto'?'off':mapDisplay.regionCluster)
+      : (mapDisplay.cluster==='auto'?'medium':mapDisplay.cluster)
+    const radius=clusterRadiusOf(level)
+    const old=clusterRef.current
+    const next=makeClusterGroup(L,radius)
+    // مارکرهای فعلی رو به گروه جدید منتقل کن
+    const current=Object.values(mksRef.current).filter(mk=>{
+      try{ return old?old.hasLayer(mk):mapInst.current.hasLayer(mk) }catch(e){ return false }
+    })
+    if(old){ try{ mapInst.current.removeLayer(old) }catch(e){} }
+    current.forEach(mk=>next.addLayer(mk))
+    mapInst.current.addLayer(next)
+    clusterRef.current=next
+  },[mapDisplay.cluster,mapDisplay.regionCluster,filterApplied,mapReady])
+
+  const filtered=cafes.filter(c=>{
+    const zOk=zone==='all'||c.zone===zone||(zone==='top'&&c.is_top)
+    const sOk=!search||c.name.includes(search)
+    // فیلتر منطقه‌ای اعمال‌شده
+    let rOk=true
+    if(filterApplied && selectedRegions.length){
+      // تشخیص منطقه از روی مختصات GPS کافه (نقطه داخل چندضلعی منطقه)
+      // این برای همه‌ی کافه‌ها کار می‌کنه، حتی اونایی که district ندارن، و برای هر ۲۲ منطقه
+      const lat=Number(c.lat), lng=Number(c.lng)
+      let inRegion=false
+      if(!isNaN(lat)&&!isNaN(lng)){
+        inRegion=selectedRegions.some(rn=>{
+          const lyr=regionLayersRef.current[rn]
+          return lyr && cafeInLayer(lat,lng,lyr)
+        })
+      }
+      const catOk=!regionFilter.categories.length || regionFilter.categories.includes(c.category||'cafe')
+      rOk=inRegion&&catOk
+    }
+    return zOk&&sOk&&rOk
+  })
+
+  useEffect(()=>{
+    if(!mapReady||!mapInst.current) return
+    const cluster=clusterRef.current
+    Object.entries(mksRef.current).forEach(([id,mk])=>{
+      const show=filtered.find(c=>c.id===id)
+      try{
+        if(cluster){
+          if(show){ if(!cluster.hasLayer(mk)) cluster.addLayer(mk) }
+          else cluster.removeLayer(mk)
+        } else {
+          if(show){ if(!mapInst.current.hasLayer(mk)) mk.addTo(mapInst.current) }
+          else mapInst.current.removeLayer(mk)
+        }
+      }catch(e){}
+    })
+  },[zone,search,mapReady,filtered,filterApplied,selectedRegions,regionFilter])
+
+  // اعمال فیلتر منطقه: زوم روی مناطق انتخابی + محو بقیه
+  function applyRegionFilter(){
+    setFilterApplied(true)
+    setShowRegionFilter(false)
+    const L=window.L
+    if(L&&mapInst.current&&selectedRegions.length){
+      // محو کردن مناطق انتخاب‌نشده، پررنگ‌کردن انتخابی‌ها، و زوم
+      let bounds=null
+      Object.entries(regionLayersRef.current).forEach(([name,lyr])=>{
+        const on=selectedRegions.includes(name)
+        try{
+          lyr.setStyle(on
+            ?{color:'#000',weight:2.5,fillColor:'#000',fillOpacity:0.12,opacity:0.95}
+            :{color:'#8E8E93',weight:0.5,fillColor:'#8E8E93',fillOpacity:0,opacity:0.15})
+          if(on){ const b=lyr.getBounds?.(); if(b){ bounds=bounds?bounds.extend(b):b } }
+        }catch(e){}
+      })
+      if(bounds) mapInst.current.flyToBounds(bounds,{padding:[40,40],maxZoom:15})
+    }
+    // اگه لیدربورد یا کلن منطقه روشنه، برای همه‌ی مناطق انتخابی داده بگیر
+    if(regionFilter.showLeaderboard || regionFilter.showClans){
+      const sess=getSession()
+      const regionNums=selectedRegions.map(r=>digitsOnly(r)).filter(Boolean)
+      Promise.all(regionNums.map(region=>
+        Promise.all([
+          regionFilter.showLeaderboard?fetchRegionLeaderboard(sess,region):Promise.resolve([]),
+          regionFilter.showClans?fetchRegionClans(sess,region):Promise.resolve([]),
+        ]).then(([lb,cl])=>({region,leaderboard:lb,clans:cl}))
+      )).then(pages=>{
+        setRegionResults(pages)   // آرایه‌ای از صفحات، هر کدوم یک منطقه
+        setShowRegionResults(true)
+      })
+    } else {
+      setRegionResults(null); setShowRegionResults(false)
+    }
+    showToast('✅ فیلتر اعمال شد')
+  }
+  function clearRegionFilter(){
+    setFilterApplied(false); setSelectedRegions([]); setShowRegionFilter(false)
+    setRegionResults(null); setShowRegionResults(false)
+    Object.values(regionLayersRef.current).forEach(lyr=>{
+      try{ lyr.setStyle({color:'#8E8E93',weight:1.3,fillColor:'#8E8E93',fillOpacity:0,opacity:0.5}) }catch(e){}
+    })
+    const c=CITIES[city]; if(mapInst.current&&c) mapInst.current.flyTo([c.lat,c.lng],c.zoom)
+  }
+
+  function panMap(x,y){ mapInst.current?.panBy([x,y],{animate:true}) }
+
+  // ── ادمین: پرکردن district همه‌ی کافه‌های بدون منطقه (point-in-polygon) ──────
+  const [backfilling,setBackfilling]=useState(false)
+  async function backfillDistricts(){
+    if(backfilling) return
+    // منطقه‌ی هر کافه رو خود دیتابیس با PostGIS حساب می‌کنه (تریگر trg_cafe_district).
+    // این دکمه فقط از سرور می‌خواد کافه‌های بدون منطقه رو دوباره حساب کنه — فقط برای مالک اپ.
+    setBackfilling(true)
+    try{
+      const token=await freshToken()
+      const r=await fetch(SB_URL+'/rest/v1/rpc/admin_backfill_districts',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:'{}'
+      }).then(x=>x.json())
+      if(r&&r.ok){
+        const missing=r.still_missing||0
+        showToast(missing===0
+          ?'همه‌ی کافه‌ها منطقه دارن ✅'
+          :('✅ بررسی شد — '+missing.toLocaleString('fa')+' کافه بیرون از مرز مناطق تهرانه'))
+      }else{
+        showToast(r&&r.error==='not_owner'?'این ابزار فقط برای مالک اپه':'خطا در پردازش','warn')
+      }
+    }catch(e){ showToast('خطا در پردازش','warn') }
+    setBackfilling(false)
+  }
+
+  // تپ روی لوگو: ۱ بار = صفحه اصلی، ۳ بار = XP مخفی (فقط یک‌بار برای هر کاربر)
+  async function onLogoTap(){
+    const t=logoTapRef.current
+    t.count++
+    clearTimeout(t.timer)
+    if(t.count>=3){
+      t.count=0
+      claimSecretXP()
+      return
+    }
+    t.timer=setTimeout(()=>{
+      if(t.count===1){
+        // یک تپ: برو صفحه اصلی (بستن پنل‌ها و رفتن به نمای نقشه)
+        setPanelOpen(false); setTab('map')
+        const c=CITIES[city]; if(mapInst.current&&c) mapInst.current.flyTo([c.lat,c.lng],c.zoom)
+      }
+      t.count=0
+    },450)
+  }
+
+  async function claimSecretXP(){
+    const s=getSession(); const token=s&&s.access_token; const uid=s&&s.user&&s.user.id
+    if(!uid) return
+    try{
+      const res=await fetch(SB_URL+'/rest/v1/rpc/claim_secret_xp',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(token||SB_KEY),'Content-Type':'application/json'},
+        body:'{}'
+      }).then(r=>r.json())
+      const row=Array.isArray(res)?res[0]:res
+      if(row&&row.ok){
+        if(row.xp!=null) setXp(row.xp)
+        showToast('🧠 آفرین زرنگ! ۱۰۰ XP گرفتی!')
+      } else if(row&&row.error==='already_claimed'){
+        showToast('🎁 قبلاً جایزه‌ی زرنگ رو گرفتی!')
+      } else {
+        showToast('یه مشکلی پیش اومد')
+      }
+    }catch(e){ showToast('یه مشکلی پیش اومد') }
+  }
+  function goZone(z){
+    setZone(z.key)
+    if(z.lat&&mapInst.current) mapInst.current.flyTo([z.lat,z.lng],13)
+    else if(z.key==='all'&&mapInst.current){ const c=CITIES[city]; mapInst.current.flyTo([c.lat,c.lng],c.zoom) }
+  }
+
+  // ── BOUNDARY LAYER (استان‌ها / مناطق تهران) ──
+  useEffect(()=>{
+    if(!mapReady||!window.L||!mapInst.current) return
+    const L=window.L
+    if(boundaryLayerRef.current){
+      mapInst.current.removeLayer(boundaryLayerRef.current)
+      boundaryLayerRef.current=null
+    }
+    if(boundaryMode==='off') return
+    let cancelled=false
+
+    const styleFor=(idx)=>{
+      const on=idx>0
+      const color=on?'#000000':'#8E8E93'
+      return {color,weight:on?2.5:1.3,fillColor:color,fillOpacity:on?0.32:0,opacity:on?0.95:0.5}
+    }
+
+    const render=(data)=>{
+      if(cancelled||!mapInst.current) return
+      const regionState={}
+      regionLayersRef.current={}
+      const layer=L.geoJSON(data,{
+        style:()=>styleFor(0),
+        onEachFeature:(feature,lyr)=>{
+          const name=feature.properties.name||'—'
+          regionState[name]=0
+          regionLayersRef.current[name]=lyr
+          lyr.bindTooltip(name,{sticky:true,direction:'top',className:'boundary-tip'})
+          lyr.on('click',(e)=>{
+            L.DomEvent.stopPropagation(e)
+            regionState[name]=regionState[name]?0:1
+            lyr.setStyle(styleFor(regionState[name]))
+            // به‌روزرسانی state ری‌اکت برای نمایش دکمه فیلتر
+            setSelectedRegions(prev=>{
+              if(regionState[name]>0) return prev.includes(name)?prev:[...prev,name]
+              return prev.filter(n=>n!==name)
+            })
+          })
+        }
+      })
+      layer.addTo(mapInst.current)
+      boundaryLayerRef.current=layer
+    }
+
+    if(boundaryDataRef.current[boundaryMode]){
+      render(boundaryDataRef.current[boundaryMode])
+    } else {
+      fetch(BOUNDARY_SOURCES[boundaryMode].url).then(r=>r.json()).then(data=>{
+        boundaryDataRef.current[boundaryMode]=data
+        render(data)
+      }).catch(()=>showToast('خطا در بارگذاری مرزها'))
+    }
+    return ()=>{ cancelled=true }
+  },[boundaryMode,mapReady,showToast])
+
+  const tokenRef      = useRef(session?.access_token)
+  const tokenExpRef   = useRef(session?.expires_at||0)
+  const refreshTokRef = useRef(session?.refresh_token)
+  const refreshingRef = useRef(null)
+  async function freshToken(){
+    if(tokenRef.current && (tokenExpRef.current - Date.now() > 60000)) return tokenRef.current
+    if(!refreshTokRef.current) return tokenRef.current
+    if(!refreshingRef.current){
+      refreshingRef.current = fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+        method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({refresh_token:refreshTokRef.current})
+      }).then(r=>r.json()).then(d=>{
+        refreshingRef.current=null
+        if(d&&d.access_token){
+          tokenRef.current=d.access_token
+          tokenExpRef.current=Date.now()+((d.expires_in||3600)*1000)
+          if(d.refresh_token) refreshTokRef.current=d.refresh_token
+          try{ localStorage.setItem('tl_session',JSON.stringify({access_token:tokenRef.current,refresh_token:refreshTokRef.current,expires_at:tokenExpRef.current,user:(d.user||(session&&session.user))})) }catch(e){}
+        }
+        return tokenRef.current
+      }).catch(()=>{ refreshingRef.current=null; return tokenRef.current })
+    }
+    return refreshingRef.current
+  }
+
+  async function markNotifRead(id){
+    setNotifications(prev=>prev.map(n=>n.id===id?{...n,read:true}:n))
+    const token=await freshToken()
+    fetch(SB_URL+'/rest/v1/notifications?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({read:true})
+    }).catch(()=>{})
+  }
+
+  async function markAllNotifRead(){
+    const unreadIds=notifications.filter(n=>!n.read).map(n=>n.id)
+    if(unreadIds.length===0) return
+    setNotifications(prev=>prev.map(n=>({...n,read:true})))
+    const token=await freshToken()
+    fetch(SB_URL+'/rest/v1/notifications?user_id=eq.'+(session&&session.user&&session.user.id),{
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({read:true})
+    }).catch(()=>{})
+  }
+
+  async function toggleViewMode(){
+    const next=!viewAsUser
+    setViewAsUser(next)   // فوری اعمال شه، سرور پشتش تایید می‌کنه
+    try{
+      const sess=getSession()
+      const r=await fetch(SB_URL+'/rest/v1/rpc/set_view_mode',{
+        method:'POST',
+        headers:{apikey:SB_KEY,Authorization:'Bearer '+((sess&&sess.access_token)||SB_KEY),'Content-Type':'application/json'},
+        body:JSON.stringify({p_user_view:next})
+      }).then(x=>x.json())
+      if(!(r&&r.ok)){
+        setViewAsUser(!next)   // سرور قبول نکرد → برگرد
+        showToast(r&&r.error==='not_owner'?'این قابلیت فقط برای مالک اپه':'ثبت نشد','warn')
+      }else{
+        showToast(next?'👤 حالا سایت رو مثل یه کاربر عادی می‌بینی':'👑 برگشتی به حالت مالک')
+      }
+    }catch(e){ setViewAsUser(!next); showToast('خطا در ارتباط','warn') }
+  }
+
+  async function resetMe(){
+    if(!session||!session.access_token) return
+    if(typeof window!=='undefined' && !window.confirm('کل پروفایلت به حالت تازه‌وارد برمی‌گرده و همه‌ی XP، مدال، کلکسیون، رویداد، نوتیف و تاریخچه‌ات پاک می‌شه. مطمئنی؟')) return
+    const token=await freshToken()
+    try{
+      const r=await fetch(SB_URL+'/rest/v1/rpc/reset_me',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:'{}'}).then(r=>r.json())
+      if(r&&r.ok){
+        showToast('حساب ریست شد ♻️ در حال تازه‌سازی…','xp')
+        // رفرش کامل صفحه تا همه‌ی بخش‌ها (مدال، کلکسیون، نوتیف، پروفایل) از نو و خالی لود بشن
+        setTimeout(()=>{ if(typeof window!=='undefined') window.location.reload() }, 900)
+      }
+      else showToast('ریست نشد'+(r&&r.error?': '+r.error:''),'warn')
+    }catch(e){ showToast('ریست نشد','warn') }
+  }
+
+  async function doCheckin(cafe){
+    if(!effAdmin && checkedIn.has(cafe.id)){ showToast('قبلاً اینجا بودی!','warn'); return }
+    if(!session||!session.access_token){ showToast('اول وارد شو','warn'); return }
+    setSelCafe(null)
+    const prevLevel=getLevelInfo(xp).current.level
+    const token=await freshToken()
+    let res=null
+    try{
+      res=await fetch(SB_URL+'/rest/v1/rpc/do_checkin',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({p_cafe_id:cafe.id})
+      }).then(r=>r.json())
+    }catch(e){ res=null }
+    if(!res||!res.ok){
+      const err=res&&res.error
+      if(err==='cooldown') showToast('همین الان اینجا چک‌این کردی!','warn')
+      else if(err==='not_authenticated'||(res&&res.code==='PGRST301')) showToast('نشستت منقضی شد، یه‌بار خروج و ورود کن','warn')
+      else showToast('چک‌این نشد: '+((res&&(res.message||res.error))||'خطای ناشناخته'),'warn')
+      return
+    }
+    setXp(res.xp); setStreak(res.streak); setCoins(res.coins)
+    setCheckedIn(prev=>new Set([...prev,cafe.id]))
+
+    // ── انیمیشن جشن تمام‌صفحه ────────────────────────────────────────────────
+    // به‌جای toastهای پراکنده، همه‌ی نتیجه‌ی چک‌این (XP، استریک، کافه‌ی جدید،
+    // رویدادهای تکمیل‌شده، آیتم کلکسیونی، رتبه) یک‌جا توی کارت جشن نشون داده
+    // می‌شه. ثبتِ واقعی همه‌چیز سمت سرور داخل do_checkin انجام شده — این فقط
+    // نمایشه؛ اگه مرورگر همین‌جا قطع بشه چیزی از دست نمی‌ره (نوتیف جبران می‌کنه).
+    const lvlInfo=getLevelInfo(res.xp)
+    setCelebration({
+      awarded: res.awarded||0,
+      levelUp: res.level>prevLevel,
+      levelName: lvlInfo.current.name,
+      levelIcon: lvlInfo.current.icon,
+      levelColor: lvlInfo.current.color,
+      streak: res.streak||0,
+      isNewCafe: !!res.is_new_cafe,
+      cafeName: cafe.name,
+      district: res.district||null,
+      rank: res.rank||null,
+      quests: Array.isArray(res.completed_quests)?res.completed_quests:[],
+    })
+  }
+
+  const TH=isMobile?52:56, BH=isMobile?58:62
+  const PANEL_W=isDesktop?300:280
+  const panelIsOverlay=!isDesktop
+  const totalLive=Object.values(live).reduce((a,b)=>a+b,0)
+
+  return (
+    <div style={{height:'100dvh',width:'100vw',display:'flex',flexDirection:'column',fontFamily:"'Estedad','Vazirmatn',system-ui,sans-serif",direction:'rtl',background:C.bg,overflow:'hidden',position:'fixed',inset:0}}>
+      <style dangerouslySetInnerHTML={{__html:`
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;900&display=swap');
+        *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+        ::-webkit-scrollbar{display:none}
+        button{cursor:pointer;transition:opacity .15s,transform .1s}
+        button:active{opacity:.75;transform:scale(.96)}
+        input{outline:none}
+        @keyframes tlNavPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+        input::placeholder{color:#AEAEB2}
+        .leaflet-container{background:#E8E4DC !important}
+        .leaflet-control-attribution{font-size:9px !important;line-height:13px !important;padding:0 6px !important;margin:0 !important;background:${C.chip}d9 !important;color:${C.chipText} !important;border-radius:0 6px 0 0;direction:ltr}
+        .leaflet-control-attribution a{color:inherit !important;text-decoration:none}
+        @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+        @keyframes fadeIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes xpFloat{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1;transform:translateY(-44px) scale(1.2)}100%{opacity:0;transform:translateY(-70px) scale(.9)}}
+        @keyframes shimmer{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
+        @keyframes ledScroll{from{transform:translateX(-50%)}to{transform:translateX(0)}}
+        @keyframes evSlide{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes coachPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes tlConfetti{0%{transform:translateY(-8vh) rotate(0deg)}100%{transform:translateY(108vh) rotate(720deg)}}
+        @keyframes tlCelebPop{0%{opacity:0;transform:translateY(30px) scale(.85)}60%{opacity:1;transform:translateY(-6px) scale(1.03)}100%{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes tlCelebGlow{0%,100%{box-shadow:0 0 40px 4px rgba(255,255,255,.06)}50%{box-shadow:0 0 70px 10px rgba(255,255,255,.14)}}
+        @keyframes tlShuttle{from{transform:translateX(0)}to{transform:translateX(var(--shift,0px))}}
+        .tl-shuttle{animation:tlShuttle var(--dur,8s) ease-in-out 1s infinite alternate}
+        /* انیمیشن مودالِ کافه در دسکتاپ — بقیه‌ی کلاس‌های tl-* در app/ui.js */
+        @keyframes cpZoom{from{opacity:0;transform:translate(-50%,-50%) scale(.94)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+        @keyframes tlSpotPulse{0%,100%{box-shadow:0 0 0 100vmax rgba(0,0,0,.62),0 0 0 3px #CCFF00,0 0 18px 3px #CCFF0088}50%{box-shadow:0 0 0 100vmax rgba(0,0,0,.62),0 0 0 3px #CCFF00,0 0 30px 8px #CCFF00cc}}
+        @keyframes tlRingPulse{0%{transform:scale(.4);opacity:.9}70%{transform:scale(2.1);opacity:0}100%{transform:scale(2.1);opacity:0}}
+        .tl-event-pulse-ring{width:30px;height:30px;border-radius:50%;border:5px solid var(--pulse-color,#1a1a1a);box-shadow:0 0 4px 1px var(--pulse-color,#1a1a1a);animation:tlRingPulse 1.3s ease-out infinite}
+        .xp-float{animation:xpFloat 1.8s ease forwards}
+        .mission-bar{transition:width .8s ease}
+        .boundary-tip{background:rgba(28,28,30,.88)!important;color:#fff!important;border:none!important;border-radius:8px!important;font-family:'Vazirmatn',sans-serif!important;font-size:11px!important;font-weight:600!important;padding:4px 9px!important;box-shadow:0 2px 10px rgba(0,0,0,.25)!important}
+        .boundary-tip::before{display:none!important}
+      `}}/>
+
+      {/* TOPBAR */}
+      <div style={{height:TH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',borderBottom:'1px solid '+C.border,padding:'0 12px',display:'flex',alignItems:'center',gap:8,zIndex:300,overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
+        <button data-tut="menu-btn" onClick={()=>setShowMenu(v=>!v)} style={{background:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>☰</button>
+        <img src="/twinland_logo.webp" alt="TwinLand" onClick={onLogoTap} style={{height:isMobile?32:38,width:'auto',flexShrink:0,objectFit:'contain',display:'block',cursor:'pointer'}}/>
+
+        {!isMobile&&(
+          <button onClick={()=>setShowXP(true)} style={{flex:1,background:C.chip,border:'1.5px solid '+C.border,borderRadius:10,padding:'5px 10px',display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:10,color:C.sub}}>{levelInfo.current.icon} {levelInfo.current.name}</span>
+              <span style={{fontSize:10,fontWeight:700,color:C.accent}}>{xp} XP</span>
+            </div>
+            <div style={{height:5,background:C.border,borderRadius:99,overflow:'hidden'}}>
+              <div style={{height:'100%',width:levelInfo.progress+'%',background:'linear-gradient(90deg,'+C.accent+',#FF9500)',borderRadius:99,transition:'width .6s'}}/>
+            </div>
+          </button>
+        )}
+        {isMobile&&<div style={{flex:1}}/>}
+
+        <button data-tut="notif-btn" onClick={()=>setShowNotif(v=>!v)} style={{position:'relative',background:showNotif?C.accent:C.chip,border:'none',borderRadius:10,width:36,height:36,fontSize:15,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:showNotif?onColor(C.accent):C.text}}>
+          🔔
+          {notifications.some(n=>!n.read) && (
+            <span style={{position:'absolute',top:4,left:4,width:8,height:8,borderRadius:'50%',background:'#ef4444',border:'1.5px solid '+C.bg}}/>
+          )}
+        </button>
+
+        <button onClick={()=>setPanelOpen(v=>!v)} style={{background:panelOpen?C.accent:C.chip,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:panelOpen?onColor(C.accent):C.sub,fontFamily:'inherit',fontWeight:700,flexShrink:0,display:'flex',alignItems:'center',gap:5}}>
+          {panelOpen?<span style={{fontSize:15,fontWeight:800}}>✕</span>:<img src="/dashboard@256.png" alt="داشبورد" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>}{!isMobile&&<span>{panelOpen?'بستن':'پنل'}</span>}
+        </button>
+        <button onClick={()=>setShowMode(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.accent,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center'}}>
+          <img src="/map_style@256.png" alt="استایل نقشه" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>
+        </button>
+        <button data-tut="boundary-btn" onClick={()=>setShowBoundary(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:12,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
+          <img src="/boundaries@256.png" alt="مرزبندی" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>{!isMobile&&<span> مرزها</span>}
+        </button>
+        <button onClick={()=>setShowPalette(true)} style={{background:C.chip,border:'none',borderRadius:10,padding:'0 9px',height:36,fontSize:14,color:C.text,fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
+          <img src="/theme@256.png" alt="پالت" width={24} height={24} style={{objectFit:'contain',display:'block'}}/>{!isMobile&&<span style={{fontSize:12}}> پالت</span>}
+        </button>
+        <button onClick={()=>setShowCity(true)} style={{background:C.accent,border:'none',borderRadius:10,padding:'0 11px',height:36,fontSize:12,color:onColor(C.accent),fontFamily:'inherit',fontWeight:700,flexShrink:0,whiteSpace:'nowrap'}}>
+          {CITIES[city].name} ▾
+        </button>
+      </div>
+
+      {/* FILTER BAR */}
+      <div style={{height:46,flexShrink:0,display:'flex',alignItems:'center',gap:7,padding:'0 12px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',background:C.glassDark,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderBottom:'1px solid '+C.border}}>
+        {ZONES.map(z=>(
+          <button key={z.key} onClick={()=>goZone(z)} style={{flexShrink:0,background:zone===z.key?C.accent:C.chip,border:'none',borderRadius:99,padding:'8px 17px',fontSize:13.5,fontWeight:zone===z.key?800:600,color:zone===z.key?onColor(C.accent):C.text,whiteSpace:'nowrap',fontFamily:'inherit',transition:'all .2s'}}>{z.label}</button>
+        ))}
+        <div style={{width:1,height:24,background:C.border,flexShrink:0,margin:'0 2px'}}/>
+        <div style={{position:'relative',display:'flex',alignItems:'center',flexShrink:0}}>
+          <span style={{position:'absolute',right:12,fontSize:13,pointerEvents:'none',opacity:0.6}}>🔍</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="جستجوی کافه..."
+            style={{background:search?C.accentL:C.chip,border:'1.5px solid '+(search?C.accent:'transparent'),borderRadius:99,padding:'8px 34px 8px 30px',fontSize:12.5,fontFamily:'inherit',color:C.text,width:search?170:140,flexShrink:0,transition:'all .25s',outline:'none'}}/>
+          {search&&(
+            <button onClick={()=>setSearch('')} style={{position:'absolute',left:8,background:C.border,border:'none',borderRadius:'50%',width:18,height:18,fontSize:11,color:C.text,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>✕</button>
+          )}
+        </div>
+      </div>
+
+      {/* BODY */}
+      <div style={{flex:1,position:'relative',overflow:'hidden'}}>
+
+        {/* MAP */}
+        <div style={{position:'absolute',inset:0,zIndex:1}}>
+          <div ref={mapRef} style={{position:'absolute',inset:0,zIndex:1,isolation:'isolate'}}/>
+
+          {/* پاپ‌آپ فیلتر حرفه‌ای */}
+          {showRegionFilter && (
+            <RegionFilterPopup
+              C={C} regions={selectedRegions} value={regionFilter} setValue={setRegionFilter}
+              onApply={applyRegionFilter} onClose={()=>setShowRegionFilter(false)}
+            />
+          )}
+
+          {/* پنل نتایج منطقه: لیدربورد و کلن‌های منطقه (چند-صفحه‌ای) */}
+          {showRegionResults && Array.isArray(regionResults) && regionResults.length>0 && (
+            <RegionResultsPanel C={C} pages={regionResults} onClose={()=>setShowRegionResults(false)} />
+          )}
+
+          {mapMode==='dark'&&<div style={{position:'absolute',inset:0,pointerEvents:'none',background:'rgba(4,8,28,.72)',zIndex:2}}/>}
+
+          {/* LOADING SKELETON */}
+          {mapLoading&&(
+            <div style={{position:'absolute',inset:0,zIndex:5,background:'#E8E4DC',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
+              <div style={{position:'absolute',inset:0,overflow:'hidden'}}>
+                {/* شبیه‌سازی tile‌های نقشه */}
+                {Array.from({length:20}).map((_,i)=>(
+                  <div key={i} style={{position:'absolute',width:256,height:256,left:(i%5)*256,top:Math.floor(i/5)*256,background:'#DDD9D0',border:'1px solid #C8C4BB',overflow:'hidden'}}>
+                    <div style={{position:'absolute',inset:0,background:'linear-gradient(90deg,transparent 0%,rgba(255,255,255,.4) 50%,transparent 100%)',animation:'shimmer 1.8s infinite',animationDelay:(i*0.1)+'s'}}/>
+                  </div>
+                ))}
+              </div>
+              <div style={{zIndex:2,background:'rgba(255,255,255,.9)',backdropFilter:'blur(12px)',borderRadius:20,padding:'20px 28px',display:'flex',flexDirection:'column',alignItems:'center',gap:12,boxShadow:'0 8px 32px rgba(0,0,0,.12)'}}>
+                <div style={{fontSize:40}}>🗺️</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.text}}>در حال بارگذاری نقشه...</div>
+                <div style={{width:160,height:6,background:C.border,borderRadius:99,overflow:'hidden'}}>
+                  <div style={{height:'100%',background:'linear-gradient(90deg,'+C.accent+',#FF9500)',borderRadius:99,animation:'shimmer 1.4s ease infinite'}}/>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* nav controls → moved outside the map layer so they always stay on top */}
+        </div>
+
+        {/* live pill + streak — بیرون از لایه‌ی نقشه تا همیشه بالای نقشه دیده بشن */}
+        <div data-tut="live-pill" style={{position:'absolute',top:10,right:(isDesktop&&panelOpen)?PANEL_W+14:10,zIndex:18,transition:'right .35s ease',height:25,boxSizing:'border-box',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'0 13px',display:'flex',gap:8,alignItems:'center',fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
+          <span style={{color:C.text,fontWeight:700}}>☕ {filtered.length}</span>
+          <span style={{color:C.border}}>|</span>
+          <span><span style={{color:C.green,fontSize:8}}>●</span> {totalLive}</span>
+          {checkedIn.size>0&&<><span style={{color:C.border}}>|</span><span style={{color:C.green,fontWeight:700}}>✓ {checkedIn.size}</span></>}
+        </div>
+        <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe} onActiveCafeChange={setActiveEventCafeId}/>
+        {streak>=2&&<div style={{position:'absolute',top:52,left:10,zIndex:18,height:25,boxSizing:'border-box',display:'flex',alignItems:'center',background:streak>=5?C.gold:C.accent,borderRadius:99,padding:'0 10px',fontSize:11,fontWeight:700,color:streak>=5?'#fff':onColor(C.accent),boxShadow:'0 2px 10px rgba(0,0,0,.15)'}}>🔥 {streak} روز</div>}
+
+        {/* دکمه‌های فیلتر منطقه — بیرون از لایه‌ی نقشه و «زیرِ» نوار رویدادها، تا دیگه پشتش گم نشن */}
+        {selectedRegions.length>0 && !showRegionFilter && (
+          <div style={{position:'absolute',top:streak>=2?86:52,left:10,zIndex:18,display:'flex',flexDirection:'column',gap:7,alignItems:'stretch',width:170}}>
+            <button onClick={()=>setShowRegionFilter(true)}
+              style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,width:'100%',
+                background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                color:C.text,border:'1px solid '+C.border,borderRadius:99,padding:'7px 14px',
+                fontSize:12.5,fontWeight:800,fontFamily:'inherit',cursor:'pointer',
+                boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+              فیلتر {selectedRegions.length.toLocaleString('fa')} منطقه
+            </button>
+            {filterApplied && (
+              <button onClick={clearRegionFilter}
+                style={{width:'100%',background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                  color:C.text,border:'1px solid '+C.border,borderRadius:99,
+                  padding:'7px 14px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
+                  boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+                پاک کردن فیلتر
+              </button>
+            )}
+            {Array.isArray(regionResults) && regionResults.length>0 && !showRegionResults && (
+              <button onClick={()=>setShowRegionResults(true)}
+                style={{width:'100%',background:C.glass,opacity:0.95,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',
+                  color:C.text,border:'1px solid '+C.border,borderRadius:99,
+                  padding:'7px 14px',fontSize:12.5,fontWeight:700,fontFamily:'inherit',cursor:'pointer',
+                  boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+                نتایج منطقه
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* nav controls — بیرون از لایه‌ی نقشه. هنگام باز بودن هر پاپ‌آپ مخفی می‌شه */}
+        {!(showRegionFilter||showRegionResults||showXP||showMenu||showCity||showMode||showBoundary||showPalette||showMapSettings||panelOpen) && (
+        <div style={{position:'absolute',bottom:14,left:0,zIndex:18,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:8}}>
+          <div style={{overflow:'hidden',opacity:navOpen?0.7:0,maxHeight:navOpen?180:0,transform:navOpen?'translateY(0) scale(1)':'translateY(14px) scale(.85)',transformOrigin:'bottom left',pointerEvents:navOpen?'auto':'none',transition:'opacity .3s ease, max-height .34s ease, transform .34s cubic-bezier(.34,1.45,.5,1)',display:'flex',flexDirection:'column',gap:5}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,32px)',gap:3}}>
+              {[{e:1},{l:'↑',fn:()=>panMap(0,-80)},{e:1},{l:'←',fn:()=>panMap(80,0)},{l:'⌖',fn:()=>{const c=CITIES[city];mapInst.current?.flyTo([c.lat,c.lng],c.zoom)}},{l:'→',fn:()=>panMap(-80,0)},{e:1},{l:'↓',fn:()=>panMap(0,80)},{e:1}].map((b,i)=>
+                b.e?<div key={i}/>:<button key={i} onClick={b.fn} style={{background:C.glass,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',border:'1px solid '+C.border,borderRadius:9,width:32,height:32,fontSize:b.l==='⌖'?10:15,color:C.text,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 6px rgba(0,0,0,.08)'}}>{b.l}</button>
+              )}
+            </div>
+            <div style={{display:'flex',gap:3}}>
+              {[['＋',()=>mapInst.current?.zoomIn()],['－',()=>mapInst.current?.zoomOut()]].map(([l,fn])=>(
+                <button key={l} onClick={fn} style={{background:C.glass,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',border:'1px solid '+C.border,borderRadius:9,width:32,height:32,fontSize:18,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 6px rgba(0,0,0,.08)'}}>{l}</button>
+              ))}
+            </div>
+          </div>
+          <button data-tut="map-nav" onClick={()=>setNavOpen(v=>!v)} title={navOpen?'مخفی کردن کنترل‌ها':'نمایش کنترل‌ها'} style={{width:32,height:32,borderRadius:9,border:navOpen?'1px solid '+C.border:'none',cursor:'pointer',fontFamily:'inherit',background:navOpen?C.glass:C.grad,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',boxShadow:navOpen?'0 2px 6px rgba(0,0,0,.08)':'0 6px 22px '+C.accent+'99',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .3s ease, box-shadow .3s ease, transform .18s cubic-bezier(.34,1.6,.5,1)',animation:navOpen?'none':'tlNavPulse 2s ease-in-out infinite'}} onMouseDown={e=>e.currentTarget.style.transform='scale(.86)'} onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
+            <span style={{display:'inline-block',fontSize:16,fontWeight:900,lineHeight:1,color:navOpen?C.text:'#fff',transition:'transform .4s cubic-bezier(.34,1.7,.4,1)',transform:navOpen?'rotate(0deg)':'rotate(180deg)'}}>▾</span>
+          </button>
+        </div>
+        )}
+
+        {/* GLASS PANEL */}
+        {panelOpen&&(
+          <>
+            {panelIsOverlay&&(
+              <div onClick={()=>setPanelOpen(false)} style={{position:'absolute',inset:0,zIndex:19,background:'rgba(0,0,0,.25)',backdropFilter:'blur(2px)',WebkitBackdropFilter:'blur(2px)'}}/>
+            )}
+            <div style={{position:'absolute',top:0,right:0,bottom:0,width:PANEL_W,zIndex:20,background:'linear-gradient(165deg, '+C.accent+'26, transparent 55%), '+C.glassDark,backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderLeft:'1px solid '+C.border,boxShadow:'-4px 0 32px rgba(0,0,0,.12)',display:'flex',flexDirection:'column',animation:panelIsOverlay?'slideUp .3s ease':'fadeIn .2s ease'}}>
+              {/* tabs — روی ویندوز چرخ ماوس عمودیه و نوار افقی اسکرول نمی‌شد؛
+                   حالا چرخ ماوس به اسکرول افقی ترجمه می‌شه و دو طرفش fade داره
+                   تا معلوم باشه هنوز تب هست. با درگ هم می‌شه کشیدش. */}
+              <div ref={panelTabsRef} className="tl-hscroll"
+                style={{...hscroll,gap:6,padding:'14px 12px 10px',flexShrink:0,borderBottom:'1px solid '+C.border}}>
+                {[{key:'dashboard',icon:'📊',img:null,imgActive:'/dashboard@256.png',imgInactive:'/dashboard@256_disabled.png',label:'داشبورد'},{key:'missions',icon:'📋',img:'icon_mission',label:'ماموریت'},{key:'rank',icon:'🏆',img:'icon_rank',label:'رتبه'},{key:'clan',icon:'🛡',img:'icon_clan',label:'کلن'},{key:'profile',icon:'👤',img:'icon_profile',label:'پروفایل'}].map(t=>(
+                  <button key={t.key} className="tl-press" onClick={()=>setPanelTab(t.key)} style={{flexShrink:0,background:panelTab===t.key?C.accent:C.chip,border:'none',borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:700,fontFamily:'inherit',color:panelTab===t.key?onColor(C.accent):C.sub,display:'flex',alignItems:'center',justifyContent:'center',gap:5,whiteSpace:'nowrap'}}>
+                    {t.imgActive
+                      ? <img src={panelTab===t.key?t.imgActive:t.imgInactive} alt={t.label} width={19} height={19} style={{objectFit:'contain',display:'block'}}/>
+                      : t.img
+                      ? <img src={'/'+t.img+(panelTab===t.key?'_active':'_inactive')+'_L.png'} alt={t.label} width={18} height={18} style={{objectFit:'contain',display:'block'}}/>
+                      : <span>{t.icon}</span>}
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="tl-vscroll" style={{flex:1,overflowY:'auto'}}>
+                {panelTab==='dashboard'&&<DashboardTab C={C} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP}/>}
+                {panelTab==='missions'&&<MissionsTab C={C} cafes={cafes} setSelCafe={setSelCafe} showToast={showToast}/>}
+                {panelTab==='rank'&&<RankTab C={C}/>}
+                {panelTab==='clan'&&<ClanTab C={C}/>}
+                {panelTab==='profile'&&<ProfileTab C={C} xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn} userName={userName} coins={coins}/>}
+              </div>
+            </div>
+          </>
+        )}
+        <LedAdBar C={C} />
+      </div>
+
+      {/* BOTTOM NAV */}
+      <div data-tut="bottom-nav" style={{height:BH,flexShrink:0,background:C.glassDark,backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderTop:'1px solid '+C.border,display:'flex',alignItems:'stretch'}}>
+        {NAV.map(item=>{
+          const active=tab===item.key
+          const isz=isMobile?26:30
+          const src='/'+item.img+(active?'_active':'_inactive')+'_L.png'
+          return <button key={item.key} onClick={()=>{
+            setTab(item.key)
+            if(item.key==='map'){ setPanelOpen(false); return }
+            if(item.key==='missions'){ setPanelOpen(true); setPanelTab('missions'); return }
+            if(item.key==='clan'){ setPanelOpen(true); setPanelTab('clan'); return }
+            if(item.key==='rank'){ setPanelOpen(true); setPanelTab('rank'); return }
+            if(item.key==='profile'){ setPanelOpen(true); setPanelTab('profile'); return }
+          }} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,background:'none',border:'none',color:active?C.accent:C.sub,fontSize:isMobile?9:10,position:'relative',fontFamily:'inherit',fontWeight:active?700:400}}>
+            <img src={src} alt={item.label} width={isz} height={isz} style={{objectFit:'contain',display:'block'}}/>
+            {item.label}
+            {active&&<div style={{position:'absolute',bottom:0,left:'20%',right:'20%',height:2.5,background:C.accent,borderRadius:'2px 2px 0 0'}}/>}
+          </button>
+        })}
+      </div>
+
+      {selCafe&&<CafePopup C={C} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={()=>setSelCafe(null)} onCheckin={()=>doCheckin(selCafe)} showToast={showToast}/>}
+      {showXP&&<XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={()=>setShowXP(false)}/>}
+      {showNotif&&<NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={()=>setShowNotif(false)}/>}
+      <UIStyles/>
+      <TutorialCoach C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} tutorialLoaded={tutorialLoaded} replay={tutorialReplay} onReplayEnd={()=>setTutorialReplay(false)} isMobile={isMobile}/>
+      {celebration&&<CelebrationOverlay C={C} data={celebration} onClose={()=>setCelebration(null)}/>}
+
+      {showMenu&&(
+        <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:TH+8,right:14,left:14,maxHeight:'calc(100dvh - '+(TH+28)+'px)',overflowY:'auto',WebkitOverflowScrolling:'touch',background:'linear-gradient(165deg, '+C.accent+'26, transparent 55%), '+C.glassDark,backdropFilter:'blur(24px)',borderRadius:18,border:'1px solid '+C.border,boxShadow:'0 8px 40px rgba(0,0,0,.15)',animation:'fadeIn .2s ease'}}>
+            {/* ── سوییچ حالت نمایش — فقط مالک اپ می‌بیندش ───────────────
+                امنیت سمت سرور: RPC set_view_mode ایمیل واقعی رو از auth
+                چک می‌کنه، پس حتی اگه کسی این UI رو دستکاری کنه، سرور رد
+                می‌کنه. سوییچ هم فقط «کم» می‌کنه، قدرتی اضافه نمی‌کنه. */}
+            {isOwner&&(
+              <div style={{padding:'12px 16px',borderBottom:'1px solid '+C.border,background:viewAsUser?'#10b98114':C.accent+'12'}}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontSize:19,width:28,textAlign:'center'}}>{viewAsUser?'👤':'👑'}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:800,color:C.text}}>{viewAsUser?'حالت کاربر عادی':'حالت مالک'}</div>
+                    <div style={{fontSize:10,color:C.sub,marginTop:1}}>{viewAsUser?'داری سایت رو مثل یه کاربر معمولی می‌بینی':'همه‌چیز بدون محدودیت'}</div>
+                  </div>
+                  <button onClick={toggleViewMode} className="tl-press"
+                    style={{position:'relative',width:46,height:26,borderRadius:99,border:'none',cursor:'pointer',flexShrink:0,
+                      background:viewAsUser?'#10b981':C.chip,transition:'background .25s ease'}}>
+                    <span style={{position:'absolute',top:3,right:viewAsUser?23:3,width:20,height:20,borderRadius:'50%',background:'#fff',boxShadow:'0 1px 4px rgba(0,0,0,.3)',transition:'right .25s cubic-bezier(.2,.9,.3,1)'}}/>
+                  </button>
+                </div>
+              </div>
+            )}
+            {[
+              {key:'map',icon:'🗺',img:'/icon_map_active@2x.png',label:'نقشه',href:null},
+              {key:'missions',icon:'📋',img:'/icon_mission_active@2x.png',label:'ماموریت‌ها',href:null},
+              {key:'profile',icon:ICON.profile,img:'/icon_profile_active@2x.png',label:L.profile,href:ROUTE.profile},
+              {key:'rank',icon:ICON.leaderboard,img:'/icon_rank_active@2x.png',label:L.leaderboard,href:ROUTE.leaderboard},
+              {key:'clans',icon:ICON.clans,img:'/icon_clan_active@2x.png',label:L.clans,href:ROUTE.clans},
+              {key:'quests',icon:ICON.quests,label:L.quests,href:ROUTE.quests},
+              {key:'gallery',icon:ICON.gallery,label:L.gallery,href:ROUTE.gallery},
+              // قبلاً smeOnly بود و چون حساب تو 'sme' نیست اصلاً رندر نمی‌شد —
+              // آیتم پایینی جاش می‌اومد و با همون ضربه می‌رفتی گنجینه.
+              // حالا برای همه هست: هر کسی ممکنه کافه‌دار باشه و باید بتونه
+              // کافه‌ش رو claim کنه. خودِ صفحه اگه کافه نداشتی راهنمایی می‌کنه.
+              {key:'business',icon:ICON.business,label:L.business,href:ROUTE.business},
+              {key:'admin',icon:'🛡️',label:'پنل ادمین',href:'/admin',adminOnly:true},
+              {key:'xp',icon:ICON.xpSystem,img:'/xp_coin@256-1.png',label:L.xpSystem,href:null},
+              {key:'tutorial',icon:ICON.tutorial,label:L.tutorial,href:null},
+              {key:'settings',icon:ICON.settings,img:'/settings@256.png',label:L.settings,href:null},
+              {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
+              {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
+              {key:'logout',icon:ICON.logout,label:L.logout,href:null},
+            ].filter(item=>(!item.adminOnly||effAdmin)).map((item,i,arr)=>{
+              const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
+              if(item.href){
+                return <a key={item.key} className="tl-row" href={item.href} style={style}>
+                  {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.label}
+                  <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
+                </a>
+              }
+              return <button key={item.key} className="tl-row" onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='tutorial'){setTutorialReplay(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+                {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.key==='backfill'&&backfilling?'در حال پردازش…':item.label}
+              </button>
+            })}
+          </div>
+        </div>
+      )}
+
+      {showCity&&(
+        <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowCity(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:540,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease',maxHeight:'75dvh',overflowY:'auto'}}>
+            <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 18px'}}/>
+            <div style={{fontSize:17,fontWeight:800,color:C.text,textAlign:'center',marginBottom:16}}>🏙️ انتخاب شهر</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+              {Object.entries(CITIES).map(([k,v])=>(
+                <button key={k} onClick={()=>{setCity(k);setShowCity(false);showToast('✈️ '+v.name)}} style={{background:city===k?C.accent:C.chip,border:'none',borderRadius:12,padding:'12px 6px',fontSize:12,fontWeight:city===k?800:500,color:city===k?onColor(C.accent):C.text,fontFamily:'inherit'}}>{v.name}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPalette&&(
+        <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.45)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowPalette(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 18px 40px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease',maxHeight:'80vh',overflowY:'auto'}}>
+            <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 16px'}}/>
+            <div style={{fontSize:18,fontWeight:800,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:4}}><img src="/theme@256.png" alt="" width={30} height={30} style={{objectFit:'contain'}}/>پالت رنگی</div>
+            <div style={{fontSize:11,color:C.sub,textAlign:'center',marginBottom:16}}>تم دلخواهت رو انتخاب کن — ذخیره می‌شه</div>
+
+            {/* سوییچ روز / شب */}
+            <div style={{display:'flex',background:C.chip,borderRadius:12,padding:4,marginBottom:18}}>
+              <button onClick={()=>themeMode!=='light'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='light'?C.accent:'transparent',color:themeMode==='light'?onColor(C.accent):C.sub}}>☀️ روز</button>
+              <button onClick={()=>themeMode!=='dark'&&toggleMode()} style={{flex:1,padding:'9px',borderRadius:9,border:'none',fontFamily:'inherit',fontSize:13,fontWeight:800,background:themeMode==='dark'?C.accent:'transparent',color:themeMode==='dark'?onColor(C.accent):C.sub}}>🌙 شب</button>
+            </div>
+
+            {/* لیست پالت‌ها */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {PALETTE_ORDER.map(key=>{
+                const p=PALETTES[key]
+                const pc=p[themeMode]
+                const active=paletteKey===key
+                return (
+                  <button key={key} onClick={()=>pickPalette(key)} style={{textAlign:'right',background:pc.card,border:active?'2.5px solid '+pc.accent:'1.5px solid '+pc.border,borderRadius:16,padding:'12px',fontFamily:'inherit',cursor:'pointer',position:'relative'}}>
+                    <div style={{display:'flex',gap:5,marginBottom:9}}>
+                      <span style={{width:22,height:22,borderRadius:7,background:pc.grad||pc.accent,display:'inline-block'}}/>
+                      <span style={{width:22,height:22,borderRadius:7,background:pc.chip,display:'inline-block',border:'1px solid '+pc.border}}/>
+                      <span style={{width:22,height:22,borderRadius:7,background:pc.bg,display:'inline-block',border:'1px solid '+pc.border}}/>
+                    </div>
+                    <div style={{fontSize:13,fontWeight:800,color:pc.text}}>{p.emoji} {p.name}</div>
+                    {active&&<div style={{position:'absolute',top:8,left:8,width:20,height:20,borderRadius:99,background:pc.accent,color:pc.accentText,fontSize:12,display:'flex',alignItems:'center',justifyContent:'center'}}>✓</div>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMapSettings&&(
+        <MapSettingsPopup C={C} value={mapDisplay} setValue={setMapDisplay} onClose={()=>setShowMapSettings(false)} />
+      )}
+      {showBoundary&&(
+        <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowBoundary(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
+            <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 18px'}}/>
+            <div style={{fontSize:17,fontWeight:800,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:6}}><img src="/boundaries@256.png" alt="" width={30} height={30} style={{objectFit:'contain'}}/>مرزهای جغرافیایی</div>
+            <div style={{fontSize:11,color:C.sub,textAlign:'center',marginBottom:16,lineHeight:1.6}}>روی هر منطقه روی نقشه بزن تا رنگش عوض بشه یا خاموش شه</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {[{key:'off',label:'❌ خاموش'},{key:'province',label:'🇮🇷 استان‌های ایران'},{key:'district',label:'🏙️ مناطق ۲۲گانه تهران'}].map(o=>(
+                <button key={o.key} onClick={()=>{setBoundaryMode(o.key);setShowBoundary(false);if(o.key!=='off')showToast(BOUNDARY_SOURCES[o.key]?.label+' فعال شد')}} style={{background:boundaryMode===o.key?C.accent:C.chip,border:boundaryMode===o.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'14px',fontSize:14,fontWeight:boundaryMode===o.key?800:500,color:boundaryMode===o.key?onColor(C.accent):C.text,fontFamily:'inherit',textAlign:'right'}}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMode&&(
+        <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.4)',backdropFilter:'blur(10px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={()=>setShowMode(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'24px 24px 0 0',padding:'20px 20px 44px',width:'100%',maxWidth:480,border:'1px solid '+C.border,borderBottom:'none',animation:'slideUp .3s ease'}}>
+            <div style={{width:40,height:4,background:C.border,borderRadius:99,margin:'0 auto 18px'}}/>
+            <div style={{fontSize:17,fontWeight:800,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:16}}><img src="/map_style@256.png" alt="" width={30} height={30} style={{objectFit:'contain'}}/>استایل نقشه</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {MAP_MODES.map(m=>(
+                <button key={m.key} onClick={()=>{setMapMode(m.key);setShowMode(false);showToast(m.label+' فعال شد')}} style={{background:mapMode===m.key?C.accent:C.chip,border:mapMode===m.key?'none':'1.5px solid '+C.border,borderRadius:14,padding:'16px',fontSize:14,fontWeight:mapMode===m.key?800:500,color:mapMode===m.key?onColor(C.accent):C.text,fontFamily:'inherit'}}>{m.label}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {xpAnim&&<div className="xp-float" style={{position:'fixed',top:'30%',left:'50%',transform:'translateX(-50%)',zIndex:9999,pointerEvents:'none',fontSize:28,fontWeight:900,color:C.accent,textShadow:'0 2px 12px rgba(0,0,0,.2)'}}>+{xpAnim.amount} XP ⭐</div>}
+
+      {toast&&(()=>{
+        const bg = toast.type==='xp'?C.accent:toast.type==='level'?C.gold:toast.type==='warn'?'#FF9500':(C.isDarkBg?C.card:C.text)
+        const fg = toast.type==='xp'?onColor(C.accent):(toast.type==='level'||toast.type==='warn')?'#1a1a1a':(C.isDarkBg?C.text:'#fff')
+        return <div style={{position:'fixed',bottom:BH+14,left:'50%',transform:'translateX(-50%)',zIndex:4000,background:bg,color:fg,border:'1px solid '+C.border,borderRadius:99,padding:'10px 22px',fontSize:13,fontWeight:600,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,.2)',animation:'fadeUp .2s ease'}}>{toast.msg}</div>
+      })()}
+    </div>
+  )
+}
