@@ -275,18 +275,19 @@ export function TwinLand({ session, onLogout }) {
             center:[c.lat,c.lng],zoom:c.zoom,
             zoomControl:false,attributionControl:false,preferCanvas:true
           })
+          // نام منبع نقشه طبق شرایط OpenStreetMap و CARTO باید دیده شود — کوچک، پایین سمت چپ
+          L.control.attribution({position:'bottomleft',prefix:false}).addTo(m)
+          const TILE_ATTR='© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
+          const OSM_URL='https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
           // ── TILE از proxy خودمون ──
-          // اگه روی localhost هستی از CDN مستقیم میاد، روی Vercel از proxy
+          // روی Vercel کاشی‌ها از /api/tiles می‌آیند تا کلید CARTO در مرورگر دیده نشود
+          // و CDN کش کند؛ روی localhost مستقیم از OpenStreetMap.
+          // v=2: کاشی‌های واترمارک‌دار قدیمی را که مرورگرها کش کرده‌اند دور می‌زند.
           const isLocal = typeof window!=='undefined' && (window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1')
 
-          const tileUrl = isLocal
-            ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-            : '/api/tiles/{z}/{x}/{y}.png'
-
-          const tileOpts = isLocal
-            ? { maxZoom:19, subdomains:'abc' }
-            : { maxZoom:19 }
+          const tileUrl = isLocal ? OSM_URL : '/api/tiles/{z}/{x}/{y}.png?v=2'
+          const tileOpts = { maxZoom:19, attribution:TILE_ATTR }
 
           const mainLayer = L.tileLayer(tileUrl, tileOpts)
           let tileLoaded=false
@@ -295,12 +296,10 @@ export function TwinLand({ session, onLogout }) {
             if(!tileLoaded){ tileLoaded=true; setMapLoading(false) }
           })
           mainLayer.on('tileerror',()=>{
-            // fallback به CartoDB
-            if(!tileLoaded) {
+            // اگر proxy اصلاً جواب نداد، مستقیم از OpenStreetMap — CARTO بدون کلید واترمارک می‌گذارد
+            if(!tileLoaded && !isLocal) {
               mainLayer.remove()
-              L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                {maxZoom:19,subdomains:'abcd'}
-              ).addTo(m)
+              L.tileLayer(OSM_URL,{maxZoom:19,attribution:TILE_ATTR}).addTo(m)
               setMapLoading(false)
             }
           })
@@ -776,7 +775,8 @@ export function TwinLand({ session, onLogout }) {
         @keyframes tlNavPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
         input::placeholder{color:#AEAEB2}
         .leaflet-container{background:#E8E4DC !important}
-        .leaflet-control-attribution{display:none !important}
+        .leaflet-control-attribution{font-size:9px !important;line-height:13px !important;padding:0 6px !important;margin:0 !important;background:${C.chip}d9 !important;color:${C.chipText} !important;border-radius:0 6px 0 0;direction:ltr}
+        .leaflet-control-attribution a{color:inherit !important;text-decoration:none}
         @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes fadeIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
