@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
-import { getSession, subscribeToTables, SB_URL, SB_KEY } from '../gameSystem'
-import { L, ICON } from '../labels'
-import { UIStyles, useDragScroll, hscroll, onColor } from '../ui'
+import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '@/lib/theme/palettes'
+import { SB_URL, SB_KEY } from '@/lib/config'
+import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
+import { L, ICON } from '@/lib/theme/labels'
+import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 const WEEKDAYS = ['شنبه', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'جمعه']

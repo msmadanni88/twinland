@@ -3,7 +3,7 @@
 // whole site down (it happened on 2026-07-22 and again before 2026-09-24).
 // Vercel Cron calls this route once a day (see vercel.json); one small real
 // query is enough to count as activity.
-import { SB_URL, SB_KEY } from '../../../lib/config'
+import { SB_URL, SB_KEY } from '@/lib/config'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '../palettes'
-import { SB_URL, SB_KEY, getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile } from '../gameSystem'
-import { L, ICON, fa } from '../labels'
-import { UIStyles, useDragScroll, hscroll, onColor } from '../ui'
+import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '@/lib/theme/palettes'
+import { SB_URL, SB_KEY } from '@/lib/config'
+import { getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile } from '@/lib/game/gameSystem'
+import { L, ICON, fa } from '@/lib/theme/labels'
+import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
 
 export default function LeaderboardPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
