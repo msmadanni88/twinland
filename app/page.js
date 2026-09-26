@@ -128,19 +128,6 @@ const BOUNDARY_SOURCES = {
   district: { url:'/tehran_districts.json', label:'مناطق تهران' },
 }
 
-const MOCK_CAFES = [
-  {id:'c1',name:'کافه نادری', lat:35.6992,lng:51.4165,description:'خیابان نادری، مرکز',  zone:'center',is_top:true, tags:['کلاسیک','صبحانه']},
-  {id:'c2',name:'کافه فرانسه',lat:35.7580,lng:51.4080,description:'تجریش، شمال تهران',   zone:'north', is_top:true, tags:['فرانسوی','دنج','اسپشالتی']},
-  {id:'c3',name:'دیوار قهوه', lat:35.7450,lng:51.3750,description:'ولنجک، شمال تهران',   zone:'north', is_top:false,tags:['مدرن','کتاب']},
-  {id:'c4',name:'کافه بام',   lat:35.7600,lng:51.3700,description:'درکه، شمال تهران',    zone:'north', is_top:true, tags:['روباز','موسیقی','شبانه']},
-  {id:'c5',name:'کافه پانیذ', lat:35.7100,lng:51.4600,description:'میدان آرژانتین',      zone:'center',is_top:false,tags:['صبحانه','خانگی']},
-  {id:'c6',name:'اسپرسو لاو', lat:35.7300,lng:51.5100,description:'تهرانپارس، شرق',      zone:'east',  is_top:false,tags:['اسپشالتی']},
-  {id:'c7',name:'کافه ژاله',  lat:35.7050,lng:51.3200,description:'ستارخان، غرب تهران',  zone:'west',  is_top:false,tags:['دنج','شبانه']},
-  {id:'c8',name:'تریا سبز',   lat:35.6890,lng:51.3850,description:'انقلاب، مرکز تهران',  zone:'center',is_top:true, tags:['کتاب','دانشجویی']},
-  {id:'c9',name:'کافه ری',    lat:35.5920,lng:51.4380,description:'شهرری، جنوب تهران',   zone:'south', is_top:false,tags:['سنتی','دنج']},
-  {id:'c10',name:'کافه نازی', lat:35.6420,lng:51.4020,description:'نازی‌آباد، جنوب تهران',zone:'south', is_top:true, tags:['خانگی','صبحانه']},
-]
-
 const BP = { mobile:640, tablet:1024 }
 
 function TwinLand({ session, onLogout }) {
@@ -260,13 +247,22 @@ function TwinLand({ session, onLogout }) {
     setXp(prev=>prev+amount); setXpAnim({amount}); setTimeout(()=>setXpAnim(null),1800)
   },[])
 
+  // کافه‌ها فقط از دیتابیس — بدون دادهٔ ساختگی. اگه لود نشد، پیام واقعی + تلاش دوباره.
   useEffect(()=>{
-    fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true',{
-      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
-    }).then(r=>r.json()).then(d=>{
-      const list = (Array.isArray(d)&&d.length) ? d : MOCK_CAFES
-      setCafes(list)
-    }).catch(()=>setCafes(MOCK_CAFES))
+    let alive=true, retry=null
+    const load=(attempt=0)=>{
+      fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true',{
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      }).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json() }).then(d=>{
+        if(alive && Array.isArray(d)) setCafes(d)
+      }).catch(()=>{
+        if(!alive) return
+        if(attempt===0) showToast('کافه‌ها لود نشدن — دوباره تلاش می‌کنم…','warn')
+        retry=setTimeout(()=>load(attempt+1), Math.min(30000, 3000*(attempt+1)))
+      })
+    }
+    load()
+    return ()=>{ alive=false; clearTimeout(retry) }
   },[])
 
   // پروفایل واقعی کاربر + چک‌این‌های قبلی رو از دیتابیس بخون
@@ -311,16 +307,21 @@ function TwinLand({ session, onLogout }) {
     return ()=>unsub()
   },[session])
 
-  // اگه بعد از ۲ ثانیه هنوز کافه‌ای نیومد، mock رو بذار
-  useEffect(()=>{
-    const t=setTimeout(()=>{ setCafes(prev=>prev.length?prev:MOCK_CAFES) },2000)
-    return ()=>clearTimeout(t)
-  },[])
-
+  // «الان اینجا»: تعداد واقعی آدم‌هایی که در ۲ ساعت اخیر در هر کافه چک‌این کردن
+  // (ویوی cafe_live_counts — فقط عدد، بدون هویت). هر ۶۰ ثانیه تازه می‌شه.
   useEffect(()=>{
     if(!cafes.length) return
-    const update=()=>{ const c={}; cafes.forEach(cafe=>{c[cafe.id]=Math.floor(Math.random()*12)}); setLive(c) }
-    update(); const t=setInterval(update,4000); return ()=>clearInterval(t)
+    let alive=true
+    const update=()=>{
+      fetch(SB_URL+'/rest/v1/cafe_live_counts?select=cafe_id,live_count',{
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      }).then(r=>r.ok?r.json():[]).then(rows=>{
+        if(!alive||!Array.isArray(rows)) return
+        const c={}; rows.forEach(r=>{ c[r.cafe_id]=r.live_count||0 }); setLive(c)
+      }).catch(()=>{})
+    }
+    update(); const t=setInterval(update,60000)
+    return ()=>{ alive=false; clearInterval(t) }
   },[cafes])
 
   useEffect(()=>{
@@ -615,40 +616,25 @@ function TwinLand({ session, onLogout }) {
   const [backfilling,setBackfilling]=useState(false)
   async function backfillDistricts(){
     if(backfilling) return
-    // مرزهای مناطق باید لود باشن
-    const layers=regionLayersRef.current
-    if(!layers || Object.keys(layers).length===0){
-      showToast('اول لایه‌ی مناطق تهران رو روشن کن')
-      return
-    }
+    // منطقه‌ی هر کافه رو خود دیتابیس با PostGIS حساب می‌کنه (تریگر trg_cafe_district).
+    // این دکمه فقط از سرور می‌خواد کافه‌های بدون منطقه رو دوباره حساب کنه — فقط برای مالک اپ.
     setBackfilling(true)
     try{
-      const s=getSession(); const token=(s&&s.access_token)||SB_KEY
-      const h={'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'}
-      // کافه‌های بدون district که مختصات دارن
-      const rows=await fetch(SB_URL+'/rest/v1/cafes?district=is.null&select=id,lat,lng&limit=5000',{headers:h}).then(r=>r.json())
-      if(!Array.isArray(rows)||rows.length===0){ showToast('همه‌ی کافه‌ها منطقه دارن ✅'); setBackfilling(false); return }
-      let done=0, skipped=0
-      for(const c of rows){
-        const lat=Number(c.lat), lng=Number(c.lng)
-        if(isNaN(lat)||isNaN(lng)){ skipped++; continue }
-        // پیدا کردن منطقه‌ای که این نقطه داخلشه
-        let regionName=null
-        for(const [name,lyr] of Object.entries(layers)){
-          if(cafeInLayer(lat,lng,lyr)){ regionName=name; break }
-        }
-        if(!regionName){ skipped++; continue }
-        // ذخیره: فرمت «منطقه X» (با عدد نرمال) تا با region_num لیدربورد سازگار باشه
-        const num=digitsOnly(regionName)
-        const district='منطقه '+num
-        await fetch(SB_URL+'/rest/v1/cafes?id=eq.'+c.id,{
-          method:'PATCH',headers:{...h,'Prefer':'return=minimal'},
-          body:JSON.stringify({district})
-        })
-        done++
+      const token=await freshToken()
+      const r=await fetch(SB_URL+'/rest/v1/rpc/admin_backfill_districts',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:'{}'
+      }).then(x=>x.json())
+      if(r&&r.ok){
+        const missing=r.still_missing||0
+        showToast(missing===0
+          ?'همه‌ی کافه‌ها منطقه دارن ✅'
+          :('✅ بررسی شد — '+missing.toLocaleString('fa')+' کافه بیرون از مرز مناطق تهرانه'))
+      }else{
+        showToast(r&&r.error==='not_owner'?'این ابزار فقط برای مالک اپه':'خطا در پردازش','warn')
       }
-      showToast('✅ '+done.toLocaleString('fa')+' کافه منطقه گرفت'+(skipped?('، '+skipped.toLocaleString('fa')+' رد شد'):''))
-    }catch(e){ showToast('خطا در پردازش') }
+    }catch(e){ showToast('خطا در پردازش','warn') }
     setBackfilling(false)
   }
 
@@ -1732,7 +1718,7 @@ function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearch,check
     <div style={{padding:'12px',borderTop:'1px solid rgba(0,0,0,.06)',marginTop:12}}>
       <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>فیلتر سریع</div>
       {QUICK_FILTERS.map(f=>(
-        <button key={f.tag} className="tl-row" onClick={()=>{setSearch(f.tag);showToast('🔍 '+f.tag)}} style={{width:'100%',borderRadius:10,display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',padding:'8px 4px',borderRadius:8,color:C.text,fontSize:13,fontFamily:'inherit',fontWeight:500}}>
+        <button key={f.tag} className="tl-row" onClick={()=>{setSearch(f.tag);showToast('🔍 '+f.tag)}} style={{width:'100%',display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',padding:'8px 4px',borderRadius:8,color:C.text,fontSize:13,fontFamily:'inherit',fontWeight:500}}>
           <span style={{fontSize:17,width:24,textAlign:'center'}}>{f.icon}</span>{f.tag}
         </button>
       ))}
@@ -2517,7 +2503,7 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
     let alive=true
     const h={apikey:SB_KEY,Authorization:'Bearer '+((sess&&sess.access_token)||SB_KEY)}
     const loadEvents=()=>{
-      fetch(SB_URL+'/rest/v1/quests?cafe_id=eq.'+cafe.id+'&active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,discount_pct,collectible_defs(icon,title,rarity)&order=created_at.desc&limit=6',{headers:h})
+      fetch(SB_URL+'/rest/v1/quests?cafe_id=eq.'+cafe.id+'&active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,title,icon,reward_label,reward_xp,discount_pct,target_count,collectible_defs(icon,title,rarity)&order=created_at.desc&limit=6',{headers:h})
         .then(r=>r.json()).then(rows=>{ if(alive) setCafeEvents(Array.isArray(rows)?rows:[]) }).catch(()=>{})
         .finally(()=>{ if(alive) setEvLoading(false) })
       if(uid){
@@ -2544,16 +2530,16 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
       body:JSON.stringify({p_quest_id:ev.id})
     }).then(r=>r.json()).catch(()=>null)
     setJoiningId(null)
+    // شرکت = فقط ثبت‌نام. جایزه فقط با چک‌این واقعی در خود کافه باز می‌شه.
     if(res&&res.ok){
-      if(res.already_completed){ showToast('قبلاً شرکت کردی!','warn') }
-      else if(res.completed){
-        const gift=res.collectible?(' + '+(res.collectible.icon||'🎁')+' '+res.collectible.title):''
-        showToast('🎯 شرکت کردی! '+res.reward+' — کد: '+res.code+gift,'xp')
-      }else{
-        showToast('پیشرفت ثبت شد: '+res.progress+' از '+res.target,'xp')
+      if(res.already_completed){ showToast('این رویداد رو قبلاً کامل کردی ✅','warn') }
+      else{
+        const left=Math.max(0,(res.target||1)-(res.progress||0))
+        showToast('🎯 ثبت شد! برای گرفتن جایزه برو به کافه و چک‌این کن'+(left>1?(' — '+left.toLocaleString('fa')+' بار'):''),'xp')
+        setEvProgress(prev=>({...prev,[ev.id]:{quest_id:ev.id,progress:res.progress||0,completed:false}}))
       }
     }else{
-      const em={quest_not_active:'این رویداد دیگه فعال نیست',not_new_customer:'این رویداد فقط مخصوص مشتری‌های جدیده',not_authenticated:'اول وارد شو'}
+      const em={quest_not_active:'این رویداد دیگه فعال نیست',not_new_customer:'این رویداد فقط مخصوص مشتری‌های جدیده',quest_full:'ظرفیت جایزه‌های این رویداد تموم شده',not_authenticated:'اول وارد شو'}
       showToast(em[res&&res.error]||'خطا در شرکت','warn')
     }
   }
@@ -2591,7 +2577,9 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
             <div style={{fontSize:11.5,fontWeight:700,color:C.sub,marginBottom:8}}>🎉 رویدادهای فعال این کافه</div>
             {cafeEvents.map(ev=>{
               const cd=ev.collectible_defs
-              const joined=!!(evProgress[ev.id]&&evProgress[ev.id].completed)
+              const prog=evProgress[ev.id]
+              const joined=!!(prog&&prog.completed)
+              const enrolled=!!prog&&!joined
               const busy=joiningId===ev.id
               return <div key={ev.id} style={{background:C.accentL,border:'1px solid '+C.accent+'44',borderRadius:14,padding:'11px 13px',marginBottom:8}}>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -2601,8 +2589,10 @@ function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin
                     <div style={{fontSize:11,color:C.sub,marginTop:2}}>🎁 {ev.reward_label}{ev.reward_xp>0?' · +'+ev.reward_xp+' XP':''}{ev.discount_pct>0?' · 🏷️'+ev.discount_pct+'٪':''}</div>
                   </div>
                 </div>
-                <button onClick={()=>joinEvent(ev)} disabled={joined||busy} style={{width:'100%',marginTop:9,background:joined?C.green:C.accent,color:joined?'#fff':onColor(C.accent),border:'none',borderRadius:10,padding:'8px',fontSize:12,fontWeight:800,fontFamily:'inherit',opacity:busy?.6:1}}>
-                  {joined?'✅ شرکت کردی':busy?'...':'🎯 شرکت در رویداد'}
+                <button onClick={()=>joinEvent(ev)} disabled={joined||enrolled||busy} style={{width:'100%',marginTop:9,background:joined?C.green:enrolled?C.chip:C.accent,color:joined?onColor(C.green):enrolled?C.text:onColor(C.accent),border:'none',borderRadius:10,padding:'8px',fontSize:12,fontWeight:800,fontFamily:'inherit',opacity:busy?.6:1}}>
+                  {joined?'✅ جایزه‌ت رو گرفتی'
+                    :enrolled?('📍 ثبت‌نام شدی — چک‌این '+(prog.progress||0).toLocaleString('fa')+' از '+(ev.target_count||1).toLocaleString('fa'))
+                    :busy?'...':'🎯 شرکت در رویداد'}
                 </button>
               </div>
             })}

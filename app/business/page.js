@@ -96,11 +96,14 @@ export default function BusinessPage() {
   useEffect(() => { load() }, [load])
   useEffect(() => {
     const unsub = subscribeToTables([
-      { table: 'checkins', event: 'INSERT' }, { table: 'businesses', event: '*' },
+      { table: 'businesses', event: '*' },
       { table: 'quests', event: '*' }, { table: 'quest_progress', event: '*' }, { table: 'redemptions', event: '*' },
       { table: 'favorites', event: '*' },
     ], () => load())
-    return () => unsub()
+    // Check-ins are private rows now, so their realtime events don't reach this
+    // panel; the aggregate numbers are refreshed once a minute instead.
+    const t = setInterval(() => { if (!document.hidden) load() }, 60000)
+    return () => { unsub(); clearInterval(t) }
   }, [load])
 
   const C = buildC(pal.palette, pal.mode)
@@ -509,7 +512,16 @@ function NewQuestForm({ C, biz, onDone }) {
     }).then(r => r.json()).catch(() => null)
     setBusy(false)
     if (res && res.ok) onDone && onDone()
-    else setErr('ساخت کمپین شکست خورد')
+    else {
+      const em = {
+        not_owner: 'این کافه متعلق به حساب تو نیست',
+        title_required: 'عنوان کمپین رو بنویس',
+        invalid_discount: 'درصد تخفیف باید بین ۱ تا ۱۰۰ باشه',
+        invalid_reward_cap: 'سقف جایزه باید حداقل ۱ باشه',
+        ends_in_past: 'تاریخ پایان باید در آینده باشه',
+      }
+      setErr(em[res && res.error] || 'ساخت کمپین شکست خورد')
+    }
   }
 
   const inputStyle = { width: '100%', background: C.card, border: '1px solid ' + C.border, borderRadius: 10, padding: '10px 12px', fontSize: 13, color: C.text, fontFamily: 'inherit', marginBottom: 10 }
