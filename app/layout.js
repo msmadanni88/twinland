@@ -1,4 +1,9 @@
 import { Analytics } from '@vercel/analytics/react'
+import { UiVersionProvider } from '@/components/ui/UiVersionProvider'
+import { fetchSiteUiVersion } from '@/lib/ui/siteVersion'
+
+// نسخه ظاهر سایت هر 30 ثانیه از دیتابیس تازه می‌شود — lib/ui/siteVersion.js
+export const revalidate = 30
 
 export const metadata = {
   title: 'TwinLand',
@@ -23,9 +28,10 @@ const GLOBAL_CSS = `
   body{margin:0}
 `
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const siteUi = await fetchSiteUiVersion()
   return (
-    <html lang="fa" dir="rtl">
+    <html lang="fa" dir="rtl" data-ui={siteUi}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -35,7 +41,7 @@ export default function RootLayout({ children }) {
         />
         <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       </head>
-      <body>{children}<Analytics /></body>
+      <body><UiVersionProvider site={siteUi}>{children}</UiVersionProvider><Analytics /></body>
     </html>
   )
 }
