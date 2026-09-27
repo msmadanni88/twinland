@@ -6,6 +6,7 @@ import { SB_URL, SB_KEY } from '@/lib/config'
 import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
 import { L, ICON } from '@/lib/theme/labels'
 import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
+import { CafeContentEditor } from '@/components/business/CafeContentEditor'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 const WEEKDAYS = ['شنبه', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'جمعه']
@@ -24,7 +25,6 @@ export default function BusinessPage() {
   const H = (s) => ({ apikey: SB_KEY, Authorization: 'Bearer ' + ((s && s.access_token) || SB_KEY) })
   const get = (url, h) => fetch(SB_URL + '/rest/v1/' + url, { headers: h }).then(r => r.json()).catch(() => [])
   const post = (url, h, body) => fetch(SB_URL + '/rest/v1/' + url, { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(r => r.json()).catch(() => null)
-  const one = (arr) => (Array.isArray(arr) && arr[0]) ? arr[0] : null
 
   const load = useCallback(async () => {
     const s = getSession()
@@ -58,51 +58,39 @@ export default function BusinessPage() {
     setLoading(false)
   }, [])
 
-  // آمار یک کافه — فقط به‌درخواستِ خودِ کارت
+  // آمار یک کافه — فقط به‌درخواستِ خودِ کارت.
+  // همه‌ی 13 بخش آمار با یک درخواست از تابع business_dashboard می‌آید؛ همان
+  // ویوهای محافظت‌شده را با دسترسی خودِ کاربر می‌خواند، پس قوانین دسترسی عوض نشده.
   const loadCafe = useCallback(async (b) => {
     const s = getSession(); if (!s || !s.user) return
-    const h = H(s)
     const cid = b.cafe_id
-    {
-      const [daily, hourly, weekday, retention, periods, clv, cohort, rank, clans, covisit, quests, qstats, favs] = await Promise.all([
-        get('business_daily?cafe_id=eq.' + cid + '&select=day,checkins&order=day.asc', h),
-        get('business_hourly?cafe_id=eq.' + cid + '&select=hour,checkins&order=hour.asc', h),
-        get('business_weekday?cafe_id=eq.' + cid + '&select=weekday,checkins&order=weekday.asc', h),
-        get('business_retention?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_periods?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_clv?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_cohort?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_rank?cafe_id=eq.' + cid + '&select=*', h),
-        get('business_clans?cafe_id=eq.' + cid + '&select=*&order=members_visited.desc&limit=5', h),
-        get('business_covisit?cafe_id=eq.' + cid + '&select=*&order=shared_customers.desc&limit=6', h),
-        get('quests?business_id=eq.' + b.id + '&select=*&order=created_at.desc', h),
-        get('quest_stats?business_id=eq.' + b.id + '&select=*', h),
-        // ❤️ تعداد قلب‌های این کافه — فقط عدد تجمیعی، بدون اینکه کی قلب زده
-        get('cafe_fav_counts?cafe_id=eq.' + cid + '&select=fav_count', h),
-      ])
-      const map = {}
-      map[cid] = {
-        stat: (statMapRef.current && statMapRef.current[cid]) || {},
-        daily: daily || [], hourly: hourly || [], weekday: weekday || [],
-        retention: one(retention), periods: one(periods), clv: one(clv),
-        cohort: one(cohort), rank: one(rank),
-        clans: Array.isArray(clans) ? clans : [], covisit: Array.isArray(covisit) ? covisit : [],
-        quests: Array.isArray(quests) ? quests : [], qstats: Array.isArray(qstats) ? qstats : [],
-        favCount: (one(favs) && one(favs).fav_count) || 0,
-      }
-      setData(prev => ({ ...prev, ...map }))
+    const res = await post('rpc/business_dashboard', H(s), { p_business_id: b.id })
+    const ok = !!(res && res.ok)
+    const arr = (v) => (ok && Array.isArray(v) ? v : [])
+    const map = {}
+    map[cid] = {
+      stat: (statMapRef.current && statMapRef.current[cid]) || {},
+      daily: arr(res && res.daily), hourly: arr(res && res.hourly), weekday: arr(res && res.weekday),
+      retention: (ok && res.retention) || null, periods: (ok && res.periods) || null, clv: (ok && res.clv) || null,
+      cohort: (ok && res.cohort) || null, rank: (ok && res.rank) || null,
+      clans: arr(res && res.clans), covisit: arr(res && res.covisit),
+      quests: arr(res && res.quests), qstats: arr(res && res.qstats),
+      // ❤️ تعداد قلب‌های این کافه — فقط عدد تجمیعی، بدون اینکه کی قلب زده
+      favCount: (ok && res.fav_count) || 0,
     }
+    setData(prev => ({ ...prev, ...map }))
   }, [])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
     const unsub = subscribeToTables([
       { table: 'businesses', event: '*' },
-      { table: 'quests', event: '*' }, { table: 'quest_progress', event: '*' }, { table: 'redemptions', event: '*' },
+      { table: 'quests', event: '*' },
       { table: 'favorites', event: '*' },
     ], () => load())
-    // Check-ins are private rows now, so their realtime events don't reach this
-    // panel; the aggregate numbers are refreshed once a minute instead.
+    // Check-ins, quest progress and redemptions are private per customer, so
+    // their realtime events don't reach this panel (a café owner sees totals
+    // only). The aggregate numbers are refreshed once a minute instead.
     const t = setInterval(() => { if (!document.hidden) load() }, 60000)
     return () => { unsub(); clearInterval(t) }
   }, [load])
@@ -181,7 +169,7 @@ function BusinessCard({ C, biz, d, onReload, onNeedData }) {
     }
   }
   const isPending = biz.status === 'pending'
-  const TABS = [['overview', 'نمای کلی'], ['customers', 'مشتری‌ها'], ['timing', 'زمان‌بندی'], ['market', 'بازار'], ['campaigns', L.quests]]
+  const TABS = [['overview', 'نمای کلی'], ['customers', 'مشتری‌ها'], ['timing', 'زمان‌بندی'], ['market', 'بازار'], ['campaigns', L.quests], ['content', 'صفحه کافه']]
   return (
     <div style={{ background: C.card, border: '1px solid ' + (isPending ? '#f59e0b44' : C.border), borderRadius: 20, padding: 18, marginBottom: 16 }}>
       {isPending && (
@@ -216,6 +204,7 @@ function BusinessCard({ C, biz, d, onReload, onNeedData }) {
       {tab === 'timing' && <TabTiming C={C} d={d} />}
       {tab === 'market' && <TabMarket C={C} d={d} />}
       {tab === 'campaigns' && <TabCampaigns C={C} d={d} biz={biz} isPending={isPending} onReload={onReload} />}
+      {tab === 'content' && <CafeContentEditor C={C} biz={biz} isPending={isPending} />}
       </>)}
     </div>
   )
