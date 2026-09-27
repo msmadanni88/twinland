@@ -5,6 +5,12 @@ import { onColor } from '@/lib/theme/ui'
 import { getSession, subscribeToChanges, subscribeToTables } from '@/lib/game/gameSystem'
 import { claimCafe, ownerClaimDirect } from '@/components/cafe/cafeClaims'
 import { XP_CONFIG, getColor } from '@/lib/constants'
+import { CafeGallery } from '@/components/cafe/CafeGallery'
+import { CafeMenu } from '@/components/cafe/CafeMenu'
+import { CafeMyRewards } from '@/components/cafe/CafeMyRewards'
+
+// صفحه‌های پنجره‌ی کافه. «درباره» همان محتوای قبلی است؛ بقیه فقط با باز شدن بار می‌شوند.
+const CAFE_PAGES = [['about','درباره'],['gallery','گالری'],['menu','منو'],['rewards','جایزه‌های من']]
 
 export function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,onCheckin,showToast}) {
   const color=getColor(cafe.name); const isChecked=checkedIn.has(cafe.id); const isFav=favs.has(cafe.id)
@@ -22,6 +28,8 @@ export function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,on
   const [joiningId,setJoiningId]=useState(null)
   const sess=getSession()
   const uid=sess&&sess.user&&sess.user.id
+  const [page,setPage]=useState('about')
+  useEffect(()=>{ setPage('about') },[cafe.id])
 
   useEffect(()=>{
     let alive=true
@@ -92,7 +100,17 @@ export function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,on
           <div style={{fontSize:9,color:C.sub,marginTop:1}}>الان اینجا</div>
         </div>
       </div>
+      {/* صفحه‌های پنجره‌ی کافه */}
+      <div style={{display:'flex',gap:6,padding:'12px 18px 0',overflowX:'auto'}}>
+        {CAFE_PAGES.map(([k,label])=>(
+          <button key={k} onClick={()=>setPage(k)} style={{flexShrink:0,padding:'7px 13px',borderRadius:10,border:'none',background:page===k?C.accent:C.chip,color:page===k?onColor(C.accent):C.sub,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>{label}</button>
+        ))}
+      </div>
       <div style={{padding:'16px 18px'}}>
+        {page==='gallery'&&<div style={{marginBottom:14}}><CafeGallery C={C} cafeId={cafe.id} canManageHint={isAdmin}/></div>}
+        {page==='menu'&&<div style={{marginBottom:14}}><CafeMenu C={C} cafeId={cafe.id} canManageHint={isAdmin}/></div>}
+        {page==='rewards'&&<div style={{marginBottom:14}}><CafeMyRewards C={C} cafeId={cafe.id} uid={uid} token={sess&&sess.access_token} showToast={showToast}/></div>}
+        {page==='about'&&<>
         {cafe.tags?.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:14}}>{cafe.tags.map((t)=><span key={t} style={{background:C.chip,borderRadius:99,fontSize:11,color:C.text,padding:'3px 11px',fontWeight:500}}>{t}</span>)}</div>}
 
         {/* رویدادها/آیتم‌های فعال این کافه — واقعی، لحظه‌ای و قابل شرکت */}
@@ -161,6 +179,7 @@ export function CafePopup({C,cafe,live,favs,setFavs,checkedIn,isAdmin,onClose,on
             </button>
           ))}
         </div>
+        </>}
         <button onClick={onCheckin} disabled={isChecked} style={{width:'100%',background:isChecked?C.green:C.accent,color:isChecked?'#fff':onColor(C.accent),border:'none',borderRadius:14,padding:15,fontSize:15,fontWeight:700,fontFamily:'inherit',boxShadow:'0 4px 18px '+(isChecked?C.green:C.accent)+'44',opacity:isChecked?.85:1,transition:'all .3s'}}>
           {isChecked?'✅ چک‌این شد!':'📍 چک‌این — +'+xpAmount+' XP'}
         </button>
