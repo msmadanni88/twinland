@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { buildC, loadPrefs, DEFAULT_PALETTE, DEFAULT_MODE } from '@/lib/theme/palettes'
 import { SB_URL, SB_KEY } from '@/lib/config'
 import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
+import { UiVersionCard } from '@/components/ui/UiVersionCard'
 
 export default function AdminPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
@@ -83,6 +84,7 @@ export default function AdminPage() {
       </div>
 
       <div style={{ padding: '18px', maxWidth: 640, margin: '0 auto' }}>
+        <UiVersionCard C={C} />
         <div style={{ fontSize: 13, color: C.sub, marginBottom: 14 }}>
           {claims.length > 0 ? claims.length.toLocaleString('fa') + ' درخواست در انتظار تأیید' : 'درخواستی در انتظار نیست'}
         </div>
