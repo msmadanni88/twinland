@@ -34,7 +34,7 @@ import { v2Layout, v2Tokens } from '@/components/v2/theme'
 import { V2Styles } from '@/components/v2/V2Styles'
 import { makePinStyle } from '@/components/v2/map/pins'
 import { MapStage } from '@/components/v2/map/MapStage'
-import { DEFAULT_SKIN, SKIN_STORAGE_KEY, isKnownSkin } from '@/components/v2/map/skins'
+import { DEFAULT_SKIN, SKIN_STORAGE_KEY, isKnownSkin, skinInfo } from '@/components/v2/map/skins'
 import { makeVectorBase } from '@/components/v2/map/vectorBase'
 import { SkinPicker } from '@/components/v2/map/SkinPicker'
 import { CommandBar } from '@/components/v2/home/CommandBar'
@@ -75,7 +75,8 @@ export function TwinLandV2({ session, onLogout }) {
   const { C, paletteKey, pickPalette, themeMode, toggleMode } = useThemePalette()
   const T = useMemo(() => v2Tokens(C), [C])
   const Lay = v2Layout({ isMobile, isDesktop })
-  const pinStyle = useMemo(() => makePinStyle(C, T), [C, T])
+  const cafeArt = skinInfo(skinId).cafeArt
+  const pinStyle = useMemo(() => makePinStyle(C, T, cafeArt), [C, T, cafeArt])
   useEffect(() => {
     try {
       const saved = localStorage.getItem(SKIN_STORAGE_KEY)

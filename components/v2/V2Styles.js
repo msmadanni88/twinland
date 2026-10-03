@@ -7,7 +7,8 @@ export function V2Styles({ C, T }) {
   .tl2{--tl2-ink:${C.text};--tl2-sub:${C.sub};--tl2-accent:${C.accent}}
   .tl2 .leaflet-container{background:${T.mapBg} !important;font-family:inherit}
   /* فقط وقتی پوسته برداری بالا نیامده و کاشی عکسی پشتیبان نشان داده می‌شود */
-  .tl2 .leaflet-container:not(.tl-vector) .leaflet-tile-pane{filter:${T.tileFilter} !important;transition:filter .5s}
+  .tl2 .leaflet-container:not(.tl-vector):not(.tl-plain) .leaflet-tile-pane{filter:${T.tileFilter} !important;transition:filter .5s}
+  .tl2 .leaflet-container.tl-plain .leaflet-tile-pane{filter:none !important}
   .tl2 .leaflet-container.tl-vector .leaflet-tile-pane{filter:none !important}
   .tl2 .leaflet-gl-layer canvas{outline:none}
   .tl2 .leaflet-control-attribution{background:${alpha(C.card, 0.7)} !important;color:${C.sub} !important;border-radius:8px !important;margin:0 0 6px 8px !important;padding:1px 7px !important;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
@@ -22,6 +23,11 @@ export function V2Styles({ C, T }) {
   .tl2-pin-live{position:absolute;top:-5px;right:-3px;min-width:19px;height:19px;padding:0 4px;border-radius:99px;border:2px solid;align-items:center;justify-content:center;font-size:10px;font-weight:800;box-sizing:border-box}
   .tl2-pin.is-top .tl2-pin-head{animation:tl2Breath 3.2s ease-in-out infinite}
   @keyframes tl2Breath{0%,100%{filter:brightness(1)}50%{filter:brightness(1.12)}}
+
+  /* کافه نقاشی‌شده — پوسته‌های کارتونی و مدادی */
+  .tl2-cafe{position:relative;width:44px;height:48px;cursor:pointer;transform-origin:50% 92%;transition:transform .2s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 3px 3px rgba(0,0,0,.28))}
+  .tl2-cafe:hover{transform:translateY(-3px) scale(1.1)}
+  .tl2-cafe-shadow{position:absolute;left:50%;bottom:2px;width:30px;height:7px;margin-left:-15px;border-radius:50%;background:rgba(0,0,0,.28);filter:blur(2px)}
 
   /* خوشه */
   .tl2-cluster{border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-weight:900;box-sizing:border-box;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}

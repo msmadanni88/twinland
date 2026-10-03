@@ -28,15 +28,14 @@ export function SkinPicker({ C, T, setShowSkin, setSkinId, showSkin, showToast, 
     <div onClick={() => setShowSkin(false)} style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'tl2Fade .2s' }}>
       <div onClick={e => e.stopPropagation()} role="dialog" aria-label="پوسته نقشه"
-        style={{ width: '100%', maxWidth: 480, padding: '14px 18px calc(env(safe-area-inset-bottom, 0px) + 26px)', borderRadius: T.radius.xl + 'px ' + T.radius.xl + 'px 0 0',
+        style={{ width: '100%', maxWidth: 560, padding: '14px 18px calc(env(safe-area-inset-bottom, 0px) + 26px)', borderRadius: T.radius.xl + 'px ' + T.radius.xl + 'px 0 0',
           background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderBottom: 'none', boxShadow: T.shadow2,
           animation: 'tl2Sheet .3s cubic-bezier(.2,.9,.3,1)' }}>
         <div style={{ width: 42, height: 5, borderRadius: 99, background: T.hairStrong, margin: '0 auto 14px' }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, fontSize: 17, fontWeight: 900, color: C.text, marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, fontSize: 17, fontWeight: 900, color: C.text, marginBottom: 14 }}>
           <img src="/map_skin.svg" alt="" width={30} height={30} style={{ objectFit: 'contain' }} />پوسته نقشه
         </div>
-        <div style={{ textAlign: 'center', fontSize: 12, color: C.sub, marginBottom: 14 }}>همان نقشه واقعی، با شکل دلخواه تو</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div className="tl-vscroll" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 10, maxHeight: '62dvh', overflowY: 'auto', padding: 2 }}>
           {SKINS.map(s => {
             const on = s.id === skinId
             return (
