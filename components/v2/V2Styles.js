@@ -6,7 +6,10 @@ export function V2Styles({ C, T }) {
   const css = `
   .tl2{--tl2-ink:${C.text};--tl2-sub:${C.sub};--tl2-accent:${C.accent}}
   .tl2 .leaflet-container{background:${T.mapBg} !important;font-family:inherit}
-  .tl2[data-mapmode="normal"] .leaflet-tile-pane{filter:${T.tileFilter} !important;transition:filter .5s}
+  /* فقط وقتی پوسته برداری بالا نیامده و کاشی عکسی پشتیبان نشان داده می‌شود */
+  .tl2 .leaflet-container:not(.tl-vector) .leaflet-tile-pane{filter:${T.tileFilter} !important;transition:filter .5s}
+  .tl2 .leaflet-container.tl-vector .leaflet-tile-pane{filter:none !important}
+  .tl2 .leaflet-gl-layer canvas{outline:none}
   .tl2 .leaflet-control-attribution{background:${alpha(C.card, 0.7)} !important;color:${C.sub} !important;border-radius:8px !important;margin:0 0 6px 8px !important;padding:1px 7px !important;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 
   /* پین فانوسی */

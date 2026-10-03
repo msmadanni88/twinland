@@ -30,11 +30,13 @@ import { AppMenu } from '@/components/home/AppMenu'
 import { CityPicker } from '@/components/home/pickers/CityPicker'
 import { PalettePicker } from '@/components/home/pickers/PalettePicker'
 import { BoundaryPicker } from '@/components/home/pickers/BoundaryPicker'
-import { MapModePicker } from '@/components/home/pickers/MapModePicker'
 import { v2Layout, v2Tokens } from '@/components/v2/theme'
 import { V2Styles } from '@/components/v2/V2Styles'
 import { makePinStyle } from '@/components/v2/map/pins'
 import { MapStage } from '@/components/v2/map/MapStage'
+import { DEFAULT_SKIN, SKIN_STORAGE_KEY, isKnownSkin } from '@/components/v2/map/skins'
+import { makeVectorBase } from '@/components/v2/map/vectorBase'
+import { SkinPicker } from '@/components/v2/map/SkinPicker'
 import { CommandBar } from '@/components/v2/home/CommandBar'
 import { ZoneChips } from '@/components/v2/home/ZoneChips'
 import { HudOverlays } from '@/components/v2/home/HudOverlays'
@@ -45,7 +47,9 @@ import { CafeSheet } from '@/components/v2/cafe/CafeSheet'
 
 export function TwinLandV2({ session, onLogout }) {
   const [city, setCity] = useState('tehran')
-  const [mapMode, setMapMode] = useState('normal')
+  // پوسته نقشه — جای چهار حالت رنگی قدیم؛ انتخاب کاربر روی همین دستگاه می‌ماند
+  const [skinId, setSkinIdState] = useState(DEFAULT_SKIN)
+  const basemap = useMemo(() => makeVectorBase(), [])
   const [zone, setZone] = useState('all')
   const [search, setSearch] = useState('')
   const logoTapRef = useRef({ count: 0, timer: null })
@@ -72,12 +76,22 @@ export function TwinLandV2({ session, onLogout }) {
   const T = useMemo(() => v2Tokens(C), [C])
   const Lay = v2Layout({ isMobile, isDesktop })
   const pinStyle = useMemo(() => makePinStyle(C, T), [C, T])
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SKIN_STORAGE_KEY)
+      if (isKnownSkin(saved)) setSkinIdState(saved)
+      else if (themeMode === 'dark') setSkinIdState('ember')
+    } catch (e) {}
+    // فقط یک بار در شروع؛ بعد از آن انتخاب خود کاربر معتبر است
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const setSkinId = (id) => { if (!isKnownSkin(id)) return; setSkinIdState(id); try { localStorage.setItem(SKIN_STORAGE_KEY, id) } catch (e) {} }
   const { showToast, toast } = useToast()
   const { mapDisplay, setMapDisplay } = useMapDisplay()
   const { freshToken } = useFreshToken({ session })
   const { cafes, live } = useCafes({ showToast })
   const { accountType, checkedIn, coins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp } = useUserData({ freshToken, session })
-  const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, pinStyle, search, setSelCafe, showToast, themeMode, zone })
+  const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode: 'normal', pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
   const { backfillDistricts, backfilling, claimSecretXP, resetMe, toggleViewMode } = useOwnerTools({ freshToken, session, setViewAsUser, setXp, showToast, viewAsUser })
   const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp })
   const levelInfo = getLevelInfo(xp)
@@ -114,13 +128,13 @@ export function TwinLandV2({ session, onLogout }) {
   const anySheet = showRegionFilter || showRegionResults || showXP || showMenu || showCity || showMode || showBoundary || showPalette || showMapSettings || (!docked && panelOpen)
 
   return (
-    <div className="tl2" data-mapmode={mapMode}
+    <div className="tl2" data-skin={skinId}
       style={{ position: 'fixed', inset: 0, height: '100dvh', width: '100vw', overflow: 'hidden', direction: 'rtl', background: T.mapBg, color: C.text,
         fontFamily: "'Estedad','Vazirmatn',system-ui,sans-serif" }}>
       <HomeGlobalStyles C={C} />
       <V2Styles C={C} T={T} />
 
-      <MapStage C={C} T={T} applyRegionFilter={applyRegionFilter} mapLoading={mapLoading} mapMode={mapMode} mapRef={mapRef} regionFilter={regionFilter} regionResults={regionResults} selectedRegions={selectedRegions} setRegionFilter={setRegionFilter} setShowRegionFilter={setShowRegionFilter} setShowRegionResults={setShowRegionResults} showRegionFilter={showRegionFilter} showRegionResults={showRegionResults} />
+      <MapStage C={C} T={T} applyRegionFilter={applyRegionFilter} mapLoading={mapLoading} mapRef={mapRef} regionFilter={regionFilter} regionResults={regionResults} selectedRegions={selectedRegions} setRegionFilter={setRegionFilter} setShowRegionFilter={setShowRegionFilter} setShowRegionResults={setShowRegionResults} showRegionFilter={showRegionFilter} showRegionResults={showRegionResults} />
 
       <CommandBar C={C} T={T} Lay={Lay} city={city} isMobile={isMobile} levelInfo={levelInfo} notifications={notifications} onLogoTap={onLogoTap} search={search} setSearch={setSearch} setShowCity={setShowCity} setShowMenu={setShowMenu} setShowNotif={setShowNotif} setShowXP={setShowXP} showNotif={showNotif} xp={xp} />
 
@@ -151,7 +165,7 @@ export function TwinLandV2({ session, onLogout }) {
       <PalettePicker C={C} paletteKey={paletteKey} pickPalette={pickPalette} setShowPalette={setShowPalette} showPalette={showPalette} themeMode={themeMode} toggleMode={toggleMode} />
       {showMapSettings && <MapSettingsPopup C={C} value={mapDisplay} setValue={setMapDisplay} onClose={() => setShowMapSettings(false)} />}
       <BoundaryPicker C={C} boundaryMode={boundaryMode} setBoundaryMode={setBoundaryMode} setShowBoundary={setShowBoundary} showBoundary={showBoundary} showToast={showToast} />
-      <MapModePicker C={C} mapMode={mapMode} setMapMode={setMapMode} setShowMode={setShowMode} showMode={showMode} showToast={showToast} />
+      <SkinPicker C={C} T={T} setShowSkin={setShowMode} setSkinId={setSkinId} showSkin={showMode} showToast={showToast} skinId={skinId} />
 
       <Toast BH={Lay.aboveDock + 36} C={C} toast={toast} />
     </div>

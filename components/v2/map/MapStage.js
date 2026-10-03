@@ -5,7 +5,7 @@ import { RegionFilterPopup } from '@/components/map/RegionFilterPopup'
 import { RegionResultsPanel } from '@/components/map/RegionResultsPanel'
 import { alpha } from '@/components/v2/theme'
 
-export function MapStage({ C, T, applyRegionFilter, mapLoading, mapMode, mapRef, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults }) {
+export function MapStage({ C, T, applyRegionFilter, mapLoading, mapRef, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
       <div ref={mapRef} style={{ position: 'absolute', inset: 0, zIndex: 1, isolation: 'isolate' }} />
@@ -22,8 +22,6 @@ export function MapStage({ C, T, applyRegionFilter, mapLoading, mapMode, mapRef,
       {showRegionResults && Array.isArray(regionResults) && regionResults.length > 0 && (
         <RegionResultsPanel C={C} pages={regionResults} onClose={() => setShowRegionResults(false)} />
       )}
-
-      {mapMode === 'dark' && <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: alpha(C.bg, 0.6), zIndex: 2 }} />}
 
       {mapLoading && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: T.mapBg, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'tl2Fade .3s' }}>
