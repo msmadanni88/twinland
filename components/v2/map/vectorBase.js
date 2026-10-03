@@ -4,7 +4,9 @@
 import { SKIN_ATTRIBUTION, buildSkinStyle, cafeFeatures, skinImage } from '@/components/v2/map/skins'
 
 const LIB = '/api/mapkit/lib/'
-const FAIL_AFTER_MS = 14000
+// زمان فقط وقتی شمرده می‌شود که صفحه دیده می‌شود؛ در تب پنهان مرورگر رسم را نگه می‌دارد و نباید خطا حساب شود
+const STYLE_WAIT_S = 20   // تا آماده شدن سبک
+const TILE_WAIT_S = 30    // تا رسیدن اولین تکه داده نقشه
 let libsPromise = null
 
 function loadScript(src) {
@@ -51,30 +53,40 @@ export function makeVectorBase() {
   return {
     attach({ L, map, skinId, cafes, live, onReady, onFail }) {
       const state = { skinId, cafes: cafes || [], live: live || {} }
-      let layer = null, gl = null, ready = false, dead = false, attribution = false
+      let layer = null, gl = null, ready = false, dead = false, attribution = false, gotTile = false
+      let seen = 0, watch = null
       const origin = window.location.origin
       const data = () => cafeFeatures(state.cafes, state.live)
 
       const fail = () => {
-        if (dead || ready) return
+        if (dead) return
         dead = true
-        clearTimeout(timer)
+        clearInterval(watch)
+        try { map.getContainer().classList.remove('tl-vector') } catch (e) {}
         try { if (layer) map.removeLayer(layer) } catch (e) {}
         try { if (attribution && map.attributionControl) map.attributionControl.removeAttribution(SKIN_ATTRIBUTION) } catch (e) {}
         onFail()
       }
-      const timer = setTimeout(fail, FAIL_AFTER_MS)
+      // هر ثانیه یک بار؛ ثانیه‌های پنهان بودن صفحه شمرده نمی‌شود
+      watch = setInterval(() => {
+        if (dead) { clearInterval(watch); return }
+        if (gotTile) { clearInterval(watch); return }
+        if (document.hidden) return
+        seen += 1
+        if (!ready && seen >= STYLE_WAIT_S) fail()
+        else if (ready && seen >= TILE_WAIT_S) fail()
+      }, 1000)
 
       const ctl = {
         update(next) {
           if (dead) return
-          const skinChanged = next.skinId && next.skinId !== state.skinId
+          const skinChanged = !!next.skinId && next.skinId !== state.skinId
           if (next.skinId) state.skinId = next.skinId
           if (next.cafes) state.cafes = next.cafes
           if (next.live) state.live = next.live
           if (!gl) return
           try {
-            if (skinChanged) gl.setStyle(buildSkinStyle(state.skinId, origin, data()))
+            if (skinChanged) gl.setStyle(buildSkinStyle(state.skinId, origin, data()), { diff: false })
             else { const src = gl.getSource('cafes'); if (src && src.setData) src.setData(data()) }
           } catch (e) {}
         },
@@ -85,6 +97,7 @@ export function makeVectorBase() {
 
       loadLibs().then(() => {
         if (dead) return
+        // اگر کاربر در فاصله بار شدن کتابخانه پوسته را عوض کرده باشد، همان آخری رسم می‌شود
         layer = L.maplibreGL({ style: buildSkinStyle(state.skinId, origin, data()), attributionControl: false, interactive: false })
         layer.addTo(map)
         gl = layer.getMaplibreMap()
@@ -95,21 +108,17 @@ export function makeVectorBase() {
             if (img) gl.addImage(e.id, img, { pixelRatio: 2 })
           } catch (err) {}
         })
-        gl.on('error', (e) => {
-          // خطای یک کاشی یا یک فونت نباید کل نقشه را برگرداند؛ فقط اگر هنوز چیزی رسم نشده و خود سبک خراب است
-          const msg = String((e && e.error && e.error.message) || '')
-          if (!ready && /style|layers|sources|glyphs/i.test(msg) && !/tile|pbf|Failed to fetch|AJAXError/i.test(msg)) fail()
-        })
+        gl.on('data', (e) => { if (e && e.dataType === 'source' && e.sourceId === 'omt' && e.tile) gotTile = true })
         const done = () => {
           if (ready || dead) return
           ready = true
-          clearTimeout(timer)
           try { map.getContainer().classList.add('tl-vector') } catch (e) {}
           try { if (map.attributionControl) { map.attributionControl.addAttribution(SKIN_ATTRIBUTION); attribution = true } } catch (e) {}
           onReady()
         }
+        // به محض آماده شدن سبک، کاغذ و رنگ زمینه دیده می‌شود و تکه‌های نقشه یکی‌یکی می‌رسند
+        gl.once('style.load', done)
         gl.once('load', done)
-        gl.once('idle', done)
       }).catch(fail)
 
       return ctl
