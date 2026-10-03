@@ -20,7 +20,7 @@ export function Dock({ C, T, Lay, isMobile, panelOpen, panelTab, rightInset, set
     if (panel) { setPanelOpen(true); setPanelTab(panel) }
   }
   return (
-    <div style={{ position: 'absolute', left: Lay.gap, right: rightInset, bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + Lay.dockBottom + 'px)', zIndex: 280,
+    <div style={{ position: 'absolute', left: Lay.gap, right: rightInset, bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + Lay.dockBottom + 'px)', zIndex: isMobile && panelOpen ? 950 : 280,
       display: 'flex', justifyContent: 'center', pointerEvents: 'none', transition: 'right .35s ease' }}>
       <nav data-tut="bottom-nav" aria-label="بخش‌های اصلی"
         style={{ pointerEvents: 'auto', width: Lay.dockW || '100%', maxWidth: '100%', height: Lay.dockH, display: 'flex', alignItems: 'stretch', padding: 5, gap: 2,

@@ -24,7 +24,10 @@ export function PanelShell({ C, T, Lay, cafes, checkedIn, coins, docked, filtere
   const frame = docked
     ? { position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + ' + (Lay.barTop + Lay.barH + 10) + 'px)', right: Lay.gap, bottom: Lay.gap, width: Lay.panelW,
         borderRadius: T.radius.xl, animation: 'tl2Slide .35s cubic-bezier(.2,.9,.3,1)' }
-    : { position: 'fixed', left: 0, right: 0, bottom: 0, height: '78dvh', borderRadius: T.radius.xl + 'px ' + T.radius.xl + 'px 0 0', animation: 'tl2Sheet .35s cubic-bezier(.2,.9,.3,1)' }
+    // موبایل: برگه روی داک نمی‌نشیند؛ داک پایین می‌ماند تا کلید نقشه و پنل همیشه در دسترس باشد
+    : { position: 'fixed', left: Lay.gap, right: Lay.gap, bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.dockBottom + Lay.dockH + 10) + 'px)',
+        height: 'min(72dvh, calc(100dvh - env(safe-area-inset-top, 0px) - ' + (Lay.barTop + Lay.barH + 20) + 'px - ' + (Lay.dockBottom + Lay.dockH + 10) + 'px))',
+        borderRadius: T.radius.xl, animation: 'tl2Sheet .35s cubic-bezier(.2,.9,.3,1)' }
   return (<>
     {!docked && <div onClick={() => setPanelOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 900, background: 'rgba(0,0,0,.35)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', animation: 'tl2Fade .25s' }} />}
     <aside aria-label="پنل" style={{ ...frame, zIndex: docked ? 250 : 901, display: 'flex', flexDirection: 'column', overflow: 'hidden',
