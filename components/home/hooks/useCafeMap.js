@@ -94,7 +94,8 @@ export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes,
           const c=CITIES.tehran
           const m=L.map(mapRef.current,{
             center:[c.lat,c.lng],zoom:c.zoom,
-            zoomControl:false,attributionControl:false,preferCanvas:true
+            zoomControl:false,attributionControl:false,preferCanvas:true,
+            maxZoom:19   // خوشه‌بندی سقف زوم لازم دارد؛ قبلاً از لایه کاشی می‌آمد، حالا زیرنقشه برداری لایه کاشی ندارد
           })
           // نام منبع نقشه طبق شرایط OpenStreetMap و CARTO باید دیده شود — کوچک، پایین سمت چپ
           L.control.attribution({position:'bottomleft',prefix:false}).addTo(m)
