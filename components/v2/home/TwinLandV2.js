@@ -1,0 +1,159 @@
+'use client'
+// ─────────────────────────────────────────────────────────────
+//  صفحه اصلی — نسخه ظاهر v2.0 «فانوس»
+//  منطق همان hookهای مشترک نسخه v1.0 است؛ فقط چیدمان و ظاهر عوض شده:
+//  نقشه تمام‌صفحه، نوار فرمان و داک شناور، پنل شیشه‌ای، پین‌های فانوسی و پنجره تازه کافه.
+// ─────────────────────────────────────────────────────────────
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { UIStyles } from '@/lib/theme/ui'
+import { getLevelInfo } from '@/lib/game/gameSystem'
+import { CITIES } from '@/lib/constants'
+import { MapSettingsPopup } from '@/components/map/MapSettingsPopup'
+import { CelebrationOverlay } from '@/components/overlays/CelebrationOverlay'
+import { LedAdBar } from '@/components/overlays/LedAdBar'
+import { NotificationPanel } from '@/components/overlays/NotificationPanel'
+import { TutorialCoach } from '@/components/overlays/TutorialCoach'
+import { XPPanel } from '@/components/overlays/XPPanel'
+import { Toast } from '@/components/overlays/Toast'
+import { useViewport } from '@/components/home/hooks/useViewport'
+import { useThemePalette } from '@/components/home/hooks/useThemePalette'
+import { useToast } from '@/components/home/hooks/useToast'
+import { useMapDisplay } from '@/components/home/hooks/useMapDisplay'
+import { useFreshToken } from '@/components/home/hooks/useFreshToken'
+import { useCafes } from '@/components/home/hooks/useCafes'
+import { useUserData } from '@/components/home/hooks/useUserData'
+import { useCafeMap } from '@/components/home/hooks/useCafeMap'
+import { useOwnerTools } from '@/components/home/hooks/useOwnerTools'
+import { useCheckin } from '@/components/home/hooks/useCheckin'
+import { HomeGlobalStyles } from '@/components/home/HomeGlobalStyles'
+import { AppMenu } from '@/components/home/AppMenu'
+import { CityPicker } from '@/components/home/pickers/CityPicker'
+import { PalettePicker } from '@/components/home/pickers/PalettePicker'
+import { BoundaryPicker } from '@/components/home/pickers/BoundaryPicker'
+import { MapModePicker } from '@/components/home/pickers/MapModePicker'
+import { v2Layout, v2Tokens } from '@/components/v2/theme'
+import { V2Styles } from '@/components/v2/V2Styles'
+import { makePinStyle } from '@/components/v2/map/pins'
+import { MapStage } from '@/components/v2/map/MapStage'
+import { CommandBar } from '@/components/v2/home/CommandBar'
+import { ZoneChips } from '@/components/v2/home/ZoneChips'
+import { HudOverlays } from '@/components/v2/home/HudOverlays'
+import { MapToolRail } from '@/components/v2/home/MapToolRail'
+import { Dock } from '@/components/v2/home/Dock'
+import { PanelShell } from '@/components/v2/panels/PanelShell'
+import { CafeSheet } from '@/components/v2/cafe/CafeSheet'
+
+export function TwinLandV2({ session, onLogout }) {
+  const [city, setCity] = useState('tehran')
+  const [mapMode, setMapMode] = useState('normal')
+  const [zone, setZone] = useState('all')
+  const [search, setSearch] = useState('')
+  const logoTapRef = useRef({ count: 0, timer: null })
+  const [selCafe, setSelCafe] = useState(null)
+  const [activeEventCafeId, setActiveEventCafeId] = useState(null)
+  const [tab, setTab] = useState('map')
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [panelTab, setPanelTab] = useState('dashboard')
+  const [showMenu, setShowMenu] = useState(false)
+  const [showCity, setShowCity] = useState(false)
+  const [showMode, setShowMode] = useState(false)
+  const [showXP, setShowXP] = useState(false)
+  const [showNotif, setShowNotif] = useState(false)
+  const [tutorialReplay, setTutorialReplay] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
+  const [boundaryMode, setBoundaryMode] = useState('off')
+  const [showBoundary, setShowBoundary] = useState(false)
+  const [showMapSettings, setShowMapSettings] = useState(false)
+  const [showPalette, setShowPalette] = useState(false)
+
+  // ── منطق مشترک با نسخه v1.0 ──
+  const { isDesktop, isMobile } = useViewport()
+  const { C, paletteKey, pickPalette, themeMode, toggleMode } = useThemePalette()
+  const T = useMemo(() => v2Tokens(C), [C])
+  const Lay = v2Layout({ isMobile, isDesktop })
+  const pinStyle = useMemo(() => makePinStyle(C, T), [C, T])
+  const { showToast, toast } = useToast()
+  const { mapDisplay, setMapDisplay } = useMapDisplay()
+  const { freshToken } = useFreshToken({ session })
+  const { cafes, live } = useCafes({ showToast })
+  const { accountType, checkedIn, coins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp } = useUserData({ freshToken, session })
+  const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, pinStyle, search, setSelCafe, showToast, themeMode, zone })
+  const { backfillDistricts, backfilling, claimSecretXP, resetMe, toggleViewMode } = useOwnerTools({ freshToken, session, setViewAsUser, setXp, showToast, viewAsUser })
+  const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp })
+  const levelInfo = getLevelInfo(xp)
+
+  // پنل روی دسکتاپ واقعی با ماوس از اول باز است — مثل نسخه قبل
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (isDesktop && window.matchMedia('(pointer:fine)').matches) setPanelOpen(true)
+  }, [isDesktop])
+
+  // یک ضربه روی لوگو: برگشت به نقشه — سه ضربه: امتیاز مخفی، یک بار برای هر کاربر
+  function onLogoTap() {
+    const t = logoTapRef.current
+    t.count++
+    clearTimeout(t.timer)
+    if (t.count >= 3) { t.count = 0; claimSecretXP(); return }
+    t.timer = setTimeout(() => {
+      if (t.count === 1) {
+        setPanelOpen(false); setTab('map')
+        const c = CITIES[city]; if (mapInst.current && c) mapInst.current.flyTo([c.lat, c.lng], c.zoom)
+      }
+      t.count = 0
+    }, 450)
+  }
+  function goZone(z) {
+    setZone(z.key)
+    if (z.lat && mapInst.current) mapInst.current.flyTo([z.lat, z.lng], 13)
+    else if (z.key === 'all' && mapInst.current) { const c = CITIES[city]; mapInst.current.flyTo([c.lat, c.lng], c.zoom) }
+  }
+
+  const docked = isDesktop
+  const rightInset = docked && panelOpen ? Lay.panelW + Lay.gap * 2 : Lay.gap
+  const totalLive = Object.values(live).reduce((a, b) => a + b, 0)
+  const anySheet = showRegionFilter || showRegionResults || showXP || showMenu || showCity || showMode || showBoundary || showPalette || showMapSettings || (!docked && panelOpen)
+
+  return (
+    <div className="tl2" data-mapmode={mapMode}
+      style={{ position: 'fixed', inset: 0, height: '100dvh', width: '100vw', overflow: 'hidden', direction: 'rtl', background: T.mapBg, color: C.text,
+        fontFamily: "'Estedad','Vazirmatn',system-ui,sans-serif" }}>
+      <HomeGlobalStyles C={C} />
+      <V2Styles C={C} T={T} />
+
+      <MapStage C={C} T={T} applyRegionFilter={applyRegionFilter} mapLoading={mapLoading} mapMode={mapMode} mapRef={mapRef} regionFilter={regionFilter} regionResults={regionResults} selectedRegions={selectedRegions} setRegionFilter={setRegionFilter} setShowRegionFilter={setShowRegionFilter} setShowRegionResults={setShowRegionResults} showRegionFilter={showRegionFilter} showRegionResults={showRegionResults} />
+
+      <CommandBar C={C} T={T} Lay={Lay} city={city} isMobile={isMobile} levelInfo={levelInfo} notifications={notifications} onLogoTap={onLogoTap} search={search} setSearch={setSearch} setShowCity={setShowCity} setShowMenu={setShowMenu} setShowNotif={setShowNotif} setShowXP={setShowXP} showNotif={showNotif} xp={xp} />
+
+      <ZoneChips C={C} T={T} Lay={Lay} goZone={goZone} isMobile={isMobile} rightInset={rightInset} search={search} setSearch={setSearch} zone={zone} />
+
+      <HudOverlays C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} clearRegionFilter={clearRegionFilter} filterApplied={filterApplied} filtered={filtered} isMobile={isMobile} regionResults={regionResults} rightInset={rightInset} selectedRegions={selectedRegions} setActiveEventCafeId={setActiveEventCafeId} setSelCafe={setSelCafe} setShowRegionFilter={setShowRegionFilter} setShowRegionResults={setShowRegionResults} showRegionFilter={showRegionFilter} showRegionResults={showRegionResults} streak={streak} totalLive={totalLive} />
+
+      <MapToolRail C={C} T={T} Lay={Lay} city={city} hidden={anySheet} isMobile={isMobile} mapInst={mapInst} navOpen={navOpen} panMap={panMap} setNavOpen={setNavOpen} setShowBoundary={setShowBoundary} setShowCity={setShowCity} setShowMode={setShowMode} setShowPalette={setShowPalette} />
+
+      {/* نوار تبلیغ LED — جزء مشترک، بالای داک */}
+      <div className="tl2-led" style={{ position: 'absolute', left: 0, right: rightInset, bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.aboveDock - 4) + 'px)', height: 44, zIndex: 50, pointerEvents: 'none', transition: 'right .35s ease' }}>
+        <LedAdBar C={C} />
+      </div>
+
+      <Dock C={C} T={T} Lay={Lay} isMobile={isMobile} panelOpen={panelOpen} panelTab={panelTab} rightInset={rightInset} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setTab={setTab} />
+
+      <PanelShell C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
+
+      {selCafe && <CafeSheet C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => doCheckin(selCafe)} showToast={showToast} />}
+      {showXP && <XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}
+      {showNotif && <NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
+      <UIStyles />
+      <TutorialCoach C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} tutorialLoaded={tutorialLoaded} replay={tutorialReplay} onReplayEnd={() => setTutorialReplay(false)} isMobile={isMobile} />
+      {celebration && <CelebrationOverlay C={C} data={celebration} onClose={() => setCelebration(null)} />}
+
+      <AppMenu C={C} TH={Lay.barTop + Lay.barH} backfillDistricts={backfillDistricts} backfilling={backfilling} effAdmin={effAdmin} isOwner={isOwner} onLogout={onLogout} resetMe={resetMe} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setShowMapSettings={setShowMapSettings} setShowMenu={setShowMenu} setShowXP={setShowXP} setTab={setTab} setTutorialReplay={setTutorialReplay} showMenu={showMenu} showToast={showToast} toggleViewMode={toggleViewMode} viewAsUser={viewAsUser} />
+      <CityPicker C={C} city={city} setCity={setCity} setShowCity={setShowCity} showCity={showCity} showToast={showToast} />
+      <PalettePicker C={C} paletteKey={paletteKey} pickPalette={pickPalette} setShowPalette={setShowPalette} showPalette={showPalette} themeMode={themeMode} toggleMode={toggleMode} />
+      {showMapSettings && <MapSettingsPopup C={C} value={mapDisplay} setValue={setMapDisplay} onClose={() => setShowMapSettings(false)} />}
+      <BoundaryPicker C={C} boundaryMode={boundaryMode} setBoundaryMode={setBoundaryMode} setShowBoundary={setShowBoundary} showBoundary={showBoundary} showToast={showToast} />
+      <MapModePicker C={C} mapMode={mapMode} setMapMode={setMapMode} setShowMode={setShowMode} showMode={showMode} showToast={showToast} />
+
+      <Toast BH={Lay.aboveDock + 36} C={C} toast={toast} />
+    </div>
+  )
+}

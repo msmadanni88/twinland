@@ -15,14 +15,18 @@ export function clusterRadiusOf(level){
 }
 
 // ساخت گروه خوشه‌بندی با شعاع دلخواه
-export function makeClusterGroup(L,radius){
+// iconFn اختیاری است: هر نسخه ظاهر می‌تواند شکل خوشه را خودش بسازد؛ بدون آن همان شکل نسخه v1.0 است
+export function makeClusterGroup(L,radius,iconFn){
   return L.markerClusterGroup({
     chunkedLoading:true,
     maxClusterRadius:radius>0?radius:1,        // ۰ عملاً یعنی بدون خوشه
     spiderfyOnMaxZoom:true,
     showCoverageOnHover:false,
     disableClusteringAtZoom:radius>0?17:1,
-    iconCreateFunction:(cluster)=>{
+    iconCreateFunction:iconFn ? (cluster)=>{
+      const r=iconFn(cluster.getChildCount())
+      return L.divIcon({html:r.html,className:'',iconSize:r.size})
+    } : (cluster)=>{
       const count=cluster.getChildCount()
       const size=count<10?38:count<100?46:56
       const bg=count<10?'#3b82f6':count<100?'#f97316':'#ef4444'

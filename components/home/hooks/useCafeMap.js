@@ -6,7 +6,9 @@ import { CITIES, getColor } from '@/lib/constants'
 import { fetchRegionClans, fetchRegionLeaderboard, getSession } from '@/lib/game/gameSystem'
 import { cafeInLayer, digitsOnly } from '@/lib/geo'
 
-export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, search, setSelCafe, showToast, themeMode, zone }) {
+// pinStyle اختیاری است و فقط در نسخه‌های تازه ظاهر داده می‌شود: { renderPin, clusterIcon, pulseColor }
+// بدون آن، پین، خوشه و حلقه رویداد دقیقاً همان نسخه v1.0 هستند.
+export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, pinStyle, search, setSelCafe, showToast, themeMode, zone }) {
   const mapRef   = useRef(null)
   const mapInst  = useRef(null)
   const mapCenterRef = useRef(null)
@@ -26,6 +28,11 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
   const [showRegionResults, setShowRegionResults] = useState(false)
   const boundaryLayerRef = useRef(null)
   const boundaryDataRef  = useRef({})
+  // رنگ مرزها در نسخه‌های تازه ظاهر؛ با ref خوانده می‌شود تا عوض شدن پالت انتخاب مناطق را پاک نکند
+  const pinStyleRef = useRef(pinStyle)
+  pinStyleRef.current = pinStyle
+  const boundaryOn  = () => (pinStyleRef.current && pinStyleRef.current.boundaryOn)  || '#000000'
+  const boundaryOff = () => (pinStyleRef.current && pinStyleRef.current.boundaryOff) || '#8E8E93'
 
   useEffect(()=>{
     cafes.forEach(cafe=>{
@@ -127,7 +134,7 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
           // ── گروه خوشه‌بندی: پین‌های نزدیک رو جمع می‌کنه (برای مقیاس ده‌ها هزار) ──
           if(L.markerClusterGroup){
             const radius=clusterRadiusOf(mapDisplay.cluster==='auto'?'medium':mapDisplay.cluster)
-            clusterRef.current=makeClusterGroup(L,radius)
+            clusterRef.current=makeClusterGroup(L,radius,pinStyle&&pinStyle.clusterIcon)
             m.addLayer(clusterRef.current)
           }
 
@@ -172,6 +179,11 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
           color:(mapDisplay.dotColor==='#ffffff'||mapDisplay.dotColor==='#9ca3af')?'#374151':'#fff',
           weight:1.5,fillOpacity:0.9,
         })
+      }else if(pinStyle&&pinStyle.renderPin){
+        // پین نسخه‌های تازه ظاهر — المان lv-<id> برای شمارنده زنده باید در HTML باشد
+        const p=pinStyle.renderPin(cafe,{color,isChecked,live:n})
+        const icon=L.divIcon({html:p.html,iconSize:p.size,iconAnchor:p.anchor,className:''})
+        mk=L.marker([cafe.lat,cafe.lng],{icon})
       }else{
         // حالت پین (default) — آیکون کامل فنجان
         const html=`<div style="position:relative;width:44px;height:52px;cursor:pointer;filter:drop-shadow(0 4px 8px ${color}55)">
@@ -189,7 +201,7 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
       else mk.addTo(mapInst.current)
       mksRef.current[cafe.id]=mk
     })
-  },[mapReady,cafes,checkedIn,mapDisplay.markerMode,mapDisplay.dotColor,mapDisplay.dotSize])
+  },[mapReady,cafes,checkedIn,mapDisplay.markerMode,mapDisplay.dotColor,mapDisplay.dotSize,pinStyle])
 
   // هایلایت کافه‌ای که الان توی اسلایدشوی رویدادها نشون داده می‌شه — دوربین حرکت نمی‌کنه
   // برای هر دو حالت (پین/نقطه) یه حلقه‌ی پالس مستقل (divIcon واقعی) دقیقاً روی مختصات کافه اضافه می‌کنیم؛
@@ -199,12 +211,12 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
     const L=window.L
     const cafe = cafes.find(c=>c.id===activeEventCafeId)
     if(!cafe) return
-    const ringColor = themeMode==='night' ? '#ffffff' : '#1a1a1a'
+    const ringColor = (pinStyle&&pinStyle.pulseColor) || (themeMode==='night' ? '#ffffff' : '#1a1a1a')
     const icon=L.divIcon({html:'<div class="tl-event-pulse-ring" style="--pulse-color:'+ringColor+'"></div>',iconSize:[36,36],iconAnchor:[18,18],className:''})
     const ghost=L.marker([cafe.lat,cafe.lng],{icon,interactive:false,zIndexOffset:9999})
     try{ ghost.addTo(mapInst.current) }catch(e){}
     return ()=>{ try{ mapInst.current.removeLayer(ghost) }catch(e){} }
-  },[activeEventCafeId, mapReady, cafes, themeMode])
+  },[activeEventCafeId, mapReady, cafes, themeMode, pinStyle])
 
   // بازسازی گروه خوشه‌بندی وقتی شدت cluster یا حالت فیلتر منطقه عوض شه
   useEffect(()=>{
@@ -216,7 +228,7 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
       : (mapDisplay.cluster==='auto'?'medium':mapDisplay.cluster)
     const radius=clusterRadiusOf(level)
     const old=clusterRef.current
-    const next=makeClusterGroup(L,radius)
+    const next=makeClusterGroup(L,radius,pinStyle&&pinStyle.clusterIcon)
     // مارکرهای فعلی رو به گروه جدید منتقل کن
     const current=Object.values(mksRef.current).filter(mk=>{
       try{ return old?old.hasLayer(mk):mapInst.current.hasLayer(mk) }catch(e){ return false }
@@ -225,7 +237,7 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
     current.forEach(mk=>next.addLayer(mk))
     mapInst.current.addLayer(next)
     clusterRef.current=next
-  },[mapDisplay.cluster,mapDisplay.regionCluster,filterApplied,mapReady])
+  },[mapDisplay.cluster,mapDisplay.regionCluster,filterApplied,mapReady,pinStyle])
 
   const filtered=cafes.filter(c=>{
     const zOk=zone==='all'||c.zone===zone||(zone==='top'&&c.is_top)
@@ -278,8 +290,8 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
         const on=selectedRegions.includes(name)
         try{
           lyr.setStyle(on
-            ?{color:'#000',weight:2.5,fillColor:'#000',fillOpacity:0.12,opacity:0.95}
-            :{color:'#8E8E93',weight:0.5,fillColor:'#8E8E93',fillOpacity:0,opacity:0.15})
+            ?{color:boundaryOn(),weight:2.5,fillColor:boundaryOn(),fillOpacity:0.12,opacity:0.95}
+            :{color:boundaryOff(),weight:0.5,fillColor:boundaryOff(),fillOpacity:0,opacity:0.15})
           if(on){ const b=lyr.getBounds?.(); if(b){ bounds=bounds?bounds.extend(b):b } }
         }catch(e){}
       })
@@ -307,7 +319,7 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
     setFilterApplied(false); setSelectedRegions([]); setShowRegionFilter(false)
     setRegionResults(null); setShowRegionResults(false)
     Object.values(regionLayersRef.current).forEach(lyr=>{
-      try{ lyr.setStyle({color:'#8E8E93',weight:1.3,fillColor:'#8E8E93',fillOpacity:0,opacity:0.5}) }catch(e){}
+      try{ lyr.setStyle({color:boundaryOff(),weight:1.3,fillColor:boundaryOff(),fillOpacity:0,opacity:0.5}) }catch(e){}
     })
     const c=CITIES[city]; if(mapInst.current&&c) mapInst.current.flyTo([c.lat,c.lng],c.zoom)
   }
@@ -327,7 +339,7 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
 
     const styleFor=(idx)=>{
       const on=idx>0
-      const color=on?'#000000':'#8E8E93'
+      const color=on?boundaryOn():boundaryOff()
       return {color,weight:on?2.5:1.3,fillColor:color,fillOpacity:on?0.32:0,opacity:on?0.95:0.5}
     }
 
