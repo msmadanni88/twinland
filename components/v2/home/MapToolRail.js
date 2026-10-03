@@ -1,6 +1,6 @@
 'use client'
 // ستون ابزار نقشه در لبه چپ — نسخه v2.0
-// سبک نقشه، مرزها، پالت، شهر در موبایل، و کنترل جابه‌جایی و بزرگ‌نمایی.
+// پوسته نقشه، مرزها، پالت، شهر در موبایل، و کنترل جابه‌جایی و بزرگ‌نمایی.
 import { CITIES } from '@/lib/constants'
 
 export function MapToolRail({ C, T, Lay, city, hidden, isMobile, mapInst, navOpen, panMap, setNavOpen, setShowBoundary, setShowCity, setShowMode, setShowPalette }) {
@@ -17,7 +17,7 @@ export function MapToolRail({ C, T, Lay, city, hidden, isMobile, mapInst, navOpe
     <div style={{ position: 'absolute', left: Lay.gap, bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + Lay.aboveDock + 'px)', zIndex: 60,
       display: 'flex', alignItems: 'flex-end', gap: 8, animation: 'tl2Slide .5s .1s both cubic-bezier(.2,.9,.3,1)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button className="tl2-press" title="سبک نقشه" aria-label="سبک نقشه" onClick={() => setShowMode(true)} style={btn}>{img('/map_style@256.png', 'سبک نقشه')}</button>
+        <button className="tl2-press" title="پوسته نقشه" aria-label="پوسته نقشه" onClick={() => setShowMode(true)} style={btn}>{img('/map_skin.svg', 'پوسته نقشه')}</button>
         <button data-tut="boundary-btn" className="tl2-press" title="مرزها" aria-label="مرزها" onClick={() => setShowBoundary(true)} style={btn}>{img('/boundaries@256.png', 'مرزها')}</button>
         <button className="tl2-press" title="پالت رنگ" aria-label="پالت رنگ" onClick={() => setShowPalette(true)} style={btn}>{img('/theme@256.png', 'پالت')}</button>
         {isMobile && <button className="tl2-press" title="شهر" aria-label="شهر" onClick={() => setShowCity(true)} style={{ ...btn, fontSize: 10.5, lineHeight: 1.2, flexDirection: 'column' }}>📍<span>{CITIES[city].name}</span></button>}

@@ -8,12 +8,17 @@ import { cafeInLayer, digitsOnly } from '@/lib/geo'
 
 // pinStyle اختیاری است و فقط در نسخه‌های تازه ظاهر داده می‌شود: { renderPin, clusterIcon, pulseColor }
 // بدون آن، پین، خوشه و حلقه رویداد دقیقاً همان نسخه v1.0 هستند.
-export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, pinStyle, search, setSelCafe, showToast, themeMode, zone }) {
+// basemap و skinId هم اختیاری‌اند: basemap یک زیرنقشه جایگزین با تابع attach است (پوسته‌های برداری نسخه‌های تازه).
+// بدون basemap، یا اگر زیرنقشه جایگزین بالا نیاید، همان کاشی‌های عکسی نسخه v1.0 نشان داده می‌شود.
+export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone }) {
   const mapRef   = useRef(null)
   const mapInst  = useRef(null)
   const mapCenterRef = useRef(null)
   const mksRef   = useRef({})
   const clusterRef = useRef(null)   // گروه خوشه‌بندی مارکرها
+  const baseCtlRef = useRef(null)   // کنترل‌کننده زیرنقشه جایگزین، اگر باشد
+  const baseArgsRef = useRef(null)
+  baseArgsRef.current = { basemap, skinId, cafes, live }
   const [mapReady,   setMapReady]   = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
   // ── فیلتر منطقه‌ای ──
@@ -105,6 +110,7 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
           const tileUrl = isLocal ? OSM_URL : '/api/tiles/{z}/{x}/{y}.png?v=2'
           const tileOpts = { maxZoom:19, attribution:TILE_ATTR }
 
+          const addRaster=()=>{
           const mainLayer = L.tileLayer(tileUrl, tileOpts)
           let tileLoaded=false
 
@@ -123,6 +129,17 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
 
           // اگه ۸ ثانیه tile نیومد loading رو ببند
           setTimeout(()=>{ if(!tileLoaded) setMapLoading(false) },8000)
+          }
+
+          // زیرنقشه جایگزین، اگر داده شده باشد؛ هر جا نشد، کاشی‌های عکسی
+          const ba=baseArgsRef.current
+          if(ba.basemap&&ba.basemap.attach){
+            try{
+              baseCtlRef.current=ba.basemap.attach({ L, map:m, skinId:ba.skinId, cafes:ba.cafes, live:ba.live,
+                onReady:()=>{ if(mounted) setMapLoading(false) },
+                onFail:()=>{ baseCtlRef.current=null; if(mounted) addRaster() } })
+            }catch(e){ baseCtlRef.current=null; addRaster() }
+          } else addRaster()
 
           mapInst.current=m
           setMapReady(true)
@@ -147,6 +164,11 @@ export function useCafeMap({ C, activeEventCafeId, boundaryMode, cafes, checkedI
 
     return ()=>{ mounted=false; clearTimeout(timer) }
   },[])
+
+  // پوسته، کافه‌ها و حاضرین را به زیرنقشه جایگزین برسان
+  useEffect(()=>{
+    if(baseCtlRef.current) baseCtlRef.current.update({ skinId, cafes, live })
+  },[skinId,cafes,live,mapReady])
 
   useEffect(()=>{
     const pane=document.querySelector('.leaflet-tile-pane') 
