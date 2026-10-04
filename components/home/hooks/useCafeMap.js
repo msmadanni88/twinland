@@ -250,7 +250,8 @@ export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes,
     const clear=()=>{ if(timer){ clearTimeout(timer); timer=null } }
     const onStart=(e)=>{
       const target=e.target&&e.target.closest&&e.target.closest('.tl2-cafe,.tl2-pin')
-      if(!target) return
+      // لمس جای خالی نقشه: هر منظومه بازی بسته می‌شود
+      if(!target){ container.querySelectorAll('.tl2-cafe.is-open,.tl2-pin.is-open').forEach(el=>el.classList.remove('is-open')); return }
       timer=setTimeout(()=>{
         container.querySelectorAll('.tl2-cafe.is-open,.tl2-pin.is-open').forEach(el=>{ if(el!==target) el.classList.remove('is-open') })
         target.classList.toggle('is-open')
