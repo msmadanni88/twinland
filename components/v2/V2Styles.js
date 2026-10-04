@@ -64,6 +64,11 @@ export function V2Styles({ C, T }) {
     .tl2-cafe:hover .tl2-dot,.tl2-pin:hover .tl2-dot{animation:tl2Blink 1.8s ease-in-out infinite .4s}
   }
 
+  /* نسخه v3.0 — پرچم پایگاه و نرم آمدن مه */
+  .tl3-base-flag{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:900;background:${C.card};color:${C.text};border:1.5px solid ${C.text};box-shadow:0 3px 8px rgba(0,0,0,.35)}
+  .tl3-fog-deep,.tl3-fog-ring{animation:tl2Fade .6s ease both}
+  .tl3-fog-open,.tl3-fog-base{animation:tl2Fade .9s ease both}
+
   /* خوشه */
   .tl2-cluster{border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-weight:900;box-sizing:border-box;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
   .tl2-cluster:hover{transform:scale(1.08)}

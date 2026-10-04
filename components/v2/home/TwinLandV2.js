@@ -44,8 +44,10 @@ import { MapToolRail } from '@/components/v2/home/MapToolRail'
 import { Dock } from '@/components/v2/home/Dock'
 import { PanelShell } from '@/components/v2/panels/PanelShell'
 import { CafeSheet } from '@/components/v2/cafe/CafeSheet'
+import { useHexFog } from '@/components/v3/map/useHexFog'
 
-export function TwinLandV2({ session, onLogout }) {
+// hexFog فقط در نسخه v3.0 روشن است؛ بدون آن این صفحه دقیقاً همان v2.0 است
+export function TwinLandV2({ session, onLogout, hexFog = false }) {
   const [city, setCity] = useState('tehran')
   // پوسته نقشه — جای چهار حالت رنگی قدیم؛ انتخاب کاربر روی همین دستگاه می‌ماند
   const [skinId, setSkinIdState] = useState(DEFAULT_SKIN)
@@ -99,6 +101,7 @@ export function TwinLandV2({ session, onLogout }) {
   const { backfillDistricts, backfilling, claimSecretXP, resetMe, toggleViewMode } = useOwnerTools({ freshToken, session, setViewAsUser, setXp, showToast, viewAsUser })
   const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp })
   const levelInfo = getLevelInfo(xp)
+  const hex = useHexFog({ cafes, checkedIn, city, enabled: hexFog, mapInst, mapLoading, session, showToast, skinId })
 
   // پنل روی دسکتاپ واقعی با ماوس از اول باز است — مثل نسخه قبل
   useEffect(() => {
@@ -147,6 +150,14 @@ export function TwinLandV2({ session, onLogout }) {
       <HudOverlays C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} clearRegionFilter={clearRegionFilter} filterApplied={filterApplied} filtered={filtered} isMobile={isMobile} regionResults={regionResults} rightInset={rightInset} selectedRegions={selectedRegions} setActiveEventCafeId={setActiveEventCafeId} setSelCafe={setSelCafe} setShowRegionFilter={setShowRegionFilter} setShowRegionResults={setShowRegionResults} showRegionFilter={showRegionFilter} showRegionResults={showRegionResults} streak={streak} totalLive={totalLive} />
 
       <MapToolRail C={C} T={T} Lay={Lay} city={city} hidden={anySheet} isMobile={isMobile} mapInst={mapInst} navOpen={navOpen} panMap={panMap} setNavOpen={setNavOpen} setShowBoundary={setShowBoundary} setShowCity={setShowCity} setShowMode={setShowMode} setShowPalette={setShowPalette} />
+
+      {hexFog && !mapLoading && (
+        <div className="tl3-explore" style={{ position: 'absolute', left: Lay.gap, top: Lay.hudTop + 40, zIndex: 55, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderRadius: 99, padding: '5px 11px', fontSize: 11, fontWeight: 800, color: C.text, boxShadow: T.shadow1 || T.shadow2, pointerEvents: 'none', maxWidth: 'calc(100vw - 24px)' }}>
+          {hex.open === 0
+            ? '🧭 اولین چک‌این، پایگاهت را می‌سازد'
+            : '🧭 کشف نقشه: ' + hex.found.toLocaleString('fa') + ' از ' + hex.total.toLocaleString('fa') + ' خانه'}
+        </div>
+      )}
 
       {/* نوار تبلیغ LED — جزء مشترک، بالای داک */}
       <div className="tl2-led" style={{ position: 'absolute', left: 0, right: rightInset, bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.aboveDock - 4) + 'px)', height: 44, zIndex: 50, pointerEvents: 'none', transition: 'right .35s ease' }}>
