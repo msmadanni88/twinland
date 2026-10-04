@@ -152,7 +152,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
       <MapToolRail C={C} T={T} Lay={Lay} city={city} hidden={anySheet} isMobile={isMobile} mapInst={mapInst} navOpen={navOpen} panMap={panMap} setNavOpen={setNavOpen} setShowBoundary={setShowBoundary} setShowCity={setShowCity} setShowMode={setShowMode} setShowPalette={setShowPalette} />
 
       {hexFog && !mapLoading && (
-        <div className="tl3-explore" style={{ position: 'absolute', left: Lay.gap, top: Lay.hudTop + 46, zIndex: 55, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderRadius: 99, padding: '5px 11px', fontSize: 11, fontWeight: 800, color: C.text, boxShadow: T.shadow1 || T.shadow2, pointerEvents: 'none', maxWidth: 'calc(100vw - 24px)' }}>
+        <div className="tl3-explore" style={{ position: 'absolute', left: Lay.gap, top: Lay.hudTop + 78, zIndex: 55, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderRadius: 99, padding: '5px 11px', fontSize: 11, fontWeight: 800, color: C.text, boxShadow: T.shadow1 || T.shadow2, pointerEvents: 'none', maxWidth: 'calc(100vw - 24px)' }}>
           {hex.open === 0
             ? '🧭 اولین چک‌این، پایگاهت را می‌سازد'
             : '🧭 کشف نقشه: ' + hex.found.toLocaleString('fa') + ' از ' + hex.total.toLocaleString('fa') + ' خانه'}
