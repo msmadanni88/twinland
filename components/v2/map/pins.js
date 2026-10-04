@@ -93,25 +93,133 @@ function truncate(s, n) {
   return s.length > n ? s.slice(0, n - 1) + '…' : s
 }
 
-// حباب‌های کوچکی که با hover روی دسکتاپ، یا نگه‌داشتن انگشت روی موبایل (کلاس
-// is-open)، از کنار پین «پاپ» می‌زنند بیرون: شعار کافه، آیتم ویژه، یک کمپین/
-// ماموریت فعال (قابل کلیک → پنل ماموریت‌ها)، و نشان «ظرفیت تکمیل».
-function renderSatellites(cafe, C) {
-  const parts = []
+// ── منظومه دور پین ─────────────────────────────────────────────────────────
+// با hover روی دسکتاپ، یا نگه‌داشتن انگشت روی موبایل (کلاس is-open)، چند گره
+// از پشت پین بیرون می‌زنند و با خط به آن وصل می‌مانند: ابر شعار، آیتم ویژه،
+// کمپین فعال (قابل کلیک → پنل ماموریت‌ها) و نشان «ظرفیت تکمیل».
+// اندازه و زاویه هر گره از شناسه کافه درمی‌آید: برای هر کافه ثابت، ولی بین
+// کافه‌ها متفاوت، تا همه شبیه هم نباشند.
+function seedOf(cafe) {
+  const s = String(cafe.id == null ? cafe.name || '' : cafe.id)
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0 }
+  return h
+}
+function rnd(seed, i) {
+  let x = (seed + Math.imul(i + 1, 0x9E3779B9)) >>> 0
+  x ^= x >>> 16; x = Math.imul(x, 0x85EBCA6B) >>> 0
+  x ^= x >>> 13; x = Math.imul(x, 0xC2B2AE35) >>> 0
+  x ^= x >>> 16
+  return (x >>> 0) / 4294967296
+}
+const r1 = (n) => Math.round(n * 10) / 10
+
+// آیکون آیتم ویژه از روی اسم خودش حدس زده می‌شود؛ اگر چیزی پیدا نشد ستاره
+const ITEM_ICONS = [
+  [/آفوگاتو|افوگاتو|aff?ogato|بستنی|ice ?cream|gelato/i, '🍨'],
+  [/کوکی|cookie|بیسکو/i, '🍪'],
+  [/دونات|donut|doughnut/i, '🍩'],
+  [/کیک|cake|براونی|brownie|تیرامیسو|tiramisu/i, '🍰'],
+  [/کروسان|croissant/i, '🥐'],
+  [/وافل|waffle|پنکیک|pancake/i, '🧇'],
+  [/پیتزا|pizza/i, '🍕'],
+  [/برگر|burger/i, '🍔'],
+  [/ساندویچ|sandwich|پنینی|panini/i, '🥪'],
+  [/پاستا|pasta|اسپاگتی/i, '🍝'],
+  [/سالاد|salad/i, '🥗'],
+  [/صبحانه|املت|omelet|breakfast/i, '🍳'],
+  [/شیک|shake|اسموتی|smoothie|فراپه|frapp/i, '🥤'],
+  [/آب ?میوه|juice|لیموناد|lemonade|موهیتو|mojito/i, '🍹'],
+  [/چای|tea|دمنوش|ماچا|matcha/i, '🍵'],
+  [/شکلات|chocolate/i, '🍫'],
+  [/قهوه|اسپرسو|لاته|کاپوچینو|موکا|آمریکانو|coffee|latte|espresso|mocha|americano|cappuccino|v60|کمکس/i, '☕'],
+]
+function itemIcon(name) {
+  const s = String(name || '')
+  for (let i = 0; i < ITEM_ICONS.length; i++) if (ITEM_ICONS[i][0].test(s)) return ITEM_ICONS[i][1]
+  return '⭐'
+}
+
+// ابر شعار: اندازه از روی طول متن حساب می‌شود و سه مدل دارد —
+// پفکی با برآمدگی درشت، پفکی با برآمدگی ریز، و حباب گرد دوخطه
+function cloudNode(text, seed, fill, ink, textColor) {
+  const t = truncate(text, 42)
+  const per = 15
+  const lines = Math.max(1, Math.min(3, Math.ceil(t.length / per)))
+  const cols = Math.min(t.length, per)
+  const w = Math.round(Math.max(56, cols * 6.4 + 32)), h = lines * 13 + 26
+  const variant = seed % 3
+  let shape
+  if (variant === 2) {
+    shape = '<rect x="4" y="5" width="' + (w - 5) + '" height="' + (h - 6) + '" rx="' + r1((h - 6) / 2.2) + '" fill="' + ink + '" opacity=".28"/>' +
+      '<rect class="tl2-cloud-shape" x="2" y="2" width="' + (w - 5) + '" height="' + (h - 6) + '" rx="' + r1((h - 6) / 2.2) + '" fill="' + fill + '" stroke="' + ink + '" stroke-width="2"/>'
+  } else {
+    const a = w / 2 - 7, b = h / 2 - 7, e = 2 / 3.2
+    const perim = 2 * (w + h)
+    const n = Math.max(7, Math.round(perim / (variant === 0 ? 27 : 18)))
+    const pts = []
+    for (let i = 0; i < n; i++) {
+      const th = 2 * Math.PI * (i + (rnd(seed, 20 + i) - 0.5) * 0.45) / n - Math.PI / 2
+      const c = Math.cos(th), sn = Math.sin(th)
+      pts.push([w / 2 + a * Math.sign(c) * Math.pow(Math.abs(c), e), h / 2 + b * Math.sign(sn) * Math.pow(Math.abs(sn), e)])
+    }
+    let d = 'M' + r1(pts[0][0]) + ' ' + r1(pts[0][1])
+    for (let i = 1; i <= n; i++) {
+      const q = pts[i % n], o = pts[i - 1]
+      const r = Math.hypot(q[0] - o[0], q[1] - o[1]) * (variant === 0 ? 0.6 : 0.56)
+      d += 'A' + r1(r) + ' ' + r1(r) + ' 0 0 1 ' + r1(q[0]) + ' ' + r1(q[1])
+    }
+    shape = '<path class="tl2-cloud-shape" d="' + d + 'Z" fill="' + fill + '" stroke="' + ink + '" stroke-width="2" stroke-linejoin="round"/>'
+  }
+  const html = '<div class="tl2-cloud" style="width:' + w + 'px;height:' + h + 'px">' +
+    '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" aria-hidden="true">' + shape + '</svg>' +
+    '<div class="tl2-cloud-txt" style="color:' + textColor + '">' + escHtml(t) + '</div></div>'
+  return { html, w, h }
+}
+
+// cx, cy: مرکز پین داخل جعبه خودش — گره‌ها نسبت به همین نقطه چیده می‌شوند
+function renderSatellites(cafe, C, cx, cy) {
+  const q = cafe.active_quest
+  if (!cafe.motto && !cafe.featured_item_name && !q && !cafe.is_full) return ''
+  const seed = seedOf(cafe)
+  const ink = C.text
+  const rad = Math.PI / 180
+  const nodes = []
+  let links = ''
+  let k = 0
+  const place = (baseDeg, spread, dist) => {
+    const ang = (baseDeg + (rnd(seed, k * 3) - 0.5) * 2 * spread) * rad
+    const dd = dist + (rnd(seed, k * 3 + 1) - 0.5) * 12
+    return { x: Math.cos(ang) * dd, y: Math.sin(ang) * dd, d: dd, s: 0.86 + rnd(seed, k * 3 + 2) * 0.4, delay: (k++ * 0.07).toFixed(2) }
+  }
+  const disc = (cls, attrs, P, icon, bg, label) => {
+    links += '<line class="tl2-link" pathLength="1" x1="0" y1="0" x2="' + r1(P.x) + '" y2="' + r1(P.y) + '" stroke="' + ink + '" style="--d:' + P.delay + 's"/>'
+    nodes.push('<div class="tl2-node ' + cls + '"' + attrs + ' style="left:' + r1(P.x) + 'px;top:' + r1(P.y) + 'px;--s:' + P.s.toFixed(2) + ';--d:' + P.delay + 's;--b:-' + (rnd(seed, 40 + k) * 3).toFixed(2) + 's">' +
+      '<div class="tl2-node-in">' +
+        '<div class="tl2-disc" style="background:' + bg + ';color:' + onColor(bg) + ';border-color:' + ink + '">' + icon + '</div>' +
+        '<div class="tl2-tag" style="background:' + C.card + ';color:' + C.text + ';border-color:' + ink + '">' + escHtml(label) + '</div>' +
+      '</div></div>')
+  }
   if (cafe.motto) {
-    parts.push('<div class="tl2-sat tl2-sat-motto" style="background:' + C.card + ';color:' + C.text + ';border:1px solid ' + alpha(C.accent, 0.55) + '">💬 ' + escHtml(truncate(cafe.motto, 22)) + '</div>')
+    const cl = cloudNode(cafe.motto, seed, C.card, ink, C.text)
+    const ang = (-90 + (rnd(seed, 90) - 0.5) * 30) * rad
+    const dist = 46 + cl.h / 2 + 12
+    const x = Math.cos(ang) * dist, y = Math.sin(ang) * dist
+    const delay = (k++ * 0.07).toFixed(2)
+    // ردیف دایره‌های ریز «فکر» از پین تا زیر ابر، به‌جای خط
+    const from = 24, to = dist - cl.h / 2 - 3
+    const steps = [[0.1, 2.2], [0.42, 3.2], [0.8, 4.4]]
+    for (let i = 0; i < steps.length; i++) {
+      const dd = from + (to - from) * steps[i][0]
+      links += '<circle class="tl2-dot" cx="' + r1(Math.cos(ang) * dd) + '" cy="' + r1(Math.sin(ang) * dd) + '" r="' + steps[i][1] + '" fill="' + C.card + '" stroke="' + ink + '" stroke-width="1.6" style="--d:' + (i * 0.06).toFixed(2) + 's"/>'
+    }
+    nodes.push('<div class="tl2-node tl2-node-motto" style="left:' + r1(x) + 'px;top:' + r1(y) + 'px;--s:1;--d:' + delay + 's;--b:-' + (rnd(seed, 91) * 3).toFixed(2) + 's"><div class="tl2-node-in">' + cl.html + '</div></div>')
   }
-  if (cafe.featured_item_name) {
-    parts.push('<div class="tl2-sat tl2-sat-item" style="background:' + C.gold + ';color:' + onColor(C.gold) + '">⭐ ' + escHtml(truncate(cafe.featured_item_name, 16)) + '</div>')
-  }
-  if (cafe.active_quest) {
-    const q = cafe.active_quest
-    parts.push('<div class="tl2-sat tl2-sat-quest" data-quest-id="' + q.id + '" style="background:' + C.accent + ';color:' + onColor(C.accent) + '">' + escHtml(q.icon || '🎯') + ' ' + escHtml(truncate(q.title, 14)) + '</div>')
-  }
-  if (cafe.is_full) {
-    parts.push('<div class="tl2-sat tl2-sat-full" style="background:' + C.danger + ';color:' + onColor(C.danger) + '">🚫 ظرفیت تکمیل</div>')
-  }
-  return parts.join('')
+  if (cafe.featured_item_name) disc('tl2-node-item', '', place(-20, 9, 70), itemIcon(cafe.featured_item_name), C.gold, truncate(cafe.featured_item_name, 16))
+  if (q) disc('tl2-node-quest', ' data-quest-id="' + escHtml(q.id) + '"', place(-160, 9, 70), escHtml(q.icon || '🎯'), C.accent, truncate(q.title, 16))
+  if (cafe.is_full) disc('tl2-node-full', '', place(42, 8, 64), '⛔', C.danger, 'ظرفیت تکمیل')
+  return '<div class="tl2-orbit" style="left:' + cx + 'px;top:' + cy + 'px">' +
+    '<svg class="tl2-links" width="1" height="1" aria-hidden="true">' + links + '</svg>' + nodes.join('') + '</div>'
 }
 
 // art: null = پین فانوسی، 'color' = کافه نقاشی‌شده رنگی، 'ink' = کافه مدادی
@@ -126,13 +234,13 @@ export function makePinStyle(C, T, art) {
     const n = live || 0
     const html =
       '<div class="tl2-cafe' + (cafe.is_top ? ' is-top' : '') + '">' +
+        renderSatellites(cafe, C, 22, 24) +
         '<div class="tl2-cafe-shadow"></div>' +
         '<svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true" style="position:relative;display:block;overflow:visible">' + CAFE_SHAPES[iconIndexOf(cafe)](k) + '</svg>' +
         (isChecked ? '<div class="tl2-pin-star" style="left:auto;right:-4px;top:-5px;background:' + C.green + ';color:' + onColor(C.green) + ';border-color:' + ring + '">✓</div>' : '') +
         (cafe.is_top ? '<div class="tl2-pin-star" style="background:' + C.gold + ';color:' + onColor(C.gold) + ';border-color:' + ring + '">★</div>' : '') +
         '<div id="lv-' + cafe.id + '" class="tl2-pin-live" style="top:auto;bottom:-3px;right:-6px;display:' + (n > 0 ? 'flex' : 'none') +
           ';background:' + C.danger + ';color:' + onColor(C.danger) + ';border-color:' + ring + '">' + (n > 0 ? n : '') + '</div>' +
-        renderSatellites(cafe, C) +
       '</div>'
     return { html, size: [44, 48], anchor: [22, 44] }
   }
@@ -147,6 +255,7 @@ export function makePinStyle(C, T, art) {
     const n = live || 0
     const html =
       '<div class="tl2-pin' + (cafe.is_top ? ' is-top' : '') + '">' +
+        renderSatellites(cafe, C, 20, 19) +
         '<div class="tl2-pin-shadow"></div>' +
         '<div class="tl2-pin-tail" style="background:' + deep + ';border-color:' + ring + '"></div>' +
         '<div class="tl2-pin-head" style="background:radial-gradient(circle at 32% 26%,' + light + ',' + base + ' 60%,' + deep + ');' +
@@ -156,7 +265,6 @@ export function makePinStyle(C, T, art) {
         (cafe.is_top ? '<div class="tl2-pin-star" style="background:' + C.gold + ';color:' + onColor(C.gold) + ';border-color:' + ring + '">★</div>' : '') +
         '<div id="lv-' + cafe.id + '" class="tl2-pin-live" style="display:' + (n > 0 ? 'flex' : 'none') +
           ';background:' + C.danger + ';color:' + onColor(C.danger) + ';border-color:' + ring + '">' + (n > 0 ? n : '') + '</div>' +
-        renderSatellites(cafe, C) +
       '</div>'
     return { html, size: [40, 50], anchor: [20, 48] }
   }

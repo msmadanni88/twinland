@@ -29,28 +29,39 @@ export function V2Styles({ C, T }) {
   .tl2-cafe:hover,.tl2-cafe.is-open{transform:translateY(-3px) scale(1.1)}
   .tl2-cafe-shadow{position:absolute;left:50%;bottom:2px;width:30px;height:7px;margin-left:-15px;border-radius:50%;background:rgba(0,0,0,.28);filter:blur(2px)}
 
-  /* حباب‌های شناور (شعار، آیتم ویژه، کمپین، ظرفیت تکمیل) — با hover روی
-     دسکتاپ یا نگه‌داشتن انگشت روی موبایل (کلاس is-open) از کنار پین بیرون می‌زنند */
-  .tl2-sat{position:absolute;display:flex;align-items:center;gap:3px;padding:3px 7px;border-radius:99px;font-size:9.5px;font-weight:800;white-space:nowrap;max-width:118px;overflow:hidden;text-overflow:ellipsis;opacity:0;pointer-events:none;box-shadow:0 3px 8px rgba(0,0,0,.3);z-index:6;transition:opacity .16s,transform .22s cubic-bezier(.34,1.56,.64,1)}
-  .tl2-sat-motto{top:-16px;left:50%;transform:translateX(-50%) scale(.3)}
-  .tl2-sat-item{top:3px;right:-12px;transform:scale(.3)}
-  .tl2-sat-quest{top:19px;left:-14px;transform:scale(.3);cursor:pointer}
-  .tl2-sat-full{bottom:-9px;left:50%;transform:translateX(-50%) scale(.3)}
-  @keyframes tl2WiggleC{0%,100%{transform:translateX(-50%) scale(1) rotate(0deg)}25%{transform:translateX(-50%) scale(1) rotate(-3deg)}75%{transform:translateX(-50%) scale(1) rotate(3deg)}}
-  @keyframes tl2WiggleS{0%,100%{transform:scale(1) rotate(0deg)}25%{transform:scale(1) rotate(-3deg)}75%{transform:scale(1) rotate(3deg)}}
-  .tl2-cafe.is-open .tl2-sat,.tl2-pin.is-open .tl2-sat{opacity:1;pointer-events:auto;transform:scale(1)}
-  .tl2-cafe.is-open .tl2-sat-motto,.tl2-pin.is-open .tl2-sat-motto,.tl2-cafe.is-open .tl2-sat-full,.tl2-pin.is-open .tl2-sat-full{transform:translateX(-50%) scale(1)}
-  .tl2-cafe.is-open .tl2-sat-motto,.tl2-pin.is-open .tl2-sat-motto{animation:tl2WiggleC 2.6s ease-in-out infinite}
-  .tl2-cafe.is-open .tl2-sat-full,.tl2-pin.is-open .tl2-sat-full{animation:tl2WiggleC 2.6s ease-in-out infinite .3s}
-  .tl2-cafe.is-open .tl2-sat-item,.tl2-pin.is-open .tl2-sat-item{animation:tl2WiggleS 2.3s ease-in-out infinite .15s}
-  .tl2-cafe.is-open .tl2-sat-quest,.tl2-pin.is-open .tl2-sat-quest{animation:tl2WiggleS 2.3s ease-in-out infinite .45s}
+  /* منظومه دور پین: ابر شعار، آیتم ویژه، کمپین و ظرفیت تکمیل — با hover روی
+     دسکتاپ یا نگه‌داشتن انگشت روی موبایل (کلاس is-open) از پشت پین بیرون می‌زنند.
+     بسته شدن 0.25 ثانیه تأخیر دارد تا موس بتواند از پین به گره برسد. */
+  .tl2 .leaflet-marker-icon:has(.tl2-cafe:hover),.tl2 .leaflet-marker-icon:has(.tl2-pin:hover),.tl2 .leaflet-marker-icon:has(.is-open){z-index:100000 !important}
+  .tl2-orbit{position:absolute;width:0;height:0;pointer-events:none}
+  .tl2-links{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+  .tl2-link{fill:none;stroke-width:2;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .28s ease .25s}
+  .tl2-dot{transform-box:fill-box;transform-origin:center;transform:scale(0);transition:transform .2s ease .25s}
+  .tl2-node{position:absolute;transform:translate(-50%,-50%) scale(0);visibility:hidden;pointer-events:none;z-index:6;filter:drop-shadow(0 3px 3px rgba(0,0,0,.32));transition:transform .24s cubic-bezier(.34,1.56,.64,1) .25s,visibility 0s .5s}
+  .tl2-node-in{display:flex;flex-direction:column;align-items:center;gap:2px}
+  .tl2-node-quest{cursor:pointer}
+  .tl2-disc{width:34px;height:34px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;box-sizing:border-box}
+  .tl2-tag{max-width:96px;padding:0 7px;border-radius:99px;border:1.5px solid;font-size:9.5px;font-weight:800;line-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box}
+  .tl2-cloud{position:relative}
+  .tl2-cloud svg{position:absolute;left:0;top:0;overflow:visible}
+  .tl2-cloud-shape{transform-box:fill-box;transform-origin:center}
+  .tl2-cloud-txt{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 14px;font-size:10px;font-weight:800;line-height:13px;overflow-wrap:anywhere;unicode-bidi:plaintext}
+  @keyframes tl2Bob{0%,100%{transform:translateY(0) rotate(0deg)}30%{transform:translateY(-2.5px) rotate(-2deg)}70%{transform:translateY(1.5px) rotate(2deg)}}
+  @keyframes tl2Puff{0%,100%{transform:scale(1)}50%{transform:scale(1.045,1.07)}}
+  @keyframes tl2Blink{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+  .tl2-cafe.is-open .tl2-node,.tl2-pin.is-open .tl2-node{transform:translate(-50%,-50%) scale(var(--s,1));visibility:visible;pointer-events:auto;transition-delay:var(--d,0s),0s}
+  .tl2-cafe.is-open .tl2-link,.tl2-pin.is-open .tl2-link{stroke-dashoffset:0;transition-delay:var(--d,0s)}
+  .tl2-cafe.is-open .tl2-dot,.tl2-pin.is-open .tl2-dot{transform:scale(1);transition-delay:var(--d,0s)}
+  .tl2-cafe.is-open .tl2-node-in,.tl2-pin.is-open .tl2-node-in{animation:tl2Bob 3.2s ease-in-out infinite;animation-delay:var(--b,0s)}
+  .tl2-cafe.is-open .tl2-cloud-shape,.tl2-pin.is-open .tl2-cloud-shape{animation:tl2Puff 2.6s ease-in-out infinite}
+  .tl2-cafe.is-open .tl2-dot,.tl2-pin.is-open .tl2-dot{animation:tl2Blink 1.8s ease-in-out infinite .4s}
   @media (hover:hover) and (pointer:fine){
-    .tl2-cafe:hover .tl2-sat,.tl2-pin:hover .tl2-sat{opacity:1;pointer-events:auto;transform:scale(1)}
-    .tl2-cafe:hover .tl2-sat-motto,.tl2-pin:hover .tl2-sat-motto,.tl2-cafe:hover .tl2-sat-full,.tl2-pin:hover .tl2-sat-full{transform:translateX(-50%) scale(1)}
-    .tl2-cafe:hover .tl2-sat-motto,.tl2-pin:hover .tl2-sat-motto{animation:tl2WiggleC 2.6s ease-in-out infinite}
-    .tl2-cafe:hover .tl2-sat-full,.tl2-pin:hover .tl2-sat-full{animation:tl2WiggleC 2.6s ease-in-out infinite .3s}
-    .tl2-cafe:hover .tl2-sat-item,.tl2-pin:hover .tl2-sat-item{animation:tl2WiggleS 2.3s ease-in-out infinite .15s}
-    .tl2-cafe:hover .tl2-sat-quest,.tl2-pin:hover .tl2-sat-quest{animation:tl2WiggleS 2.3s ease-in-out infinite .45s}
+    .tl2-cafe:hover .tl2-node,.tl2-pin:hover .tl2-node{transform:translate(-50%,-50%) scale(var(--s,1));visibility:visible;pointer-events:auto;transition-delay:var(--d,0s),0s}
+    .tl2-cafe:hover .tl2-link,.tl2-pin:hover .tl2-link{stroke-dashoffset:0;transition-delay:var(--d,0s)}
+    .tl2-cafe:hover .tl2-dot,.tl2-pin:hover .tl2-dot{transform:scale(1);transition-delay:var(--d,0s)}
+    .tl2-cafe:hover .tl2-node-in,.tl2-pin:hover .tl2-node-in{animation:tl2Bob 3.2s ease-in-out infinite;animation-delay:var(--b,0s)}
+    .tl2-cafe:hover .tl2-cloud-shape,.tl2-pin:hover .tl2-cloud-shape{animation:tl2Puff 2.6s ease-in-out infinite}
+    .tl2-cafe:hover .tl2-dot,.tl2-pin:hover .tl2-dot{animation:tl2Blink 1.8s ease-in-out infinite .4s}
   }
 
   /* خوشه */
