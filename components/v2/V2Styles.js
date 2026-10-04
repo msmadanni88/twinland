@@ -34,7 +34,7 @@ export function V2Styles({ C, T }) {
      بسته شدن 0.25 ثانیه تأخیر دارد تا موس بتواند از پین به گره برسد. */
   .tl2 .leaflet-marker-icon:has(.tl2-cafe:hover),.tl2 .leaflet-marker-icon:has(.tl2-pin:hover),.tl2 .leaflet-marker-icon:has(.is-open){z-index:100000 !important}
   .tl2-orbit{position:absolute;width:0;height:0;pointer-events:none}
-  .tl2-links{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+  .tl2-links{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:0 !important}
   .tl2-link{fill:none;stroke-width:2;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .28s ease .25s}
   .tl2-dot{transform-box:fill-box;transform-origin:center;transform:scale(0);transition:transform .2s ease .25s}
   .tl2-node{position:absolute;transform:translate(-50%,-50%) scale(0);visibility:hidden;pointer-events:none;z-index:6;filter:drop-shadow(0 3px 3px rgba(0,0,0,.32));transition:transform .24s cubic-bezier(.34,1.56,.64,1) .25s,visibility 0s .5s}
@@ -43,9 +43,9 @@ export function V2Styles({ C, T }) {
   .tl2-disc{width:34px;height:34px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;box-sizing:border-box}
   .tl2-tag{max-width:96px;padding:0 7px;border-radius:99px;border:1.5px solid;font-size:9.5px;font-weight:800;line-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box}
   .tl2-cloud{position:relative}
-  .tl2-cloud svg{position:absolute;left:0;top:0;overflow:visible}
+  .tl2-cloud svg{position:absolute;left:0;top:0;overflow:visible;z-index:0 !important}
   .tl2-cloud-shape{transform-box:fill-box;transform-origin:center}
-  .tl2-cloud-txt{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 14px;font-size:10px;font-weight:800;line-height:13px;overflow-wrap:anywhere;unicode-bidi:plaintext}
+  .tl2-cloud-txt{z-index:1;position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 14px;font-size:10px;font-weight:800;line-height:13px;overflow-wrap:anywhere;unicode-bidi:plaintext}
   @keyframes tl2Bob{0%,100%{transform:translateY(0) rotate(0deg)}30%{transform:translateY(-2.5px) rotate(-2deg)}70%{transform:translateY(1.5px) rotate(2deg)}}
   @keyframes tl2Puff{0%,100%{transform:scale(1)}50%{transform:scale(1.045,1.07)}}
   @keyframes tl2Blink{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
