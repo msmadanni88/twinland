@@ -15,7 +15,7 @@ export function V2Styles({ C, T }) {
 
   /* پین فانوسی */
   .tl2-pin{position:relative;width:40px;height:50px;cursor:pointer;transform-origin:50% 96%;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
-  .tl2-pin:hover{transform:translateY(-3px) scale(1.08)}
+  .tl2-pin:hover,.tl2-pin.is-open{transform:translateY(-3px) scale(1.08)}
   .tl2-pin-head{position:absolute;left:3px;top:2px;width:34px;height:34px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;box-sizing:border-box;line-height:1}
   .tl2-pin-tail{position:absolute;left:50%;top:29px;width:11px;height:11px;margin-left:-5.5px;transform:rotate(45deg);border-right:2px solid;border-bottom:2px solid;border-radius:0 0 3px 0;box-sizing:border-box}
   .tl2-pin-shadow{position:absolute;left:50%;bottom:1px;width:16px;height:5px;margin-left:-8px;border-radius:50%;background:rgba(0,0,0,.38);filter:blur(1.5px)}
@@ -26,8 +26,30 @@ export function V2Styles({ C, T }) {
 
   /* کافه نقاشی‌شده — پوسته‌های کارتونی و مدادی */
   .tl2-cafe{position:relative;width:44px;height:48px;cursor:pointer;transform-origin:50% 92%;transition:transform .2s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 3px 3px rgba(0,0,0,.28))}
-  .tl2-cafe:hover{transform:translateY(-3px) scale(1.1)}
+  .tl2-cafe:hover,.tl2-cafe.is-open{transform:translateY(-3px) scale(1.1)}
   .tl2-cafe-shadow{position:absolute;left:50%;bottom:2px;width:30px;height:7px;margin-left:-15px;border-radius:50%;background:rgba(0,0,0,.28);filter:blur(2px)}
+
+  /* حباب‌های شناور (شعار، آیتم ویژه، کمپین، ظرفیت تکمیل) — با hover روی
+     دسکتاپ یا نگه‌داشتن انگشت روی موبایل (کلاس is-open) از کنار پین بیرون می‌زنند */
+  .tl2-sat{position:absolute;display:flex;align-items:center;gap:3px;padding:3px 7px;border-radius:99px;font-size:9.5px;font-weight:800;white-space:nowrap;max-width:118px;overflow:hidden;text-overflow:ellipsis;opacity:0;pointer-events:none;box-shadow:0 3px 8px rgba(0,0,0,.3);z-index:6;transition:opacity .16s}
+  .tl2-sat-motto{top:-16px;left:50%;transform:translateX(-50%) scale(.3)}
+  .tl2-sat-item{top:3px;right:-12px;transform:scale(.3)}
+  .tl2-sat-quest{top:19px;left:-14px;transform:scale(.3);cursor:pointer}
+  .tl2-sat-full{bottom:-9px;left:50%;transform:translateX(-50%) scale(.3)}
+  @keyframes tl2WiggleC{0%,100%{transform:translateX(-50%) scale(1) rotate(-3deg)}50%{transform:translateX(-50%) scale(1) rotate(3deg)}}
+  @keyframes tl2WiggleS{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1) rotate(3deg)}}
+  .tl2-cafe.is-open .tl2-sat,.tl2-pin.is-open .tl2-sat{opacity:1;pointer-events:auto}
+  .tl2-cafe.is-open .tl2-sat-motto,.tl2-pin.is-open .tl2-sat-motto{animation:tl2WiggleC 2.6s ease-in-out infinite}
+  .tl2-cafe.is-open .tl2-sat-full,.tl2-pin.is-open .tl2-sat-full{animation:tl2WiggleC 2.6s ease-in-out infinite .3s}
+  .tl2-cafe.is-open .tl2-sat-item,.tl2-pin.is-open .tl2-sat-item{animation:tl2WiggleS 2.3s ease-in-out infinite .15s}
+  .tl2-cafe.is-open .tl2-sat-quest,.tl2-pin.is-open .tl2-sat-quest{animation:tl2WiggleS 2.3s ease-in-out infinite .45s}
+  @media (hover:hover) and (pointer:fine){
+    .tl2-cafe:hover .tl2-sat,.tl2-pin:hover .tl2-sat{opacity:1;pointer-events:auto}
+    .tl2-cafe:hover .tl2-sat-motto,.tl2-pin:hover .tl2-sat-motto{animation:tl2WiggleC 2.6s ease-in-out infinite}
+    .tl2-cafe:hover .tl2-sat-full,.tl2-pin:hover .tl2-sat-full{animation:tl2WiggleC 2.6s ease-in-out infinite .3s}
+    .tl2-cafe:hover .tl2-sat-item,.tl2-pin:hover .tl2-sat-item{animation:tl2WiggleS 2.3s ease-in-out infinite .15s}
+    .tl2-cafe:hover .tl2-sat-quest,.tl2-pin:hover .tl2-sat-quest{animation:tl2WiggleS 2.3s ease-in-out infinite .45s}
+  }
 
   /* خوشه */
   .tl2-cluster{border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-weight:900;box-sizing:border-box;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}

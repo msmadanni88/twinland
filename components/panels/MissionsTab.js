@@ -6,7 +6,8 @@ import { onColor } from '@/lib/theme/ui'
 import { getSession, subscribeToChanges, subscribeToTables } from '@/lib/game/gameSystem'
 
 // ── MISSIONS TAB — حالا کاملاً واقعی: از quests واقعی می‌خونه، claim تکراری امکان نداره ──
-export function MissionsTab({C, cafes, setSelCafe, showToast}) {
+// highlightQuestId: از کلیک روی حباب کمپین روی نقشه می‌آد — همون کارت رو هایلایت و اسکرول می‌کنیم
+export function MissionsTab({C, cafes, highlightQuestId, setSelCafe, showToast}) {
   const [quests, setQuests] = useState([])
   const [progress, setProgress] = useState({})
   const [redemptions, setRedemptions] = useState({})
@@ -26,6 +27,11 @@ export function MissionsTab({C, cafes, setSelCafe, showToast}) {
   },[uid])
 
   useEffect(()=>{ load() },[load])
+  useEffect(()=>{
+    if(!highlightQuestId) return
+    const el=typeof document!=='undefined'&&document.getElementById('quest-'+highlightQuestId)
+    if(el) el.scrollIntoView({behavior:'smooth',block:'center'})
+  },[highlightQuestId,quests])
   useEffect(()=>{
     // رویدادها (عمومی، پرحجم) → کانال سبک مشترک با debounce
     const unsubLight=subscribeToChanges(['quests'],()=>load())
@@ -72,7 +78,8 @@ export function MissionsTab({C, cafes, setSelCafe, showToast}) {
         const pct=Math.min(100,Math.round((cur/(q.target_count||1))*100))
         const red=redemptions[q.id]
         const cafeName=q.cafes?q.cafes.name:'کافه'
-        return <div key={q.id} style={{background:isDone?C.green+'18':C.card,border:'1px solid '+(isDone?C.green+'55':C.border),borderRadius:14,padding:12}}>
+        const hl=String(q.id)===String(highlightQuestId)
+        return <div key={q.id} id={'quest-'+q.id} style={{background:isDone?C.green+'18':C.card,border:'1px solid '+(hl?C.accent:(isDone?C.green+'55':C.border)),borderRadius:14,padding:12,boxShadow:hl?('0 0 0 3px '+C.accent+'33'):'none',transition:'box-shadow .3s,border-color .3s'}}>
           <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
             <div style={{width:40,height:40,borderRadius:12,flexShrink:0,background:isDone?C.green+'20':C.accent+'15',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{isDone?'✅':(q.icon||'🎯')}</div>
             <div style={{flex:1,minWidth:0}}>

@@ -10,11 +10,33 @@ export function useCafes({ showToast }) {
   // کافه‌ها فقط از دیتابیس — بدون دادهٔ ساختگی. اگه لود نشد، پیام واقعی + تلاش دوباره.
   useEffect(()=>{
     let alive=true, retry=null
+    const h={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+    // ویترین هر کافه: اسم آیتم ویژه (از روی featured_menu_item_id) + یک کمپین/ماموریت
+    // فعال — برای حباب‌های شناور روی نقشه. یک‌جا برای همه‌ی کافه‌ها، نه به‌ازای هر hover.
+    const enrich=(rows)=>{
+      const withFeatured=rows.filter(c=>c.featured_menu_item_id!=null).map(c=>c.featured_menu_item_id)
+      const ids=rows.map(c=>c.id)
+      const p1 = withFeatured.length
+        ? fetch(SB_URL+'/rest/v1/cafe_menu_items?id=in.('+withFeatured.join(',')+')&select=id,name',{headers:h}).then(r=>r.ok?r.json():[]).catch(()=>[])
+        : Promise.resolve([])
+      const p2 = ids.length
+        ? fetch(SB_URL+'/rest/v1/quests?active=eq.true&cafe_id=in.('+ids.join(',')+')&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,cafe_id,title,icon&order=created_at.desc',{headers:h}).then(r=>r.ok?r.json():[]).catch(()=>[])
+        : Promise.resolve([])
+      Promise.all([p1,p2]).then(([items,quests])=>{
+        if(!alive) return
+        const itemName={}; (Array.isArray(items)?items:[]).forEach(i=>{ itemName[i.id]=i.name })
+        const questByCafe={}; (Array.isArray(quests)?quests:[]).forEach(q=>{ if(!questByCafe[q.cafe_id]) questByCafe[q.cafe_id]=q })
+        setCafes(rows.map(c=>({
+          ...c,
+          featured_item_name: c.featured_menu_item_id!=null ? (itemName[c.featured_menu_item_id]||null) : null,
+          active_quest: questByCafe[c.id]||null,
+        })))
+      })
+    }
     const load=(attempt=0)=>{
-      fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true',{
-        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
-      }).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json() }).then(d=>{
-        if(alive && Array.isArray(d)) setCafes(d)
+      fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true',{ headers:h }
+      ).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json() }).then(d=>{
+        if(alive && Array.isArray(d)){ setCafes(d); enrich(d) }
       }).catch(()=>{
         if(!alive) return
         if(attempt===0) showToast('کافه‌ها لود نشدن — دوباره تلاش می‌کنم…','warn')

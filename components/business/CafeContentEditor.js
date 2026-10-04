@@ -5,9 +5,12 @@
 import { useEffect, useState } from 'react'
 import { getSession } from '@/lib/game/gameSystem'
 import { onColor } from '@/lib/theme/ui'
+import { getColor } from '@/lib/constants'
+import { CAFE_SHAPES, shapeKeyFor } from '@/components/v2/map/pins'
 import {
   listPhotos, photoUrl, uploadPhoto, updatePhotoCaption, deletePhoto,
   listMenu, groupMenu, formatToman, saveMenuItem, deleteMenuItem,
+  setCafeIcon, setCafeMotto, setCafeCapacityFull, setCafeFeaturedItem,
 } from '@/lib/cafeContent'
 
 const MAX_PHOTOS = 30
@@ -16,6 +19,8 @@ const ERR = {
   menu_limit: 'حداکثر 200 آیتم منو برای هر کافه',
   too_large: 'این عکس حتی بعد از فشرده‌سازی از 2 مگابایت بزرگ‌تر است',
   not_an_image: 'فقط فایل عکس قابل آپلود است',
+  invalid_icon: 'این آیکون معتبر نیست',
+  item_not_found: 'این آیتم توی منوی همین کافه پیدا نشد',
 }
 const errText = (e) => {
   const m = (e && e.message) || ''
@@ -24,18 +29,109 @@ const errText = (e) => {
   return 'ثبت نشد — دوباره امتحان کن'
 }
 
-export function CafeContentEditor({ C, biz, isPending }) {
+export function CafeContentEditor({ C, biz, isPending, onReload }) {
   const [section, setSection] = useState('photos')
   if (isPending) return (
     <div style={{ textAlign: 'center', color: C.sub, fontSize: 12.5, padding: '22px 8px' }}>بعد از تأیید مالکیت، می‌توانی عکس و منوی کافه را اضافه کنی.</div>
   )
   return <div>
-    <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-      {[['photos', '📷 عکس‌ها'], ['menu', '📋 منو']].map(([k, label]) => (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+      {[['photos', '📷 عکس‌ها'], ['menu', '📋 منو'], ['storefront', '🏠 ویترین']].map(([k, label]) => (
         <button key={k} onClick={() => setSection(k)} style={{ padding: '7px 13px', borderRadius: 10, border: '1px solid ' + (section === k ? C.accent : C.border), background: section === k ? C.accent + '18' : 'transparent', color: section === k ? C.accent : C.sub, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>{label}</button>
       ))}
     </div>
-    {section === 'photos' ? <PhotoManager C={C} cafeId={biz.cafe_id} /> : <MenuManager C={C} cafeId={biz.cafe_id} />}
+    {section === 'photos' && <PhotoManager C={C} cafeId={biz.cafe_id} />}
+    {section === 'menu' && <MenuManager C={C} cafeId={biz.cafe_id} />}
+    {section === 'storefront' && <StorefrontManager C={C} biz={biz} onReload={onReload} />}
+  </div>
+}
+
+// ── ویترین: آیکون انتخابی، شعار، آیتم ویژه، ظرفیت ────────────────────────────
+function StorefrontManager({ C, biz, onReload }) {
+  const cafe = biz.cafes || {}
+  const cafeId = biz.cafe_id
+  const color = getColor(cafe.name || cafeId)
+  const [iconId, setIconId] = useState(cafe.icon_id != null ? cafe.icon_id : null)
+  const [motto, setMotto] = useState(cafe.motto || '')
+  const [isFull, setIsFull] = useState(!!cafe.is_full)
+  const [featuredId, setFeaturedId] = useState(cafe.featured_menu_item_id != null ? cafe.featured_menu_item_id : null)
+  const [menu, setMenu] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const token = () => { const s = getSession(); return s && s.access_token }
+
+  useEffect(() => { listMenu(cafeId).then(setMenu).catch(() => setMenu([])) }, [cafeId])
+
+  async function pickIcon(id) {
+    setIconId(id); setBusy(true); setMsg(null)
+    try { await setCafeIcon(cafeId, id, token()); setMsg({ t: 'آیکون کافه ذخیره شد', bad: false }); onReload && onReload() }
+    catch (e) { setMsg({ t: errText(e), bad: true }) }
+    setBusy(false)
+  }
+  async function saveMotto() {
+    setBusy(true); setMsg(null)
+    try { const r = await setCafeMotto(cafeId, motto, token()); setMotto((r && r.motto) || ''); setMsg({ t: 'شعار ذخیره شد', bad: false }); onReload && onReload() }
+    catch (e) { setMsg({ t: errText(e), bad: true }) }
+    setBusy(false)
+  }
+  async function toggleFull() {
+    const next = !isFull; setIsFull(next); setBusy(true); setMsg(null)
+    try { await setCafeCapacityFull(cafeId, next, token()); onReload && onReload() }
+    catch (e) { setIsFull(!next); setMsg({ t: errText(e), bad: true }) }
+    setBusy(false)
+  }
+  async function pickFeatured(id) {
+    setFeaturedId(id); setBusy(true); setMsg(null)
+    try { await setCafeFeaturedItem(cafeId, id, token()); setMsg({ t: 'آیتم ویژه ذخیره شد', bad: false }); onReload && onReload() }
+    catch (e) { setMsg({ t: errText(e), bad: true }) }
+    setBusy(false)
+  }
+
+  const tileBtn = (on) => ({ aspectRatio: '1 / 1', borderRadius: 12, border: on ? '2px solid ' + C.accent : '1px solid ' + C.border, background: C.chip, padding: 3, cursor: 'pointer', opacity: busy ? 0.6 : 1 })
+
+  return <div>
+    <div style={{ fontSize: 12, fontWeight: 800, color: C.text, marginBottom: 6 }}>🏠 آیکون کافه روی نقشه</div>
+    <div style={{ fontSize: 11, color: C.sub, marginBottom: 10, lineHeight: 1.8 }}>فعلاً رایگان است — بعد از عرضه‌ی اشتراک، این بخش ویژه می‌شود. این انتخاب در پوسته‌های «کارتونی» و «طرح مدادی» نقشه دیده می‌شود.</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, marginBottom: 18 }}>
+      <button onClick={() => pickIcon(null)} disabled={busy} title="خودکار بر اساس شناسه کافه" style={{ ...tileBtn(iconId == null), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>🎲</button>
+      {CAFE_SHAPES.map((shape, i) => (
+        <button key={i} onClick={() => pickIcon(i)} disabled={busy} style={tileBtn(iconId === i)}>
+          <svg viewBox="0 0 44 44" width="100%" height="100%" dangerouslySetInnerHTML={{ __html: shape(shapeKeyFor(color)) }} />
+        </button>
+      ))}
+    </div>
+
+    <div style={{ fontSize: 12, fontWeight: 800, color: C.text, marginBottom: 6 }}>💬 شعار کوتاه کافه</div>
+    <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+      <input value={motto} maxLength={60} onChange={e => setMotto(e.target.value)} placeholder="مثلاً: بهترین اسپرسوی این محل"
+        style={{ flex: 1, minWidth: 0, background: C.card, border: '1px solid ' + C.border, borderRadius: 10, padding: '9px 10px', fontSize: 12.5, color: C.text, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+      <button onClick={saveMotto} disabled={busy} style={{ background: C.accent, color: onColor(C.accent), border: 'none', borderRadius: 10, padding: '0 16px', fontSize: 12, fontWeight: 800, fontFamily: 'inherit' }}>ذخیره</button>
+    </div>
+    <div style={{ fontSize: 10, color: C.sub, marginBottom: 18 }}>{motto.length.toLocaleString('fa')} از ۶۰ حرف — روی نقشه با hover یا لمس طولانی دیده می‌شود</div>
+
+    <div style={{ fontSize: 12, fontWeight: 800, color: C.text, marginBottom: 8 }}>⭐ آیتم ویژه یا امضای کافه</div>
+    {menu === null
+      ? <div style={{ color: C.sub, fontSize: 12, marginBottom: 18 }}>در حال گرفتن منو…</div>
+      : menu.length === 0
+        ? <div style={{ color: C.sub, fontSize: 12, marginBottom: 18 }}>اول از تب «منو» چندتا آیتم اضافه کن</div>
+        : <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.sub, padding: '7px 10px' }}>
+              <input type="radio" checked={featuredId == null} disabled={busy} onChange={() => pickFeatured(null)} /> هیچ‌کدام
+            </label>
+            {menu.map(it => (
+              <label key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: C.text, background: featuredId === it.id ? C.accent + '18' : C.chip, borderRadius: 10, padding: '8px 10px' }}>
+                <input type="radio" checked={featuredId === it.id} disabled={busy} onChange={() => pickFeatured(it.id)} /> {it.name}
+              </label>
+            ))}
+          </div>}
+
+    <div style={{ fontSize: 12, fontWeight: 800, color: C.text, marginBottom: 8 }}>🚫 ظرفیت</div>
+    <label style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.chip, borderRadius: 12, padding: '10px 12px' }}>
+      <input type="checkbox" checked={isFull} disabled={busy} onChange={toggleFull} />
+      <span style={{ fontSize: 12.5, color: C.text }}>الان جا نداریم — نشان «ظرفیت تکمیل» روی نقشه نشان داده شود</span>
+    </label>
+
+    {msg && <div style={{ fontSize: 11.5, color: msg.bad ? C.danger : C.green, marginTop: 10 }}>{msg.t}</div>}
   </div>
 }
 

@@ -58,6 +58,8 @@ export function TwinLandV2({ session, onLogout }) {
   const [tab, setTab] = useState('map')
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelTab, setPanelTab] = useState('dashboard')
+  // کلیک روی حباب کمپین/ماموریت روی نقشه → پنل ماموریت‌ها باز و همون کارت هایلایت می‌شه
+  const [highlightQuestId, setHighlightQuestId] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showCity, setShowCity] = useState(false)
   const [showMode, setShowMode] = useState(false)
@@ -92,7 +94,8 @@ export function TwinLandV2({ session, onLogout }) {
   const { freshToken } = useFreshToken({ session })
   const { cafes, live } = useCafes({ showToast })
   const { accountType, checkedIn, coins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp } = useUserData({ freshToken, session })
-  const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode: 'normal', pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
+  function onQuestTap(cafe, questId) { setHighlightQuestId(questId); setPanelTab('missions'); setPanelOpen(true) }
+  const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode: 'normal', onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
   const { backfillDistricts, backfilling, claimSecretXP, resetMe, toggleViewMode } = useOwnerTools({ freshToken, session, setViewAsUser, setXp, showToast, viewAsUser })
   const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp })
   const levelInfo = getLevelInfo(xp)
@@ -152,7 +155,7 @@ export function TwinLandV2({ session, onLogout }) {
 
       <Dock C={C} T={T} Lay={Lay} isMobile={isMobile} panelOpen={panelOpen} panelTab={panelTab} rightInset={rightInset} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setTab={setTab} />
 
-      <PanelShell C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
+      <PanelShell C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
 
       {selCafe && <CafeSheet C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => doCheckin(selCafe)} showToast={showToast} />}
       {showXP && <XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}

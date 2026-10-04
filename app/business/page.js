@@ -40,7 +40,7 @@ export default function BusinessPage() {
       })
       .catch(() => setIsOwnerAcct(isOwnerEmail))
     const h = H(s)
-    const biz = await get('businesses?owner_id=eq.' + s.user.id + '&select=id,cafe_id,status,plan,created_at,cafes(name,district)&order=created_at.desc', h)
+    const biz = await get('businesses?owner_id=eq.' + s.user.id + '&select=id,cafe_id,status,plan,created_at,cafes(name,district,icon_id,motto,is_full,featured_menu_item_id)&order=created_at.desc', h)
     const bizArr = Array.isArray(biz) ? biz : []
     setBusinesses(bizArr)
     // آمار خلاصه‌ی همه‌ی کافه‌ها یک کوئریه — سبک، پس همین اول می‌گیریمش
@@ -204,7 +204,7 @@ function BusinessCard({ C, biz, d, onReload, onNeedData }) {
       {tab === 'timing' && <TabTiming C={C} d={d} />}
       {tab === 'market' && <TabMarket C={C} d={d} />}
       {tab === 'campaigns' && <TabCampaigns C={C} d={d} biz={biz} isPending={isPending} onReload={onReload} />}
-      {tab === 'content' && <CafeContentEditor C={C} biz={biz} isPending={isPending} />}
+      {tab === 'content' && <CafeContentEditor C={C} biz={biz} isPending={isPending} onReload={onReload} />}
       </>)}
     </div>
   )

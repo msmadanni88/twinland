@@ -10,7 +10,7 @@ import { cafeInLayer, digitsOnly } from '@/lib/geo'
 // بدون آن، پین، خوشه و حلقه رویداد دقیقاً همان نسخه v1.0 هستند.
 // basemap و skinId هم اختیاری‌اند: basemap یک زیرنقشه جایگزین با تابع attach است (پوسته‌های برداری نسخه‌های تازه).
 // بدون basemap، یا اگر زیرنقشه جایگزین بالا نیاید، همان کاشی‌های عکسی نسخه v1.0 نشان داده می‌شود.
-export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone }) {
+export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone }) {
   const mapRef   = useRef(null)
   const mapInst  = useRef(null)
   const mapCenterRef = useRef(null)
@@ -38,6 +38,10 @@ export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes,
   pinStyleRef.current = pinStyle
   const boundaryOn  = () => (pinStyleRef.current && pinStyleRef.current.boundaryOn)  || '#000000'
   const boundaryOff = () => (pinStyleRef.current && pinStyleRef.current.boundaryOff) || '#8E8E93'
+  // حباب‌های شناور روی موبایل: لمس طولانی = نمایش، تپ معمولی = باز شدن کافه (بدون تغییر رفتار قبلی)
+  const onQuestTapRef = useRef(onQuestTap)
+  onQuestTapRef.current = onQuestTap
+  const longPressFiredRef = useRef(false)
 
   useEffect(()=>{
     cafes.forEach(cafe=>{
@@ -219,12 +223,54 @@ export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes,
         const icon=L.divIcon({html,iconSize:[44,52],iconAnchor:[22,52],className:''})
         mk=L.marker([cafe.lat,cafe.lng],{icon})
       }
-      mk.on('click',()=>setSelCafe(cafe))
+      mk.on('click',(e)=>{
+        // حباب شناور «کمپین/ماموریت» کلیک‌پذیره — اگه همون کلیک شد، بریم پنل ماموریت‌ها
+        // نه صفحه‌ی کافه (کلیک روی بقیه‌ی پین دقیقاً مثل قبل صفحه‌ی کافه رو باز می‌کنه)
+        const oe=e&&e.originalEvent, t=oe&&oe.target
+        const qEl=t&&t.closest&&t.closest('[data-quest-id]')
+        if(qEl&&onQuestTapRef.current){ onQuestTapRef.current(cafe,qEl.getAttribute('data-quest-id')); return }
+        // لمس طولانی برای باز کردن حباب‌ها روی موبایل، یه کلیک «شبح» بعد از خودش میاره — همونو اینجا می‌بلعیم
+        if(longPressFiredRef.current){ longPressFiredRef.current=false; return }
+        setSelCafe(cafe)
+      })
       if(clusterRef.current) clusterRef.current.addLayer(mk)
       else mk.addTo(mapInst.current)
       mksRef.current[cafe.id]=mk
     })
   },[mapReady,cafes,checkedIn,mapDisplay.markerMode,mapDisplay.dotColor,mapDisplay.dotSize,pinStyle])
+
+  // لمس طولانی روی موبایل: حباب‌های شناور (شعار/آیتم ویژه/کمپین/ظرفیت) رو مثل hover
+  // دسکتاپ نشون بده، بدون باز کردن صفحه‌ی کافه. فقط وقتی pinStyle هست (یعنی این
+  // حباب‌ها اصلاً وجود دارن)؛ روی v1 که pinStyle نمی‌فرسته، این افکت کاملاً خاموشه.
+  useEffect(()=>{
+    if(!mapReady||!pinStyle||!mapInst.current) return
+    const container=mapInst.current.getContainer()
+    let timer=null
+    const LONG_MS=420
+    const clear=()=>{ if(timer){ clearTimeout(timer); timer=null } }
+    const onStart=(e)=>{
+      const target=e.target&&e.target.closest&&e.target.closest('.tl2-cafe,.tl2-pin')
+      if(!target) return
+      timer=setTimeout(()=>{
+        container.querySelectorAll('.tl2-cafe.is-open,.tl2-pin.is-open').forEach(el=>{ if(el!==target) el.classList.remove('is-open') })
+        target.classList.toggle('is-open')
+        longPressFiredRef.current=true
+        setTimeout(()=>{ longPressFiredRef.current=false },500)
+        timer=null
+      },LONG_MS)
+    }
+    const onEnd=()=>clear()
+    container.addEventListener('touchstart',onStart,{passive:true})
+    container.addEventListener('touchend',onEnd,{passive:true})
+    container.addEventListener('touchmove',onEnd,{passive:true})
+    container.addEventListener('touchcancel',onEnd,{passive:true})
+    return ()=>{
+      container.removeEventListener('touchstart',onStart)
+      container.removeEventListener('touchend',onEnd)
+      container.removeEventListener('touchmove',onEnd)
+      container.removeEventListener('touchcancel',onEnd)
+    }
+  },[mapReady,pinStyle])
 
   // هایلایت کافه‌ای که الان توی اسلایدشوی رویدادها نشون داده می‌شه — دوربین حرکت نمی‌کنه
   // برای هر دو حالت (پین/نقطه) یه حلقه‌ی پالس مستقل (divIcon واقعی) دقیقاً روی مختصات کافه اضافه می‌کنیم؛
