@@ -3,7 +3,7 @@
 import { ICON, L, ROUTE } from '@/lib/theme/labels'
 
 // showBusiness اختیاری است: نسخه‌های تازه آن را false می‌دهند تا کاربر عادی «پنل کافه‌دار» را نبیند. بدون آن مثل قبل برای همه هست.
-export function AppMenu({ showBusiness, C, TH, backfillDistricts, backfilling, effAdmin, isOwner, onLogout, resetMe, setPanelOpen, setPanelTab, setShowMapSettings, setShowMenu, setShowXP, setTab, setTutorialReplay, showMenu, showToast, toggleViewMode, viewAsUser }) {
+export function AppMenu({ demoOn, toggleDemo, showBusiness, C, TH, backfillDistricts, backfilling, effAdmin, isOwner, onLogout, resetMe, setPanelOpen, setPanelTab, setShowMapSettings, setShowMenu, setShowXP, setTab, setTutorialReplay, showMenu, showToast, toggleViewMode, viewAsUser }) {
   return (<>
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
@@ -45,6 +45,7 @@ export function AppMenu({ showBusiness, C, TH, backfillDistricts, backfilling, e
               {key:'xp',icon:ICON.xpSystem,img:'/xp_coin@256-1.png',label:L.xpSystem,href:null},
               {key:'tutorial',icon:ICON.tutorial,label:L.tutorial,href:null},
               {key:'settings',icon:ICON.settings,img:'/settings@256.png',label:L.settings,href:null},
+              ...(toggleDemo?[{key:'demo',icon:'🎬',label:demoOn?'خاموش کردن حالت نمایشی':'حالت نمایشی — شهر شلوغ ساختگی',href:null,adminOnly:true}]:[]),
               {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
               {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
               {key:'logout',icon:ICON.logout,label:L.logout,href:null},
@@ -56,7 +57,7 @@ export function AppMenu({ showBusiness, C, TH, backfillDistricts, backfilling, e
                   <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
                 </a>
               }
-              return <button key={item.key} className="tl-row" onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='tutorial'){setTutorialReplay(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+              return <button key={item.key} className="tl-row" onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='demo'){toggleDemo&&toggleDemo();return}if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='tutorial'){setTutorialReplay(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
                 {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.key==='backfill'&&backfilling?'در حال پردازش…':item.label}
               </button>
             })}

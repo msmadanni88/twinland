@@ -18,7 +18,7 @@ const TABS = [
   { key: 'profile', label: L.profile, img: 'icon_profile' },
 ]
 
-export function PanelShell({ C, T, Lay, cafes, checkedIn, coins, docked, filtered, highlightQuestId, levelInfo, live, panelOpen, panelTab, setPanelOpen, setPanelTab, setSearch, setSelCafe, setShowXP, showToast, streak, totalLive, userName, xp }) {
+export function PanelShell({ demoLeaders = null, C, T, Lay, cafes, checkedIn, coins, docked, filtered, highlightQuestId, levelInfo, live, panelOpen, panelTab, setPanelOpen, setPanelTab, setSearch, setSelCafe, setShowXP, showToast, streak, totalLive, userName, xp }) {
   const tabsRef = useDragScroll()
   if (!panelOpen) return null
   const frame = docked
@@ -55,7 +55,7 @@ export function PanelShell({ C, T, Lay, cafes, checkedIn, coins, docked, filtere
       <div className="tl-vscroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: docked ? 0 : 'env(safe-area-inset-bottom, 0px)' }}>
         {panelTab === 'dashboard' && <DashboardTab C={C} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP} />}
         {panelTab === 'missions' && <MissionsTab C={C} cafes={cafes} highlightQuestId={highlightQuestId} setSelCafe={setSelCafe} showToast={showToast} />}
-        {panelTab === 'rank' && <RankTab C={C} />}
+        {panelTab === 'rank' && <RankTab C={C} demoRows={demoLeaders} />}
         {panelTab === 'clan' && <ClanTab C={C} />}
         {panelTab === 'profile' && <ProfileTab C={C} xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn} userName={userName} coins={coins} />}
       </div>

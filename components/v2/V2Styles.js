@@ -69,6 +69,10 @@ export function V2Styles({ C, T }) {
   .tl3-fog-deep,.tl3-fog-ring{animation:tl2Fade .6s ease both}
   .tl3-fog-open,.tl3-fog-base{animation:tl2Fade .9s ease both}
 
+  /* حالت نمایشی v3.0: پینی که همین الان چک‌این ساختگی گرفته */
+  .tl3-demo-pop{animation:tl3Ping .7s ease-out}
+  @keyframes tl3Ping{0%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}40%{filter:drop-shadow(0 0 10px ${C.accent})}100%{filter:drop-shadow(0 3px 3px rgba(0,0,0,.28))}}
+
   /* خوشه */
   .tl2-cluster{border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-weight:900;box-sizing:border-box;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
   .tl2-cluster:hover{transform:scale(1.08)}

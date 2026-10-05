@@ -47,6 +47,8 @@ import { CafeSheet } from '@/components/v2/cafe/CafeSheet'
 import { useHexFog } from '@/components/v3/map/useHexFog'
 import { V3_FLAGS } from '@/components/v3/flags'
 import { HudSquares } from '@/components/v3/home/HudSquares'
+import { useDemoSim } from '@/components/v3/demo/useDemoSim'
+import { DemoLayer } from '@/components/v3/demo/DemoLayer'
 
 // hexFog فقط در نسخه v3.0 روشن است؛ بدون آن این صفحه دقیقاً همان v2.0 است
 export function TwinLandV2({ session, onLogout, hexFog = false }) {
@@ -97,7 +99,21 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   const { showToast, toast } = useToast()
   const { mapDisplay, setMapDisplay } = useMapDisplay()
   const { freshToken } = useFreshToken({ session })
-  const { cafes, live } = useCafes({ showToast })
+  const { cafes: realCafes, live: realLive } = useCafes({ showToast })
+  // حالت نمایشی: فقط در v3.0، فقط روی همین تب، بدون هیچ نوشتنی در دیتابیس. با /?demo=1 روشن و با /?demo=0 خاموش می‌شود
+  const [demoOn, setDemoOn] = useState(false)
+  useEffect(() => {
+    if (!hexFog) return
+    try {
+      const sp = new URLSearchParams(window.location.search)
+      if (sp.get('demo') === '1') sessionStorage.setItem('tl_demo', '1')
+      if (sp.get('demo') === '0') sessionStorage.removeItem('tl_demo')
+      setDemoOn(sessionStorage.getItem('tl_demo') === '1')
+    } catch (e) {}
+  }, [hexFog])
+  const toggleDemo = () => setDemoOn(v => { try { if (v) sessionStorage.removeItem('tl_demo'); else sessionStorage.setItem('tl_demo', '1') } catch (e) {} return !v })
+  const demo = useDemoSim({ cafes: realCafes, enabled: hexFog && demoOn, live: realLive })
+  const cafes = demo.cafes, live = demo.live
   const { accountType, checkedIn, coins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp } = useUserData({ freshToken, session })
   function onQuestTap(cafe, questId) { setHighlightQuestId(questId); setPanelTab('missions'); setPanelOpen(true) }
   const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode: 'normal', onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
@@ -168,7 +184,9 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
           onMissions={() => { setPanelTab('missions'); setPanelOpen(true) }} />
       )}
 
-      {hexFog && !compact && !mapLoading && (
+      <DemoLayer C={C} T={T} Lay={Lay} compact={compact} demo={demo} isMobile={isMobile} onOff={toggleDemo} />
+
+      {hexFog && !compact && !mapLoading && !demo.on && (
         <div className="tl3-explore" style={{ position: 'absolute', left: Lay.gap, top: Lay.hudTop + (bannerBottom ? 0 : 78), zIndex: 55, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderRadius: 99, padding: '5px 11px', fontSize: 11, fontWeight: 800, color: C.text, boxShadow: T.shadow1 || T.shadow2, pointerEvents: 'none', maxWidth: 'calc(100vw - 24px)' }}>
           {hex.open === 0
             ? '🧭 اولین چک‌این، پایگاهت را می‌سازد'
@@ -183,16 +201,16 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
 
       <Dock C={C} T={T} Lay={Lay} isMobile={isMobile} panelOpen={panelOpen} panelTab={panelTab} rightInset={rightInset} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setTab={setTab} />
 
-      <PanelShell C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
+      <PanelShell demoLeaders={demo.leaders} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
 
-      {selCafe && <CafeSheet canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => doCheckin(selCafe)} showToast={showToast} />}
+      {selCafe && <CafeSheet noPlay={isBiz && !effAdmin} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => doCheckin(selCafe)} showToast={showToast} />}
       {showXP && <XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}
       {showNotif && <NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
       <UIStyles />
       <TutorialCoach C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} tutorialLoaded={tutorialLoaded} replay={tutorialReplay} onReplayEnd={() => setTutorialReplay(false)} isMobile={isMobile} />
       {celebration && <CelebrationOverlay C={C} data={celebration} onClose={() => setCelebration(null)} />}
 
-      <AppMenu showBusiness={isBiz || isOwner || effAdmin} C={C} TH={Lay.barTop + Lay.barH} backfillDistricts={backfillDistricts} backfilling={backfilling} effAdmin={effAdmin} isOwner={isOwner} onLogout={onLogout} resetMe={resetMe} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setShowMapSettings={setShowMapSettings} setShowMenu={setShowMenu} setShowXP={setShowXP} setTab={setTab} setTutorialReplay={setTutorialReplay} showMenu={showMenu} showToast={showToast} toggleViewMode={toggleViewMode} viewAsUser={viewAsUser} />
+      <AppMenu demoOn={demo.on} toggleDemo={hexFog ? toggleDemo : null} showBusiness={isBiz || isOwner || effAdmin} C={C} TH={Lay.barTop + Lay.barH} backfillDistricts={backfillDistricts} backfilling={backfilling} effAdmin={effAdmin} isOwner={isOwner} onLogout={onLogout} resetMe={resetMe} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setShowMapSettings={setShowMapSettings} setShowMenu={setShowMenu} setShowXP={setShowXP} setTab={setTab} setTutorialReplay={setTutorialReplay} showMenu={showMenu} showToast={showToast} toggleViewMode={toggleViewMode} viewAsUser={viewAsUser} />
       <CityPicker C={C} city={city} setCity={setCity} setShowCity={setShowCity} showCity={showCity} showToast={showToast} />
       <PalettePicker C={C} paletteKey={paletteKey} pickPalette={pickPalette} setShowPalette={setShowPalette} showPalette={showPalette} themeMode={themeMode} toggleMode={toggleMode} />
       {showMapSettings && <MapSettingsPopup C={C} value={mapDisplay} setValue={setMapDisplay} onClose={() => setShowMapSettings(false)} />}

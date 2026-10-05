@@ -99,7 +99,7 @@ export default function AuthGate({ onAuthed }){
     const { ok, data } = await gotrue('signup',{ email:email.trim(), password:pass, data:{ display_name:(name.trim()||email.split('@')[0]) } })
     setBusy(false)
     if(ok && data.access_token) finish(data)
-    else if(ok && data.user && !data.access_token){ setMsg({type:'ok',text:'ثبت‌نام شد! لینک تأیید به ایمیلت رفت — بعد از تأیید '+(biz?'از همین ورود کافه‌دار ':'')+'وارد شو'}); setMode('login') }
+    else if(ok && data.user && !data.access_token){ setMsg({type:'ok',text:'ثبت‌نام شد! لینک تأیید به ایمیلت رفت — بعد از تأیید '+(biz?'از همین ورود کسب‌وکار ':'')+'وارد شو'}); setMode('login') }
     else setMsg({type:'err',text:faErr(data.error_description||data.msg||data.error)})
   }
   async function doForgot(){
@@ -153,8 +153,8 @@ export default function AuthGate({ onAuthed }){
         <div className="tl-in" style={S.card}>
           <div style={{textAlign:'center',marginBottom:16}}>
             <img src="/twinland_logo.webp" alt="TwinLand" style={{width:130,filter:'drop-shadow(0 6px 16px rgba(0,0,0,.4))'}}/>
-            <div style={{fontSize:15,fontWeight:800,marginTop:6,color:'#f1ecff'}}>{mode==='signup'?(biz?'ساخت حساب کافه‌دار':'ساخت حساب'):mode==='forgot'?'بازیابی رمز':(biz?'ورود کافه‌دار':'ورود به حساب')}</div>
-            {biz && <div style={{fontSize:11.5,color:'#9a91b8',marginTop:4,lineHeight:1.7}}>بعد از ورود مستقیم به پنل کافه‌دار می‌روی</div>}
+            <div style={{fontSize:15,fontWeight:800,marginTop:6,color:'#f1ecff'}}>{mode==='signup'?(biz?'ساخت حساب کسب‌وکار':'ساخت حساب'):mode==='forgot'?'بازیابی رمز':(biz?'ورود کسب‌وکار':'ورود به حساب')}</div>
+            {biz && <div style={{fontSize:11.5,color:'#9a91b8',marginTop:4,lineHeight:1.7}}>برای کافه، رستوران، فروشگاه و هر کسب‌وکار دیگر. بعد از ورود مستقیم به پنل کسب‌وکارت می‌روی</div>}
           </div>
 
           <div style={S.tabWrap}>
@@ -212,7 +212,7 @@ export default function AuthGate({ onAuthed }){
               {/* ورود جدا برای کافه‌دارها — پیش‌فرض همیشه ورود کاربر عادی است */}
               <button onClick={()=>{setBiz(v=>!v);setMode('login');reset()}}
                 style={{width:'100%',marginTop:14,padding:'10px 12px',borderRadius:12,border:'1px solid rgba(255,255,255,.14)',background:biz?'rgba(34,211,238,.12)':'rgba(255,255,255,.04)',color:'#f1ecff',fontSize:12.5,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
-                {biz ? '← برگشت به ورود کاربران' : '🏪 کافه‌دار هستی؟ ورود کافه‌داران'}
+                {biz ? '← برگشت به ورود کاربران' : '🏪 صاحب کسب‌وکار هستی؟ ورود کسب‌وکارها'}
               </button>
             </div>
           )}

@@ -16,7 +16,8 @@ import { useCafeSheetData } from '@/components/v2/cafe/useCafeSheetData'
 const PAGES = [['about', 'درباره'], ['gallery', 'گالری'], ['menu', 'منو'], ['rewards', 'جایزه‌های من']]
 
 // canClaim: دکمه «صاحب این کافه هستید؟» فقط برای حساب کافه‌دار؛ مالک اپ همیشه دکمه مدیریت مستقیم را دارد
-export function CafeSheet({ canClaim = false, C, T, cafe, live, favs, setFavs, checkedIn, isAdmin, onClose, onCheckin, showToast }) {
+// noPlay: حساب کسب‌وکار بازی نمی‌کند، پس دکمه چک‌این ندارد
+export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, favs, setFavs, checkedIn, isAdmin, onClose, onCheckin, showToast }) {
   const [wide, setWide] = useState(false)
   const [page, setPage] = useState('about')
   useEffect(() => { setPage('about') }, [cafe.id])
@@ -174,12 +175,12 @@ export function CafeSheet({ canClaim = false, C, T, cafe, live, favs, setFavs, c
 
         {/* دکمه‌های ثابت پایین */}
         <div style={{ flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom, 0px) + 14px)', borderTop: '1px solid ' + T.hair, background: C.card }}>
-          <button className="tl2-press" onClick={onCheckin} disabled={isChecked}
+          {noPlay ? <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: C.sub, lineHeight: 1.9, padding: '6px 4px' }}>🏪 با حساب کسب‌وکار وارد شده‌ای. چک‌این و امتیاز فقط برای حساب کاربری است.</div> : <button className="tl2-press" onClick={onCheckin} disabled={isChecked}
             style={{ width: '100%', height: 54, border: 'none', borderRadius: 18, fontSize: 16, fontWeight: 900,
               background: isChecked ? alpha(C.green, 0.18) : T.grad, color: isChecked ? C.green : T.onAccent,
               boxShadow: isChecked ? 'none' : T.glow(C.accent, 0.6), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {isChecked ? '✅ امروز ' + L.checkin + ' کردی' : <>{ICON.checkin} {L.checkin} <span style={{ fontSize: 12.5, fontWeight: 900, padding: '3px 9px', borderRadius: 99, background: alpha(T.onAccent, 0.16) }}>+{xpAmount} {L.xp}</span></>}
-          </button>
+          </button>}
           {(isAdmin || canClaim) && <button onClick={() => isAdmin ? ownerClaimDirect(cafe, showToast) : claimCafe(cafe, showToast)}
             style={{ width: '100%', marginTop: 8, height: 34, border: 'none', background: 'transparent', color: C.sub, fontSize: 12, fontWeight: 700 }}>
             {isAdmin ? ICON.business + ' مدیریت مستقیم این کافه، صاحب اپ' : ICON.business + ' صاحب این کافه هستید؟'}

@@ -4,9 +4,11 @@ import { onColor } from '@/lib/theme/ui'
 import { fetchLeaderboard, getSession, subscribeToChanges } from '@/lib/game/gameSystem'
 
 // ── RANK TAB (خلاصه — داده واقعی از gameSystem، نسخه کامل در /leaderboard) ──────
-export function RankTab({C}) {
+// demoRows اختیاری است: حالت نمایشی نسخه v3.0 فهرست ساختگی خودش را می‌دهد و برچسب می‌زند
+export function RankTab({C, demoRows}) {
   const medals={1:'🥇',2:'🥈',3:'🥉'}
-  const [rows,setRows]=useState([])
+  const [realRows,setRows]=useState([])
+  const rows=demoRows||realRows
   useEffect(()=>{
     const sess=getSession()
     let alive=true
@@ -18,7 +20,7 @@ export function RankTab({C}) {
   },[])
   return <div style={{padding:'12px 12px 32px'}}>
     <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:4}}>برترین‌های این هفته 🏆</div>
-    <div style={{fontSize:11,color:C.sub,marginBottom:14}}>رتبه خودت رو بین بقیه ببین</div>
+    <div style={{fontSize:11,color:demoRows?C.danger:C.sub,fontWeight:demoRows?800:400,marginBottom:14}}>{demoRows?'🎬 حالت نمایشی — این جدول ساختگی است':'رتبه خودت رو بین بقیه ببین'}</div>
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
       {rows.map((p)=>{
         const rank=p.rank
