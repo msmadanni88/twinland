@@ -6,11 +6,14 @@ import { L, ICON } from '@/lib/theme/labels'
 import { onColor } from '@/lib/theme/ui'
 import { alpha } from '@/components/v2/theme'
 
-export function HudOverlays({ C, T, Lay, cafes, checkedIn, clearRegionFilter, filterApplied, filtered, isMobile, regionResults, rightInset, selectedRegions, setActiveEventCafeId, setSelCafe, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults, streak, totalLive }) {
-  const top = 'calc(env(safe-area-inset-top, 0px) + ' + Lay.hudTop + 'px)'
+// compact و filtersOpen فقط در چیدمان تازه موبایل نسخه v3.0 داده می‌شوند
+// bannerBottom: 'mobile' یا 'desktop' یعنی نوار رویدادها پایین صفحه بنشیند، جای نوار LED
+export function HudOverlays({ C, T, Lay, bannerBottom = null, compact = false, filtersOpen = false, cafes, checkedIn, clearRegionFilter, filterApplied, filtered, isMobile, regionResults, rightInset, selectedRegions, setActiveEventCafeId, setSelCafe, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults, streak, totalLive }) {
+  // جمع‌وجور: آمار زنده کنار دکمه فیلتر می‌نشیند؛ وقتی ردیف جستجو باز است یک ردیف پایین‌تر
+  const top = 'calc(env(safe-area-inset-top, 0px) + ' + (compact ? (filtersOpen ? Lay.hudTop : Lay.chipsTop + 6) : Lay.hudTop) + 'px)'
   // در موبایل جا کم است: آمار زنده ردیف اول، نوار رویدادها ردیف دوم
   const bannerTop = Lay.hudTop + (isMobile ? 40 : 0)
-  const regionTop = bannerTop + 46
+  const regionTop = compact ? (filtersOpen ? Lay.hudTop + 40 : Lay.chipsTop + 44) : bannerTop + 46
   const pill = {
     height: 32, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px',
     borderRadius: T.radius.pill, background: T.glass, backdropFilter: T.blur, WebkitBackdropFilter: T.blur,
@@ -21,8 +24,8 @@ export function HudOverlays({ C, T, Lay, cafes, checkedIn, clearRegionFilter, fi
   }
   return (<>
     {/* آمار زنده و استریک — بالا سمت راست */}
-    <div style={{ position: 'absolute', top, right: rightInset, zIndex: 40, display: 'flex', gap: 6, alignItems: 'center', transition: 'right .35s ease', animation: 'tl2Fade .5s .15s both' }}>
-      {streak >= 2 && (
+    <div style={{ position: 'absolute', top, right: compact ? rightInset + 52 : rightInset, zIndex: 40, display: 'flex', gap: 6, alignItems: 'center', transition: 'right .35s ease', animation: 'tl2Fade .5s .15s both' }}>
+      {!compact && streak >= 2 && (
         <div style={{ ...pill, background: streak >= 5 ? C.gold : C.accent, color: onColor(streak >= 5 ? C.gold : C.accent), border: 'none', fontWeight: 900, boxShadow: T.glow(streak >= 5 ? C.gold : C.accent) }}>
           {ICON.streak} {Number(streak).toLocaleString('fa')} روز
         </div>
@@ -42,8 +45,13 @@ export function HudOverlays({ C, T, Lay, cafes, checkedIn, clearRegionFilter, fi
     </div>
 
     {/* نوار رویدادها — بالا سمت چپ؛ جزء مشترک، فقط جایش در v2 عوض شده */}
-    <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + ' + (bannerTop - 10) + 'px)', left: Lay.gap - 10, width: isMobile ? 'calc(100vw - ' + Lay.gap + 'px)' : 'min(62vw, 420px)', height: 0, zIndex: 40, animation: 'tl2Fade .5s .2s both' }}>
-      <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe} onActiveCafeChange={setActiveEventCafeId} />
+    <div style={bannerBottom === 'desktop'
+      ? { position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.aboveDock + 52) + 'px)', left: 0, right: rightInset, height: 0, zIndex: 40, transition: 'right .35s ease', animation: 'tl2Fade .5s .2s both' }
+      : bannerBottom === 'mobile'
+      ? { position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.aboveDock + 50) + 'px)', left: Lay.gap + 52 - 10, width: 'calc(100vw - ' + (Lay.gap * 2 + 52) + 'px)', height: 0, zIndex: 40, animation: 'tl2Fade .5s .2s both' }
+      : { position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + ' + (bannerTop - 10) + 'px)', left: Lay.gap - 10, width: isMobile ? 'calc(100vw - ' + Lay.gap + 'px)' : 'min(62vw, 420px)', height: 0, zIndex: 40, animation: 'tl2Fade .5s .2s both' }}>
+      <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe} onActiveCafeChange={setActiveEventCafeId}
+        rootStyle={bannerBottom === 'desktop' ? { left: '50%', transform: 'translateX(-50%)', alignItems: 'center', maxWidth: 'min(620px, 46vw)', width: 'max-content' } : null} />
     </div>
 
     {/* دکمه‌های فیلتر منطقه */}

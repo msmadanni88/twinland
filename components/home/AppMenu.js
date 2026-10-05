@@ -2,7 +2,8 @@
 // منوی اصلی: صفحه‌ها، ابزارهای مالک و خروج — جداشده از TwinLand.js
 import { ICON, L, ROUTE } from '@/lib/theme/labels'
 
-export function AppMenu({ C, TH, backfillDistricts, backfilling, effAdmin, isOwner, onLogout, resetMe, setPanelOpen, setPanelTab, setShowMapSettings, setShowMenu, setShowXP, setTab, setTutorialReplay, showMenu, showToast, toggleViewMode, viewAsUser }) {
+// showBusiness اختیاری است: نسخه‌های تازه آن را false می‌دهند تا کاربر عادی «پنل کافه‌دار» را نبیند. بدون آن مثل قبل برای همه هست.
+export function AppMenu({ showBusiness, C, TH, backfillDistricts, backfilling, effAdmin, isOwner, onLogout, resetMe, setPanelOpen, setPanelTab, setShowMapSettings, setShowMenu, setShowXP, setTab, setTutorialReplay, showMenu, showToast, toggleViewMode, viewAsUser }) {
   return (<>
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
@@ -47,7 +48,7 @@ export function AppMenu({ C, TH, backfillDistricts, backfilling, effAdmin, isOwn
               {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
               {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
               {key:'logout',icon:ICON.logout,label:L.logout,href:null},
-            ].filter(item=>(!item.adminOnly||effAdmin)).map((item,i,arr)=>{
+            ].filter(item=>(!item.adminOnly||effAdmin)&&(item.key!=='business'||showBusiness!==false)).map((item,i,arr)=>{
               const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
               if(item.href){
                 return <a key={item.key} className="tl-row" href={item.href} style={style}>

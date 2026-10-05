@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useUiVersion } from '@/components/ui/UiVersionProvider'
 import { resolveSurface } from '@/lib/ui/surfaces'
+import { SB_KEY, SB_URL } from '@/lib/config'
 
 export default function Page(){
   const [session,   setSession]   = useState(null)
@@ -14,7 +15,23 @@ export default function Page(){
     }catch(e){}
     setAuthReady(true)
   },[])
-  useEffect(()=>{ recheck() },[session, recheck])   // پیش‌نمایش ظاهر فقط برای مالک، پس بعد از ورود دوباره چک شود
+  useEffect(()=>{ recheck() },[session, recheck])
+
+  // حساب کافه‌دار جای بازی، مستقیم به پنل کافه‌دار می‌رود. اگر خودش از پنل «نقشه» را بزند (/?play=1)
+  // در همین تب بازی را می‌بیند. مالک اپ همیشه بازی را می‌بیند. این فقط مسیر است، نه امنیت.
+  useEffect(()=>{
+    if(!session||!session.user||!session.access_token) return
+    try{
+      const sp=new URLSearchParams(window.location.search)
+      if(sp.get('play')==='1') sessionStorage.setItem('tl_play','1')
+      if(sessionStorage.getItem('tl_play')==='1') return
+    }catch(e){}
+    if(String(session.user.email||'').toLowerCase()==='msmadani88@gmail.com') return
+    let alive=true
+    fetch(SB_URL+'/rest/v1/profiles?id=eq.'+session.user.id+'&select=account_type',{headers:{apikey:SB_KEY,Authorization:'Bearer '+session.access_token}})
+      .then(r=>r.json()).then(rows=>{ if(alive&&Array.isArray(rows)&&rows[0]&&rows[0].account_type==='sme') window.location.replace('/business') }).catch(()=>{})
+    return ()=>{ alive=false }
+  },[session])   // پیش‌نمایش ظاهر فقط برای مالک، پس بعد از ورود دوباره چک شود
 
   const AuthGate = resolveSurface('auth', active)
   const TwinLand = resolveSurface('home', active)

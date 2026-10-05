@@ -116,7 +116,7 @@ export default function BusinessPage() {
           <span style={{ fontSize: 24 }}>🏪</span>
           <div><div style={{ fontSize: 17, fontWeight: 800 }}>{L.business}</div><div style={{ fontSize: 11, color: C.sub }}>TwinLand Business</div></div>
         </div>
-        <a href="/" style={{ fontSize: 13, color: C.accent, fontWeight: 700, textDecoration: 'none', background: C.chip, padding: '8px 14px', borderRadius: 99 }}>← {L.map}</a>
+        <a href="/?play=1" style={{ fontSize: 13, color: C.accent, fontWeight: 700, textDecoration: 'none', background: C.chip, padding: '8px 14px', borderRadius: 99 }}>← {L.map}</a>
       </div>
 
       {isOwnerAcct && (
@@ -129,7 +129,7 @@ export default function BusinessPage() {
 
       <div style={{ padding: '18px', maxWidth: 680, margin: '0 auto' }}>
         {loading ? <div style={{ textAlign: 'center', color: C.sub, padding: '60px 0' }}>در حال بارگذاری…</div>
-          : businesses.length === 0 ? <EmptyState C={C} />
+          : businesses.length === 0 ? <EmptyState C={C} onReload={load} />
           : <>
             <div style={{ fontSize: 12, color: C.sub, marginBottom: 10 }}>
               {fa(businesses.length)} کافه — روی هر کدوم بزن تا آمارش لود بشه
@@ -142,13 +142,61 @@ export default function BusinessPage() {
   )
 }
 
-function EmptyState({ C }) {
+// کافه‌دار بدون کافه: همین‌جا کافه‌اش را با اسم پیدا می‌کند و درخواست مالکیت می‌دهد.
+// درخواست با claim_cafe ثبت می‌شود و تا تأیید مالک اپ «در انتظار» می‌ماند.
+const CLAIM_ERR = {
+  already_owned: 'این کافه قبلاً مالک تأییدشده دارد',
+  already_claimed_by_you: 'قبلاً برای این کافه درخواست داده‌ای',
+  claim_pending_other: 'کس دیگری برای این کافه درخواست داده و در انتظار بررسی است',
+  cafe_not_found: 'این کافه پیدا نشد',
+  not_authenticated: 'دوباره وارد شو',
+}
+function EmptyState({ C, onReload }) {
+  const [q, setQ] = useState('')
+  const [rows, setRows] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+  useEffect(() => {
+    const term = q.trim()
+    if (term.length < 2) { setRows([]); return }
+    const t = setTimeout(() => {
+      fetch(SB_URL + '/rest/v1/cafes?name=ilike.*' + encodeURIComponent(term) + '*&select=id,name,district&order=name.asc&limit=8', { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } })
+        .then(r => r.json()).then(d => setRows(Array.isArray(d) ? d : [])).catch(() => setRows([]))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [q])
+  async function claim(cafe) {
+    const s = getSession()
+    if (!s || !s.access_token) { setMsg({ ok: false, text: CLAIM_ERR.not_authenticated }); return }
+    setBusy(true); setMsg(null)
+    try {
+      const r = await fetch(SB_URL + '/rest/v1/rpc/claim_cafe', { method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_cafe_id: cafe.id }) })
+      const d = await r.json()
+      if (d && d.ok) { setMsg({ ok: true, text: 'درخواستت برای «' + cafe.name + '» ثبت شد. بعد از تأیید، آمار کافه همین‌جا می‌آید.' }); onReload && onReload() }
+      else setMsg({ ok: false, text: CLAIM_ERR[d && d.error] || 'ثبت درخواست نشد، دوباره امتحان کن' })
+    } catch (e) { setMsg({ ok: false, text: 'اتصال برقرار نشد' }) }
+    setBusy(false)
+  }
   return (
-    <div style={{ textAlign: 'center', padding: '50px 20px' }}>
-      <div style={{ fontSize: 52, marginBottom: 16 }}>🏪</div>
+    <div style={{ textAlign: 'center', padding: '40px 20px', maxWidth: 440, margin: '0 auto' }}>
+      <div style={{ fontSize: 52, marginBottom: 12 }}>🏪</div>
       <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>هنوز کافه‌ای نداری</div>
-      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.8, marginBottom: 20 }}>توی اپ اصلی کافه‌ت رو پیدا کن و «صاحب این کافه هستید؟» رو بزن.</div>
-      <a href="/" style={{ display: 'inline-block', background: C.accent, color: onColor(C.accent), padding: '12px 24px', borderRadius: 14, fontWeight: 700, textDecoration: 'none', fontSize: 14 }}>رفتن به {L.map}</a>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.8, marginBottom: 16 }}>اسم کافه‌ات را بنویس، از فهرست انتخابش کن و درخواست مالکیت بده.</div>
+      <input value={q} onChange={e => setQ(e.target.value)} placeholder="اسم کافه…"
+        style={{ width: '100%', boxSizing: 'border-box', height: 46, borderRadius: 14, border: '1px solid ' + C.border, background: C.card, color: C.text, fontSize: 14, padding: '0 14px', outline: 'none', fontFamily: 'inherit' }} />
+      {msg && <div style={{ marginTop: 10, fontSize: 12.5, fontWeight: 700, color: msg.ok ? C.green : C.danger, lineHeight: 1.8 }}>{msg.text}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, textAlign: 'right' }}>
+        {rows.map(c => (
+          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.card, border: '1px solid ' + C.border, borderRadius: 14, padding: '10px 12px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: C.text }}>{c.name}</div>
+              {c.district && <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>{c.district}</div>}
+            </div>
+            <button disabled={busy} onClick={() => claim(c)} style={{ flexShrink: 0, border: 'none', borderRadius: 10, padding: '8px 12px', background: C.accent, color: onColor(C.accent), fontSize: 12, fontWeight: 800, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>این کافه من است</button>
+          </div>
+        ))}
+        {q.trim().length >= 2 && rows.length === 0 && <div style={{ fontSize: 12, color: C.sub, textAlign: 'center' }}>کافه‌ای با این اسم پیدا نشد</div>}
+      </div>
     </div>
   )
 }

@@ -4,7 +4,8 @@ import { SB_KEY, SB_URL } from '@/lib/config'
 import { sortEventsByDistance, subscribeToChanges } from '@/lib/game/gameSystem'
 
 // ── پیل شیشه‌ای رویدادها روی نقشه (هم‌استایل پیل آمار زنده، بدون بک‌گراند مجزا) ──
-export function EventBanner({C, cafes, setSelCafe, onActiveCafeChange, mapCenterRef}) {
+// rootStyle اختیاری است: نسخه‌های تازه با آن جا و پهنای نوار را عوض می‌کنند. بدون آن همان قبلی است.
+export function EventBanner({C, cafes, setSelCafe, onActiveCafeChange, mapCenterRef, rootStyle}) {
   const [rawEvents, setRawEvents] = useState([])
   const [idx, setIdx] = useState(0)
   const timerRef = useRef(null)
@@ -92,7 +93,7 @@ export function EventBanner({C, cafes, setSelCafe, onActiveCafeChange, mapCenter
   }
 
   return (
-    <div data-tut="event-banner" style={{position:'absolute',top:10,left:10,zIndex:18,display:'flex',flexDirection:'column',gap:5,alignItems:'flex-start',maxWidth:'min(64vw,400px)'}}>
+    <div data-tut="event-banner" style={{position:'absolute',top:10,left:10,zIndex:18,display:'flex',flexDirection:'column',gap:5,alignItems:'flex-start',maxWidth:'min(64vw,400px)',...(rootStyle||{})}}>
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={onClickBanner}
         style={{height:27,boxSizing:'border-box',background:C.glass,backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',border:'1px solid '+C.border,borderRadius:99,padding:'0 9px',display:'flex',alignItems:'center',gap:5,fontSize:11,color:C.sub,boxShadow:'0 2px 8px rgba(0,0,0,.08)',cursor:'pointer',minWidth:0,maxWidth:'100%'}}>
         <button onClick={(e)=>{e.stopPropagation();go(1)}} style={{background:'none',border:'none',color:C.sub,fontSize:12,padding:'0 1px',flexShrink:0,fontFamily:'inherit',lineHeight:1}}>‹</button>

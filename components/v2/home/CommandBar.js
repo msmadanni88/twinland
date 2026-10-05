@@ -4,8 +4,10 @@
 // کلید باز و بسته کردن پنل اینجا نیست؛ رفته به داک پایین، جای دکمه نقشه.
 import { CITIES } from '@/lib/constants'
 import { L } from '@/lib/theme/labels'
+import { alpha } from '@/components/v2/theme'
 
-export function CommandBar({ C, T, Lay, city, isMobile, levelInfo, notifications, onLogoTap, search, setSearch, setShowCity, setShowMenu, setShowNotif, setShowXP, showNotif, xp }) {
+// xpProminent: نوار امتیاز رنگی و کشیده‌تر نسخه v3.0؛ بدون آن همان نوار ساده v2.0 است
+export function CommandBar({ xpProminent = false, C, T, Lay, city, isMobile, levelInfo, notifications, onLogoTap, search, setSearch, setShowCity, setShowMenu, setShowNotif, setShowXP, showNotif, xp }) {
   const unread = notifications.some(n => !n.read)
   const iconBtn = (active) => ({
     width: 40, height: 40, borderRadius: 13, border: '1px solid ' + (active ? 'transparent' : T.hair), flexShrink: 0,
@@ -48,21 +50,24 @@ export function CommandBar({ C, T, Lay, city, isMobile, levelInfo, notifications
 
       {/* امتیاز و لول */}
       <button className="tl2-press" onClick={() => setShowXP(true)} aria-label={L.xpSystem}
-        style={{ flexShrink: 0, height: 40, minWidth: isMobile ? 0 : 190, borderRadius: T.radius.pill, border: '1px solid ' + T.hair, background: T.chip,
+        style={{ flexShrink: 0, height: 40, minWidth: isMobile ? 0 : (xpProminent ? 320 : 190), borderRadius: T.radius.pill,
+          border: '1px solid ' + (xpProminent ? alpha(C.accent, 0.55) : T.hair),
+          background: xpProminent ? 'linear-gradient(90deg,' + alpha(C.accent, 0.26) + ',' + alpha(C.accent, 0.08) + ')' : T.chip,
+          boxShadow: xpProminent ? '0 0 0 3px ' + alpha(C.accent, 0.1) + ', inset 0 1px 0 ' + alpha('#ffffff', 0.08) : 'none',
           padding: isMobile ? '0 10px 0 8px' : '0 12px 0 8px', display: 'flex', alignItems: 'center', gap: 8, color: C.text }}>
-        <span style={{ width: 28, height: 28, borderRadius: '50%', background: T.accentSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{levelInfo.current.icon}</span>
+        <span style={{ width: 28, height: 28, borderRadius: '50%', background: xpProminent ? C.accent : T.accentSoft, boxShadow: xpProminent ? T.glow(C.accent, 0.5) : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{levelInfo.current.icon}</span>
         {!isMobile && (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
               <span style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>{levelInfo.current.name}</span>
-              <span style={{ color: C.sub, fontWeight: 700, whiteSpace: 'nowrap' }}>{Number(xp || 0).toLocaleString('fa')} {L.xp}</span>
+              <span style={{ color: xpProminent ? C.accent : C.sub, fontWeight: xpProminent ? 900 : 700, fontSize: xpProminent ? 12 : 11, whiteSpace: 'nowrap' }}>{Number(xp || 0).toLocaleString('fa')} {L.xp}{xpProminent ? ' · ' + Math.round(levelInfo.progress || 0).toLocaleString('fa') + '٪' : ''}</span>
             </span>
-            <span style={{ height: 5, borderRadius: 99, background: T.hair, overflow: 'hidden', display: 'block' }}>
-              <span style={{ display: 'block', height: '100%', width: levelInfo.progress + '%', background: T.grad, borderRadius: 99, transition: 'width .6s' }} />
+            <span style={{ height: xpProminent ? 7 : 5, borderRadius: 99, background: xpProminent ? alpha(C.text, 0.14) : T.hair, overflow: 'hidden', display: 'block' }}>
+              <span style={{ display: 'block', height: '100%', width: levelInfo.progress + '%', background: T.grad, borderRadius: 99, transition: 'width .6s', boxShadow: xpProminent ? '0 0 8px ' + alpha(C.accent, 0.8) : 'none' }} />
             </span>
           </span>
         )}
-        {isMobile && <span style={{ fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>{Number(xp || 0).toLocaleString('fa')}</span>}
+        {isMobile && <span style={{ fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap', color: xpProminent ? C.accent : C.text }}>{Number(xp || 0).toLocaleString('fa')}</span>}
       </button>
 
       <button data-tut="notif-btn" className="tl2-press" aria-label={L.notifications} onClick={() => setShowNotif(v => !v)} style={iconBtn(showNotif)}>
