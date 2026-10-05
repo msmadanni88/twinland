@@ -7,12 +7,23 @@ import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
 import { L, ICON } from '@/lib/theme/labels'
 import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
 import { CafeContentEditor } from '@/components/business/CafeContentEditor'
+import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { BusinessApp } from '@/components/v3/business/BusinessApp'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 const WEEKDAYS = ['شنبه', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'جمعه']
 const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
 
-export default function BusinessPage() {
+// از نسخه ظاهر v3.0 به بعد پنل تازه نشان داده می‌شود. پنل قبلی پایین همین فایل دست‌نخورده مانده
+// و در نسخه‌های قدیمی‌تر ظاهر همان است. کمپین‌ها، ویترین و حالت «بدون کسب‌وکار» از همین فایل به پنل تازه داده می‌شوند.
+const V3_SLOTS = { Campaigns: (p) => <TabCampaigns {...p} />, Content: (p) => <CafeContentEditor {...p} />, EmptyState: (p) => <EmptyState {...p} /> }
+export default function BusinessRoute() {
+  const { active } = useUiVersion()
+  if (active === 'v3.0') return <BusinessApp slots={V3_SLOTS} />
+  return <LegacyBusinessPage />
+}
+
+function LegacyBusinessPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [businesses, setBusinesses] = useState([])
   const [data, setData] = useState({})   // همه‌ی داده‌ها per cafe_id
