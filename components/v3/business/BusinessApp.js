@@ -166,13 +166,18 @@ export function BusinessApp({ slots }) {
 
   function body() {
     if (loading && !demoOn) return <Card C={C} K={K}><Empty C={C} icon="⏳" title="در حال بارگذاری…" /></Card>
-    if (!view.biz) return slots && slots.EmptyState ? <slots.EmptyState C={C} onReload={loadList} /> : <Card C={C} K={K}><Empty C={C} icon="🏪" title="هنوز کسب‌وکاری ثبت نکرده‌ای" /></Card>
+    if (!view.biz && tab !== 'account') return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {slots && slots.EmptyState ? <slots.EmptyState C={C} onReload={loadList} /> : <Card C={C} K={K}><Empty C={C} icon="🏪" title="هنوز کسب‌وکاری ثبت نکرده‌ای" /></Card>}
+        <div style={{ textAlign: 'center' }}><Btn C={C} kind="ghost" onClick={toggleDemo}>🎬 دیدن پنل با داده ساختگی</Btn></div>
+      </div>
+    )
     if (tab === 'account') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Card C={C} K={K} title="حساب کسب‌وکار">
           {identity}
           <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 2, marginTop: 12 }}>
-            طرح: <b style={{ color: C.text }}>{view.biz.plan === 'pro' ? 'PRO' : 'رایگان'}</b><br />
+            {view.biz && <>طرح: <b style={{ color: C.text }}>{view.biz.plan === 'pro' ? 'PRO' : 'رایگان'}</b><br /></>}
             حساب کسب‌وکار در بازی شرکت نمی‌کند: چک‌این و امتیاز فقط برای حساب کاربری است.
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
