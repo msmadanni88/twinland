@@ -37,8 +37,8 @@ export function decorOf(c) {
   const q = QUESTS[h % QUESTS.length]
   return {
     motto: MOTTOS[h % MOTTOS.length],
-    item: h % 10 < 7 ? ITEMS[(h >> 4) % ITEMS.length] : null,
-    quest: h % 10 < 5 ? { id: 'demo-q-' + c.id, icon: q[0], title: q[1], reward_label: q[2], target: 1 + (h >> 6) % 3, xp: 60 + ((h >> 8) % 5) * 20 } : null,
+    item: h % 10 < 7 ? ITEMS[(h >>> 4) % ITEMS.length] : null,
+    quest: h % 10 < 5 ? { id: 'demo-q-' + c.id, icon: q[0], title: q[1], reward_label: q[2], target: 1 + (h >>> 6) % 3, xp: 60 + ((h >>> 8) % 5) * 20 } : null,
     full: h % 13 === 0,
   }
 }
@@ -69,7 +69,7 @@ function build(cfg) {
     const d = decorOf(c)
     const w = 0.5 + Math.pow(rng(), 2) * 3.5
     W.wSum += w; W.cum[i] = W.wSum
-    const quest = c.q ? { id: c.q.id, icon: c.q.icon || '🎯', title: c.q.title, reward_label: 'جایزه کمپین', target: 1 + (hashOf(c.id) >> 6) % 3, xp: 80 } : d.quest
+    const quest = c.q ? { id: c.q.id, icon: c.q.icon || '🎯', title: c.q.title, reward_label: 'جایزه کمپین', target: 1 + (hashOf(c.id) >>> 6) % 3, xp: 80 } : d.quest
     W.cafes.push({ id: c.id, name: c.name, lat: c.lat, lng: c.lng, district: c.district || 'تهران', w, present: 0, today: 0, total: Math.round(w * 420 + rng() * 240), base30: Math.round(w * 900 + rng() * 300),
       newV: 0, retV: 0, hours: new Array(24).fill(0), clanCk: new Array(CLANS.length).fill(0), clanMem: new Array(CLANS.length).fill(0),
       quest: quest ? { ...quest, joined: Math.round(rng() * 60), done: Math.round(rng() * 25) } : null })
