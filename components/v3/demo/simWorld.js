@@ -159,7 +159,8 @@ function step(W) {
   const b = W.leave[W.tick & 255]
   for (let i = 0; i < b.length; i++) { const u = b[i]; if (W.at[u] >= 0 && W.leaveAt[u] === W.tick) { W.cafes[W.at[u]].present--; W.at[u] = -1 } }
   b.length = 0
-  const k = 2 + (rng() < 0.6 ? 1 : 0) + (rng() < 0.5 ? 1 : 0) + (rng() < 0.25 ? 1 : 0)
+  // با مکان‌های بیشتر، رفت‌وآمد هم بیشتر می‌شود تا نقشه خلوت به نظر نرسد — حداکثر چهار برابر
+  const k = Math.round((2 + (rng() < 0.6 ? 1 : 0) + (rng() < 0.5 ? 1 : 0) + (rng() < 0.25 ? 1 : 0)) * Math.min(4, Math.max(1, W.C / 150)))
   for (let j = 0; j < k; j++) {
     const u = 1 + Math.floor(rng() * (N - 1)), ci = pickCafe(W)
     if (W.at[u] >= 0) continue

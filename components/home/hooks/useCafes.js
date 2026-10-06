@@ -19,8 +19,9 @@ export function useCafes({ showToast }) {
       const p1 = withFeatured.length
         ? fetch(SB_URL+'/rest/v1/cafe_menu_items?id=in.('+withFeatured.join(',')+')&select=id,name',{headers:h}).then(r=>r.ok?r.json():[]).catch(()=>[])
         : Promise.resolve([])
+      // کمپین‌های فعال همه مکان‌ها یک‌جا گرفته می‌شود؛ با بیش از هزار مکان، فهرست شناسه‌ها در نشانی جا نمی‌شود
       const p2 = ids.length
-        ? fetch(SB_URL+'/rest/v1/quests?active=eq.true&cafe_id=in.('+ids.join(',')+')&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,cafe_id,title,icon&order=created_at.desc',{headers:h}).then(r=>r.ok?r.json():[]).catch(()=>[])
+        ? fetch(SB_URL+'/rest/v1/quests?active=eq.true&or=(ends_at.is.null,ends_at.gt.'+new Date().toISOString()+')&select=id,cafe_id,title,icon&order=created_at.desc&limit=1000',{headers:h}).then(r=>r.ok?r.json():[]).catch(()=>[])
         : Promise.resolve([])
       Promise.all([p1,p2]).then(([items,quests])=>{
         if(!alive) return
@@ -34,8 +35,15 @@ export function useCafes({ showToast }) {
       })
     }
     const load=(attempt=0)=>{
-      fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true',{ headers:h }
-      ).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json() }).then(d=>{
+      // سرور در هر پاسخ حداکثر 1000 ردیف می‌دهد؛ مکان‌ها صفحه‌صفحه گرفته می‌شوند تا هیچ‌کدام جا نماند
+      const PAGE=1000
+      const page=(from,acc)=>fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true&order=id.asc&limit='+PAGE+'&offset='+from,{ headers:h }
+      ).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json() }).then(rows=>{
+        if(!Array.isArray(rows)) throw new Error('bad response')
+        const all=acc.concat(rows)
+        return rows.length===PAGE && all.length<20000 ? page(from+PAGE,all) : all
+      })
+      page(0,[]).then(d=>{
         if(alive && Array.isArray(d)){ setCafes(d); enrich(d) }
       }).catch(()=>{
         if(!alive) return
