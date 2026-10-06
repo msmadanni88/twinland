@@ -71,6 +71,8 @@ export function V2Styles({ C, T }) {
 
   /* حالت نمایشی v3.0: پینی که همین الان چک‌این ساختگی گرفته */
   .tl3-demo-pop{animation:tl3Ping .7s ease-out}
+  .tl3-bump{animation:tl3Bump .55s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes tl3Bump{0%{transform:scale(1)}40%{transform:scale(1.5)}100%{transform:scale(1)}}
   @keyframes tl3Ping{0%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}40%{filter:drop-shadow(0 0 10px ${C.accent})}100%{filter:drop-shadow(0 3px 3px rgba(0,0,0,.28))}}
 
   /* خوشه */

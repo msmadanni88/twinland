@@ -49,6 +49,7 @@ import { V3_FLAGS } from '@/components/v3/flags'
 import { HudSquares } from '@/components/v3/home/HudSquares'
 import { useDemoSim } from '@/components/v3/demo/useDemoSim'
 import { DemoLayer } from '@/components/v3/demo/DemoLayer'
+import { DemoConsole, SimClan, SimDashboard, SimMissions, SimProfile, SimRank } from '@/components/v3/demo/DemoPanels'
 
 // hexFog فقط در نسخه v3.0 روشن است؛ بدون آن این صفحه دقیقاً همان v2.0 است
 export function TwinLandV2({ session, onLogout, hexFog = false }) {
@@ -112,13 +113,37 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
     } catch (e) {}
   }, [hexFog])
   const toggleDemo = () => setDemoOn(v => { try { if (v) sessionStorage.removeItem('tl_demo'); else sessionStorage.setItem('tl_demo', '1') } catch (e) {} return !v })
-  const demo = useDemoSim({ cafes: realCafes, enabled: hexFog && demoOn, live: realLive })
+  const [showConsole, setShowConsole] = useState(false)
+  const { accountType, checkedIn: realCheckedIn, coins: realCoins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak: realStreak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp: realXp } = useUserData({ freshToken, session })
+  // در حالت نمایشی، نقشه و پنل‌ها از دنیای شبیه‌سازی تغذیه می‌شوند؛ وضعیت واقعی کاربر فقط خوانده می‌شود و دست نمی‌خورد
+  const demo = useDemoSim({ cafes: realCafes, enabled: hexFog && demoOn, live: realLive, me: { name: userName, xp: realXp, coins: realCoins, streak: realStreak, checkedIn: realCheckedIn } })
   const cafes = demo.cafes, live = demo.live
-  const { accountType, checkedIn, coins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp } = useUserData({ freshToken, session })
+  const xp = demo.on ? demo.me.xp : realXp
+  const coins = demo.on ? demo.me.coins : realCoins
+  const streak = demo.on ? demo.me.streak : realStreak
+  const checkedIn = demo.on ? demo.me.checkedIn : realCheckedIn
   function onQuestTap(cafe, questId) { setHighlightQuestId(questId); setPanelTab('missions'); setPanelOpen(true) }
   const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode: 'normal', onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
   const { backfillDistricts, backfilling, claimSecretXP, resetMe, toggleViewMode } = useOwnerTools({ freshToken, session, setViewAsUser, setXp, showToast, viewAsUser })
-  const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp })
+  const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn: realCheckedIn, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp: realXp })
+  // چک‌این در حالت نمایشی: بدون موقعیت‌یاب و بدون هیچ درخواستی به سرور، فقط در دنیای شبیه‌سازی
+  function demoCheckin(cafe) {
+    const r = demo.checkinMe(cafe)
+    if (r.ok) { showToast('🎬 چک‌این نمایشی ثبت شد · +' + r.gain.toLocaleString('fa') + ' XP'); setSelCafe(null) }
+    else showToast(r.reason === 'dup' ? 'قبلاً اینجا بودی!' : 'چک‌این نمایشی ثبت نشد', 'warn')
+  }
+  function demoOpenCafe(id) {
+    const c = cafes.find(x => x.id === id); if (!c) return
+    setShowConsole(false); setSelCafe(c)
+    try { if (mapInst.current) mapInst.current.flyTo([c.lat, c.lng], Math.max(mapInst.current.getZoom(), 15)) } catch (e) {}
+  }
+  const demoTabs = demo.on ? {
+    dashboard: <SimDashboard C={C} snap={demo.snap} me={demo.me} onCafe={demoOpenCafe} />,
+    missions: <SimMissions C={C} snap={demo.snap} highlightQuestId={highlightQuestId} onCafe={demoOpenCafe} />,
+    rank: <SimRank C={C} snap={demo.snap} me={demo.me} />,
+    clan: <SimClan C={C} snap={demo.snap} />,
+    profile: <SimProfile C={C} snap={demo.snap} me={demo.me} />,
+  } : null
   const levelInfo = getLevelInfo(xp)
   // چیدمان تازه موبایل و پنهان بودن نوار LED فقط در v3.0 و با کلیدهای components/v3/flags.js
   const compact = hexFog && V3_FLAGS.compactMobileHud && isMobile
@@ -184,7 +209,8 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
           onMissions={() => { setPanelTab('missions'); setPanelOpen(true) }} />
       )}
 
-      <DemoLayer C={C} T={T} Lay={Lay} compact={compact} demo={demo} isMobile={isMobile} onOff={toggleDemo} />
+      <DemoLayer C={C} T={T} Lay={Lay} compact={compact} demo={demo} isMobile={isMobile} onOff={toggleDemo} onConsole={() => setShowConsole(true)} />
+      {showConsole && <DemoConsole C={C} demo={demo} onClose={() => setShowConsole(false)} onCafe={demoOpenCafe} />}
 
       {hexFog && !compact && !mapLoading && !demo.on && (
         <div className="tl3-explore" style={{ position: 'absolute', left: Lay.gap, top: Lay.hudTop + (bannerBottom ? 0 : 78), zIndex: 55, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderRadius: 99, padding: '5px 11px', fontSize: 11, fontWeight: 800, color: C.text, boxShadow: T.shadow1 || T.shadow2, pointerEvents: 'none', maxWidth: 'calc(100vw - 24px)' }}>
@@ -201,9 +227,9 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
 
       <Dock C={C} T={T} Lay={Lay} isMobile={isMobile} panelOpen={panelOpen} panelTab={panelTab} rightInset={rightInset} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setTab={setTab} />
 
-      <PanelShell demoLeaders={demo.leaders} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
+      <PanelShell demoTabs={demoTabs} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
 
-      {selCafe && <CafeSheet noPlay={isBiz && !effAdmin} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => doCheckin(selCafe)} showToast={showToast} />}
+      {selCafe && <CafeSheet noPlay={isBiz && !effAdmin} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
       {showXP && <XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}
       {showNotif && <NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
       <UIStyles />

@@ -14,7 +14,7 @@ import { UIStyles, onColor } from '@/lib/theme/ui'
 import { Btn, Card, Empty, bizTokens, fa } from '@/components/v3/business/bizUi'
 import { Clans, Collab, Customers, DemoCampaigns, Overview, Timing } from '@/components/v3/business/sections'
 import { AreaMap } from '@/components/v3/business/AreaMap'
-import { makeBizDemo, tickBizDemo } from '@/components/v3/business/demoData'
+import { useBizSim } from '@/components/v3/demo/useBizSim'
 
 const OWNER_EMAIL = 'msmadani88@gmail.com'
 const NAV = [
@@ -36,7 +36,7 @@ export function BusinessApp({ slots }) {
   const [isOwner, setIsOwner] = useState(false)
   const [busy, setBusy] = useState(false)
   const [demoOn, setDemoOn] = useState(false)
-  const [demo, setDemo] = useState(null)
+  const [demoCollab, setDemoCollab] = useState(null)   // پیشنهادهای همکاری که در همین نمایش داده یا پذیرفته شده
   const selRef = useRef(null)
 
   useEffect(() => {
@@ -98,13 +98,11 @@ export function BusinessApp({ slots }) {
     return () => { unsub(); clearInterval(t) }
   }, [demoOn, loadList, loadData, businesses])
 
-  // حالت نمایشی: داده ساختگی در حافظه همین تب، با یک رویداد تازه هر 2 ثانیه
-  useEffect(() => {
-    if (!demoOn) { setDemo(null); return }
-    setDemo(makeBizDemo())
-    const t = setInterval(() => setDemo(s => (s ? tickBizDemo(s) : s)), 2000)
-    return () => clearInterval(t)
-  }, [demoOn])
+  // حالت نمایشی: همان دنیای شبیه‌سازی نقشه، از نگاه یکی از مکان‌ها — چیزی از دیتابیس خوانده یا در آن نوشته نمی‌شود
+  const bizSim = useBizSim(demoOn)
+  useEffect(() => { if (!demoOn) setDemoCollab(null) }, [demoOn])
+  const demo = demoOn && bizSim ? { biz: bizSim.biz, d: bizSim.d, area: bizSim.area, collab: demoCollab || bizSim.collab, last: bizSim.last, n: bizSim.n } : null
+  const setDemo = (fn) => setDemoCollab(prev => fn({ collab: prev || (bizSim && bizSim.collab) }).collab)
   const toggleDemo = () => setDemoOn(v => { try { if (v) sessionStorage.removeItem('tl_demo'); else sessionStorage.setItem('tl_demo', '1') } catch (e) {} return !v })
 
   const C = buildC(pal.palette, pal.mode)

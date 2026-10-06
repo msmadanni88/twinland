@@ -140,6 +140,10 @@ function itemIcon(name) {
   return '⭐'
 }
 
+// رنگ ثابت حباب‌ها در همه پوسته‌ها: زمینه تیره، نوشته و خط دور سفید — تا روی هر نقشه‌ای خوانا بماند
+const BUBBLE_BG = '#15171c'
+const BUBBLE_INK = '#ffffff'
+
 // ابر شعار: اندازه از روی طول متن حساب می‌شود و سه مدل دارد —
 // پفکی با برآمدگی درشت، پفکی با برآمدگی ریز، و حباب گرد دوخطه
 function cloudNode(text, seed, fill, ink, textColor) {
@@ -151,8 +155,8 @@ function cloudNode(text, seed, fill, ink, textColor) {
   const variant = seed % 3
   let shape
   if (variant === 2) {
-    shape = '<rect x="4" y="5" width="' + (w - 5) + '" height="' + (h - 6) + '" rx="' + r1((h - 6) / 2.2) + '" fill="' + ink + '" opacity=".28"/>' +
-      '<rect class="tl2-cloud-shape" x="2" y="2" width="' + (w - 5) + '" height="' + (h - 6) + '" rx="' + r1((h - 6) / 2.2) + '" fill="' + fill + '" stroke="' + ink + '" stroke-width="2"/>'
+    shape = '<rect x="4" y="5" width="' + (w - 5) + '" height="' + (h - 6) + '" rx="' + r1((h - 6) / 2.2) + '" style="fill:#000000" opacity=".3"/>' +
+      '<rect class="tl2-cloud-shape" x="2" y="2" width="' + (w - 5) + '" height="' + (h - 6) + '" rx="' + r1((h - 6) / 2.2) + '" style="fill:' + fill + ';stroke:' + ink + '" stroke-width="2"/>'
   } else {
     const a = w / 2 - 7, b = h / 2 - 7, e = 2 / 3.2
     const perim = 2 * (w + h)
@@ -169,11 +173,11 @@ function cloudNode(text, seed, fill, ink, textColor) {
       const r = Math.hypot(q[0] - o[0], q[1] - o[1]) * (variant === 0 ? 0.6 : 0.56)
       d += 'A' + r1(r) + ' ' + r1(r) + ' 0 0 1 ' + r1(q[0]) + ' ' + r1(q[1])
     }
-    shape = '<path class="tl2-cloud-shape" d="' + d + 'Z" fill="' + fill + '" stroke="' + ink + '" stroke-width="2" stroke-linejoin="round"/>'
+    shape = '<path class="tl2-cloud-shape" d="' + d + 'Z" style="fill:' + fill + ';stroke:' + ink + '" stroke-width="2" stroke-linejoin="round"/>'
   }
   const html = '<div class="tl2-cloud" style="width:' + w + 'px;height:' + h + 'px">' +
     '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" aria-hidden="true">' + shape + '</svg>' +
-    '<div class="tl2-cloud-txt" style="color:' + textColor + '">' + escHtml(t) + '</div></div>'
+    '<div class="tl2-cloud-txt" style="color:' + textColor + ' !important">' + escHtml(t) + '</div></div>'
   return { html, w, h }
 }
 
@@ -197,11 +201,11 @@ function renderSatellites(cafe, C, cx, cy) {
     nodes.push('<div class="tl2-node ' + cls + '"' + attrs + ' style="left:' + r1(P.x) + 'px;top:' + r1(P.y) + 'px;--s:' + P.s.toFixed(2) + ';--d:' + P.delay + 's;--b:-' + (rnd(seed, 40 + k) * 3).toFixed(2) + 's">' +
       '<div class="tl2-node-in">' +
         '<div class="tl2-disc" style="background:' + bg + ';color:' + onColor(bg) + ';border-color:' + ink + '">' + icon + '</div>' +
-        '<div class="tl2-tag" style="background:' + C.card + ';color:' + C.text + ';border-color:' + ink + '">' + escHtml(label) + '</div>' +
+        '<div class="tl2-tag" style="background:' + BUBBLE_BG + ';color:' + BUBBLE_INK + ';border-color:' + BUBBLE_INK + '">' + escHtml(label) + '</div>' +
       '</div></div>')
   }
   if (cafe.motto) {
-    const cl = cloudNode(cafe.motto, seed, C.card, ink, C.text)
+    const cl = cloudNode(cafe.motto, seed, BUBBLE_BG, BUBBLE_INK, BUBBLE_INK)
     const ang = (-90 + (rnd(seed, 90) - 0.5) * 30) * rad
     const dist = 46 + cl.h / 2 + 12
     const x = Math.cos(ang) * dist, y = Math.sin(ang) * dist
@@ -211,7 +215,7 @@ function renderSatellites(cafe, C, cx, cy) {
     const steps = [[0.1, 2.2], [0.42, 3.2], [0.8, 4.4]]
     for (let i = 0; i < steps.length; i++) {
       const dd = from + (to - from) * steps[i][0]
-      links += '<circle class="tl2-dot" cx="' + r1(Math.cos(ang) * dd) + '" cy="' + r1(Math.sin(ang) * dd) + '" r="' + steps[i][1] + '" fill="' + C.card + '" stroke="' + ink + '" stroke-width="1.6" style="--d:' + (i * 0.06).toFixed(2) + 's"/>'
+      links += '<circle class="tl2-dot" cx="' + r1(Math.cos(ang) * dd) + '" cy="' + r1(Math.sin(ang) * dd) + '" r="' + steps[i][1] + '" stroke-width="1.6" style="fill:' + BUBBLE_BG + ';stroke:' + BUBBLE_INK + ';--d:' + (i * 0.06).toFixed(2) + 's"/>'
     }
     nodes.push('<div class="tl2-node tl2-node-motto" style="left:' + r1(x) + 'px;top:' + r1(y) + 'px;--s:1;--d:' + delay + 's;--b:-' + (rnd(seed, 91) * 3).toFixed(2) + 's"><div class="tl2-node-in">' + cl.html + '</div></div>')
   }
