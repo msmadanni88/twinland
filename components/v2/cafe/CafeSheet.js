@@ -2,6 +2,7 @@
 // پنجره کافه — نسخه v2.0
 // کاور بزرگ، هویت کافه، چهار صفحه، و دکمه چک‌این همیشه پایین و در دسترس.
 // فقط داده واقعی نشان داده می‌شود؛ ساعت کاری و امتیاز ستاره‌ای ساختگی نسخه قبل حذف شد.
+import { CafeRating } from '@/components/v3/cafe/CafeRating'
 import { useEffect, useState } from 'react'
 import { onColor } from '@/lib/theme/ui'
 import { L, ICON } from '@/lib/theme/labels'
@@ -113,6 +114,8 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
                 : <span style={{ color: C.sub, overflowWrap: 'anywhere', unicodeBidi: 'plaintext' }}>{r[1]}</span>}
             </div>)}
           </div>}
+
+          <CafeRating C={C} T={T} cafe={cafe} isChecked={isChecked} noPlay={noPlay} showToast={showToast} />
 
           {/* صفحه‌ها */}
           <div style={{ padding: '14px 18px 0' }}>
