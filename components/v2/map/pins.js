@@ -248,7 +248,7 @@ export function makePinStyle(C, T, art) {
       '</div>'
     return { html, size: [44, 48], anchor: [22, 44] }
   }
-  const renderPin = art ? renderArt : (cafe, { color, isChecked, live }) => {
+  const renderFull = art ? renderArt : (cafe, { color, isChecked, live }) => {
     const base = isChecked ? C.green : color
     const light = mix(base, '#FFFFFF', 0.28)
     const deep = mix(base, '#000000', 0.18)
@@ -271,6 +271,17 @@ export function makePinStyle(C, T, art) {
           ';background:' + C.danger + ';color:' + onColor(C.danger) + ';border-color:' + ring + '">' + (n > 0 ? n : '') + '</div>' +
       '</div>'
     return { html, size: [40, 50], anchor: [20, 48] }
+  }
+
+  // مکان‌های کم‌اهمیت‌تر — ستون tier با مقدار minor — به شکل یک نقطه کوچک دیده می‌شوند تا نقشه شلوغ نشود.
+  // جایی که کاربر چک‌این کرده همیشه پین کامل می‌ماند.
+  const renderPin = (cafe, o) => {
+    if (cafe.tier !== 'minor' || o.isChecked) return renderFull(cafe, o)
+    const n = o.live || 0
+    const html = '<div class="tl2-minor" style="background:' + o.color + ';border-color:' + ring + '">' +
+      '<div id="lv-' + cafe.id + '" class="tl2-pin-live" style="top:-9px;right:-11px;transform:scale(.8);display:' + (n > 0 ? 'flex' : 'none') +
+      ';background:' + C.danger + ';color:' + onColor(C.danger) + ';border-color:' + ring + '">' + (n > 0 ? n : '') + '</div></div>'
+    return { html, size: [14, 14], anchor: [7, 7] }
   }
 
   const clusterIcon = (count) => {

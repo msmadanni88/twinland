@@ -36,7 +36,17 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
   const xpAmount = cafe.is_top ? XP_CONFIG.checkin_top : XP_CONFIG.checkin
   const liveNow = live[cafe.id] || 0
   const heroH = wide ? 168 : 150
-  const where = cafe.description || cafe.district
+  const where = cafe.description || cafe.address || cafe.district
+  // اطلاعات تماس و ساعت کار — فقط وقتی برای این مکان ثبت شده باشد
+  const web = cafe.website ? (/^https?:\/\//i.test(cafe.website) ? cafe.website : 'https://' + cafe.website) : null
+  const ig = cafe.instagram ? String(cafe.instagram).replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/.*$/, '') : null
+  const info = [
+    cafe.address && cafe.address !== where ? ['📍', cafe.address, null] : null,
+    cafe.opening_hours ? ['🕒', cafe.opening_hours, null] : null,
+    cafe.phone ? ['📞', cafe.phone, 'tel:' + String(cafe.phone).split(/[;,]/)[0].replace(/[^0-9+]/g, '')] : null,
+    web ? ['🌐', cafe.website.replace(/^https?:\/\//i, '').replace(/\/$/, ''), web] : null,
+    ig ? ['📷', '@' + ig, 'https://instagram.com/' + ig] : null,
+  ].filter(Boolean)
 
   const sheet = wide
     ? { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(92vw,460px)', maxHeight: '88dvh', borderRadius: T.radius.xl + 4, animation: 'tl2Pop .3s cubic-bezier(.2,.9,.3,1)' }
@@ -94,6 +104,15 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
             {isChecked && <span style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', fontSize: 11.5, fontWeight: 900, background: alpha(C.green, 0.16), color: C.green }}>✓ امروز اینجا بودی</span>}
             {(cafe.tags || []).map(t => <span key={t} style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', fontSize: 11.5, fontWeight: 700, background: T.chip, color: C.text, border: '1px solid ' + T.hair }}>{t}</span>)}
           </div>
+
+          {info.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 18px 0' }}>
+            {info.map((r, i) => <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: C.text, lineHeight: 1.7 }}>
+              <span style={{ flexShrink: 0 }}>{r[0]}</span>
+              {r[2]
+                ? <a href={r[2]} target={r[2].startsWith('tel:') ? undefined : '_blank'} rel="noopener noreferrer" dir="ltr" style={{ color: C.accent, fontWeight: 700, textDecoration: 'none', overflowWrap: 'anywhere' }}>{r[1]}</a>
+                : <span style={{ color: C.sub, overflowWrap: 'anywhere', unicodeBidi: 'plaintext' }}>{r[1]}</span>}
+            </div>)}
+          </div>}
 
           {/* صفحه‌ها */}
           <div style={{ padding: '14px 18px 0' }}>

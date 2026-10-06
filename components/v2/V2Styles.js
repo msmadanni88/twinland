@@ -75,6 +75,10 @@ export function V2Styles({ C, T }) {
   @keyframes tl3Bump{0%{transform:scale(1)}40%{transform:scale(1.5)}100%{transform:scale(1)}}
   @keyframes tl3Ping{0%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}40%{filter:drop-shadow(0 0 10px ${C.accent})}100%{filter:drop-shadow(0 3px 3px rgba(0,0,0,.28))}}
 
+  /* مکان کم‌اهمیت‌تر: نقطه کوچک */
+  .tl2-minor{position:relative;width:14px;height:14px;border-radius:50%;border:2px solid;box-sizing:border-box;cursor:pointer;opacity:.85;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .15s}
+  .tl2-minor:hover{transform:scale(1.5);opacity:1}
+
   /* خوشه */
   .tl2-cluster{border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-weight:900;box-sizing:border-box;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
   .tl2-cluster:hover{transform:scale(1.08)}
