@@ -16,6 +16,7 @@ export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes,
   const mapCenterRef = useRef(null)
   const mksRef   = useRef({})
   const clusterRef = useRef(null)   // گروه خوشه‌بندی مارکرها
+  const manyPlaces = cafes.length > 300
   const baseCtlRef = useRef(null)   // کنترل‌کننده زیرنقشه جایگزین، اگر باشد
   const baseArgsRef = useRef(null)
   baseArgsRef.current = { basemap, skinId, cafes, live }
@@ -293,9 +294,11 @@ export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes,
     if(!mapReady||!window.L||!window.L.markerClusterGroup||!mapInst.current) return
     const L=window.L
     // در حالت فیلتر منطقه از regionCluster، وگرنه از cluster استفاده کن
-    const level = filterApplied
+    let level = filterApplied
       ? (mapDisplay.regionCluster==='auto'?'off':mapDisplay.regionCluster)
       : (mapDisplay.cluster==='auto'?'medium':mapDisplay.cluster)
+    // با صدها مکان، خاموش بودن کامل خوشه‌بندی نقشه را می‌پوشاند و کند می‌کند؛ کمترین سطح خوشه‌بندی نگه داشته می‌شود
+    if(level==='off' && !filterApplied && manyPlaces) level='low'
     const radius=clusterRadiusOf(level)
     const old=clusterRef.current
     const next=makeClusterGroup(L,radius,pinStyle&&pinStyle.clusterIcon)
@@ -307,7 +310,7 @@ export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes,
     current.forEach(mk=>next.addLayer(mk))
     mapInst.current.addLayer(next)
     clusterRef.current=next
-  },[mapDisplay.cluster,mapDisplay.regionCluster,filterApplied,mapReady,pinStyle])
+  },[mapDisplay.cluster,mapDisplay.regionCluster,filterApplied,mapReady,pinStyle,manyPlaces])
 
   const filtered=cafes.filter(c=>{
     const zOk=zone==='all'||c.zone===zone||(zone==='top'&&c.is_top)
