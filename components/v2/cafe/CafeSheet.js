@@ -3,6 +3,7 @@
 // کاور بزرگ، هویت کافه، چهار صفحه، و دکمه چک‌این همیشه پایین و در دسترس.
 // فقط داده واقعی نشان داده می‌شود؛ ساعت کاری و امتیاز ستاره‌ای ساختگی نسخه قبل حذف شد.
 import { CafeRating } from '@/components/v3/cafe/CafeRating'
+import { trackPlace, withUtm } from '@/lib/track'
 import { useEffect, useState } from 'react'
 import { onColor } from '@/lib/theme/ui'
 import { L, ICON } from '@/lib/theme/labels'
@@ -38,15 +39,19 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
   const liveNow = live[cafe.id] || 0
   const heroH = wide ? 168 : 150
   const where = cafe.description || cafe.address || cafe.district
+  // از کجا به این برگه رسیده‌ایم — نقشه، جست‌وجو، یا یک کمپین. همراه هر رویداد ثبت می‌شود تا بعداً اثر هر کمپین جدا دیده شود
+  const from = cafe._from || {}
+  const track = (type, channel) => trackPlace(cafe.id, type, { channel, source: from.source || 'map', refType: from.refType, refId: from.refId })
+  useEffect(() => { track('view') }, [cafe.id])
   // اطلاعات تماس و ساعت کار — فقط وقتی برای این مکان ثبت شده باشد
   const web = cafe.website ? (/^https?:\/\//i.test(cafe.website) ? cafe.website : 'https://' + cafe.website) : null
   const ig = cafe.instagram ? String(cafe.instagram).replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/.*$/, '') : null
   const info = [
     cafe.address && cafe.address !== where ? ['📍', cafe.address, null] : null,
     cafe.opening_hours ? ['🕒', cafe.opening_hours, null] : null,
-    cafe.phone ? ['📞', cafe.phone, 'tel:' + String(cafe.phone).split(/[;,]/)[0].replace(/[^0-9+]/g, '')] : null,
-    web ? ['🌐', cafe.website.replace(/^https?:\/\//i, '').replace(/\/$/, ''), web] : null,
-    ig ? ['📷', '@' + ig, 'https://instagram.com/' + ig] : null,
+    cafe.phone ? ['📞', cafe.phone, 'tel:' + String(cafe.phone).split(/[;,]/)[0].replace(/[^0-9+]/g, ''), 'phone'] : null,
+    web ? ['🌐', cafe.website.replace(/^https?:\/\//i, '').replace(/\/$/, ''), withUtm(web, 'place_sheet', from.refId), 'website'] : null,
+    ig ? ['📷', '@' + ig, 'https://instagram.com/' + ig, 'instagram'] : null,
   ].filter(Boolean)
 
   const sheet = wide
@@ -56,8 +61,8 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
   const tile = { flex: 1, minWidth: 0, background: T.chip, border: '1px solid ' + T.hair, borderRadius: 16, padding: '11px 12px', display: 'flex', alignItems: 'center', gap: 10 }
   const actions = [
     { icon: ICON.hearts, label: L.hearts, active: isFav, fn: d.toggleFav },
-    { icon: '📤', label: 'اشتراک', fn: d.share },
-    { icon: '🗺', label: 'مسیر', fn: () => window.open('https://www.google.com/maps?q=' + cafe.lat + ',' + cafe.lng, '_blank', 'noopener') },
+    { icon: '📤', label: 'اشتراک', fn: () => { track('share'); d.share() } },
+    { icon: '🗺', label: 'مسیر', fn: () => { track('click', 'directions'); window.open('https://www.google.com/maps?q=' + cafe.lat + ',' + cafe.lng, '_blank', 'noopener') } },
     { icon: '💬', label: 'نظر', fn: () => showToast('💬 به زودی!') },
   ]
 
@@ -110,12 +115,12 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
             {info.map((r, i) => <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: C.text, lineHeight: 1.7 }}>
               <span style={{ flexShrink: 0 }}>{r[0]}</span>
               {r[2]
-                ? <a href={r[2]} target={r[2].startsWith('tel:') ? undefined : '_blank'} rel="noopener noreferrer" dir="ltr" style={{ color: C.accent, fontWeight: 700, textDecoration: 'none', overflowWrap: 'anywhere' }}>{r[1]}</a>
+                ? <a href={r[2]} onClick={() => track('click', r[3])} target={r[2].startsWith('tel:') ? undefined : '_blank'} rel="noopener noreferrer" dir="ltr" style={{ color: C.accent, fontWeight: 700, textDecoration: 'none', overflowWrap: 'anywhere' }}>{r[1]}</a>
                 : <span style={{ color: C.sub, overflowWrap: 'anywhere', unicodeBidi: 'plaintext' }}>{r[1]}</span>}
             </div>)}
           </div>}
 
-          <CafeRating C={C} T={T} cafe={cafe} isChecked={isChecked} noPlay={noPlay} showToast={showToast} />
+          <CafeRating C={C} T={T} cafe={cafe} isChecked={isChecked} noPlay={noPlay} showToast={showToast} onOut={(ch) => track('click', ch)} />
 
           {/* صفحه‌ها */}
           <div style={{ padding: '14px 18px 0' }}>

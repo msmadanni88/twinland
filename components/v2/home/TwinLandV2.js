@@ -49,6 +49,7 @@ import { V3_FLAGS } from '@/components/v3/flags'
 import { HudSquares } from '@/components/v3/home/HudSquares'
 import { useDemoSim } from '@/components/v3/demo/useDemoSim'
 import { DemoLayer } from '@/components/v3/demo/DemoLayer'
+import { setTracking } from '@/lib/track'
 import { DemoConsole, SimClan, SimDashboard, SimMissions, SimProfile, SimRank } from '@/components/v3/demo/DemoPanels'
 
 // hexFog فقط در نسخه v3.0 روشن است؛ بدون آن این صفحه دقیقاً همان v2.0 است
@@ -118,6 +119,8 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   // در حالت نمایشی، نقشه و پنل‌ها از دنیای شبیه‌سازی تغذیه می‌شوند؛ وضعیت واقعی کاربر فقط خوانده می‌شود و دست نمی‌خورد
   const demo = useDemoSim({ cafes: realCafes, enabled: hexFog && demoOn, live: realLive, me: { name: userName, xp: realXp, coins: realCoins, streak: realStreak, checkedIn: realCheckedIn } })
   const cafes = demo.cafes, live = demo.live
+  // در حالت نمایشی هیچ بازدید یا کلیکی برای کسب‌وکارها ثبت نمی‌شود
+  useEffect(() => { setTracking(!demo.on); return () => setTracking(true) }, [demo.on])
   const xp = demo.on ? demo.me.xp : realXp
   const coins = demo.on ? demo.me.coins : realCoins
   const streak = demo.on ? demo.me.streak : realStreak

@@ -15,10 +15,11 @@ import { Btn, Card, Empty, bizTokens, fa } from '@/components/v3/business/bizUi'
 import { Clans, Collab, Customers, DemoCampaigns, Overview, Timing } from '@/components/v3/business/sections'
 import { AreaMap } from '@/components/v3/business/AreaMap'
 import { useBizSim } from '@/components/v3/demo/useBizSim'
+import { Traffic } from '@/components/v3/business/Traffic'
 
 const OWNER_EMAIL = 'msmadani88@gmail.com'
 const NAV = [
-  ['overview', '🏠', 'نمای کلی'], ['customers', '👥', 'مشتری‌ها'], ['timing', '⏰', 'زمان‌بندی'], ['area', '🗺', 'نقشه و محله'],
+  ['overview', '🏠', 'نمای کلی'], ['customers', '👥', 'مشتری‌ها'], ['traffic', '📈', 'بازدید و کلیک'], ['timing', '⏰', 'زمان‌بندی'], ['area', '🗺', 'نقشه و محله'],
   ['campaigns', '🎯', 'کمپین‌ها'], ['clans', '🛡', 'کلن‌ها'], ['collab', '🤝', 'همکاری'], ['storefront', '🏪', 'ویترین و منو'], ['account', '⚙️', 'حساب'],
 ]
 
@@ -31,6 +32,7 @@ export function BusinessApp({ slots }) {
   const [dash, setDash] = useState(null)
   const [area, setArea] = useState(null)
   const [collab, setCollab] = useState(null)
+  const [traffic, setTraffic] = useState(null)
   const [loading, setLoading] = useState(true)
   const [dashState, setDashState] = useState('idle')   // idle | loading | ready | denied
   const [isOwner, setIsOwner] = useState(false)
@@ -73,7 +75,7 @@ export function BusinessApp({ slots }) {
   const loadData = useCallback(async (b, quiet) => {
     if (!b || b.status !== 'verified') { setDash(null); setArea(null); setCollab(null); setDashState(b ? 'denied' : 'idle'); return }
     if (!quiet) setDashState('loading')
-    const [res, ar, co] = await Promise.all([rpc('business_dashboard', { p_business_id: b.id }), rpc('business_area_overview', { p_business_id: b.id }), rpc('business_collab_overview', { p_business_id: b.id })])
+    const [res, ar, co, tr] = await Promise.all([rpc('business_dashboard', { p_business_id: b.id }), rpc('business_area_overview', { p_business_id: b.id }), rpc('business_collab_overview', { p_business_id: b.id }), rpc('business_traffic', { p_business_id: b.id, p_days: 30 })])
     if (selRef.current !== b.id) return
     const ok = !!(res && res.ok)
     const arr = (v) => (ok && Array.isArray(v) ? v : [])
@@ -84,6 +86,7 @@ export function BusinessApp({ slots }) {
     } : null)
     setArea(ar && ar.ok ? ar : null)
     setCollab(co && co.ok ? co : null)
+    setTraffic(tr && tr.ok ? tr : null)
     setDashState(ok ? 'ready' : 'denied')
   }, [])
 
@@ -207,6 +210,7 @@ export function BusinessApp({ slots }) {
     if (!view.d) return <Card C={C} K={K}><Empty C={C} icon="🔒" title="دسترسی به آمار این کسب‌وکار ممکن نشد" text="صفحه را تازه کن. اگر ادامه داشت، دوباره وارد شو." /></Card>
     if (tab === 'overview') return <Overview C={C} K={K} d={view.d} area={view.area} go={setTab} />
     if (tab === 'customers') return <Customers C={C} K={K} d={view.d} />
+    if (tab === 'traffic') return <Traffic C={C} K={K} t={demoOn && bizSim ? bizSim.traffic : traffic} />
     if (tab === 'timing') return <Timing C={C} K={K} d={view.d} area={view.area} />
     if (tab === 'area') return view.area ? <AreaMap C={C} K={K} area={view.area} /> : <Card C={C} K={K}><Empty C={C} icon="🗺" title="داده محله در دسترس نیست" /></Card>
     if (tab === 'clans') return <Clans C={C} K={K} d={view.d} go={setTab} />

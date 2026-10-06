@@ -90,5 +90,15 @@ export function buildBiz(W) {
     : raw.type === 'quest_new' ? { icon: '🎉', text: 'کمپین تازه این مکان روی نقشه رفت' }
     : raw.type === 'badge' ? { icon: '🏅', text: 'یک مشتری اینجا نشان تازه گرفت' }
     : raw.isNew ? { icon: '🆕', text: 'یک مشتری تازه چک‌این کرد' } : { icon: '📍', text: 'یک مشتری همیشگی چک‌این کرد' }
-  return { biz: { id: 'demo', cafe_id: c.id, status: 'verified', plan: 'pro', cafes: { name: c.name, district: c.district } }, d, area, collab: B.collab, last: ev, n: c.today, present: c.present, name: c.name, today: daily[29].checkins, newToday: c.newV, retToday: c.retV }
+  // بازدید و کلیک ساختگی: هر چک‌این شبیه‌سازی یعنی چند نفر پیش از آن برگه را دیده‌اند
+  const tv = daily.map(x => ({ day: x.day, views: Math.round(x.checkins * 3.4), clicks: Math.round(x.checkins * 0.62) }))
+  const views = tv.reduce((a, x) => a + x.views, 0), clicks = tv.reduce((a, x) => a + x.clicks, 0)
+  const share = [['instagram', 'اینستاگرام', 0.41], ['directions', 'مسیریابی', 0.27], ['phone', 'تماس تلفنی', 0.14], ['website', 'وب‌سایت', 0.1], ['google_maps', 'Google Maps', 0.08]]
+  const traffic = { ok: true, days: 30, min_group: 5,
+    totals: { views, viewers: Math.round(views * 0.71), clicks, clickers: Math.round(clicks * 0.83), visits: Math.round(month * 0.46), prev_views: Math.round(views * 0.84), prev_clicks: Math.round(clicks * 0.79) },
+    channels: share.map(x => ({ channel: x[0], label: x[1], events: Math.round(clicks * x[2]), people: Math.round(clicks * x[2] * 0.83) })),
+    sources: [{ source: 'map', views: Math.round(views * 0.58) }, { source: 'quest', views: Math.round(views * 0.24) }, { source: 'search', views: Math.round(views * 0.18) }],
+    refs: quests.filter(q => q.active).map((q, i) => ({ ref_type: 'quest', ref_id: q.id, title: q.title, views: Math.round(views * (i ? 0.08 : 0.16)), clicks: Math.round(clicks * (i ? 0.07 : 0.15)), visits: Math.round(month * (i ? 0.05 : 0.11)) })),
+    daily: tv }
+  return { traffic, biz: { id: 'demo', cafe_id: c.id, status: 'verified', plan: 'pro', cafes: { name: c.name, district: c.district } }, d, area, collab: B.collab, last: ev, n: c.today, present: c.present, name: c.name, today: daily[29].checkins, newToday: c.newV, retToday: c.retV }
 }

@@ -48,7 +48,7 @@ export function MissionsTab({C, cafes, highlightQuestId, setSelCafe, showToast})
 
   function openCafe(q){
     const cafe=cafes.find(c=>c.id===q.cafe_id)
-    if(cafe) setSelCafe(cafe)
+    if(cafe) setSelCafe({...cafe, _from:{source:'quest', refType:'quest', refId:String(q.id)}})
     else showToast && showToast('این کافه الان روی نقشه لود نشده، از /quests امتحان کن','warn')
   }
 

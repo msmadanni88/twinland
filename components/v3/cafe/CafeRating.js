@@ -15,7 +15,7 @@ function rpc(name, body) {
     .then(r => (r.ok ? r.json() : null)).catch(() => null)
 }
 
-export function CafeRating({ C, T, cafe, isChecked = false, noPlay = false, showToast }) {
+export function CafeRating({ C, T, cafe, isChecked = false, noPlay = false, showToast, onOut }) {
   const [sum, setSum] = useState(null)
   const [busy, setBusy] = useState(false)
   const [hover, setHover] = useState(0)
@@ -41,9 +41,9 @@ export function CafeRating({ C, T, cafe, isChecked = false, noPlay = false, show
   const canRate = !noPlay && (isChecked || (sum && sum.can_rate))
   const q = encodeURIComponent(cafe.name || '')
   const links = [
-    ['Google Maps', cafe.google_url || 'https://www.google.com/maps/search/' + q + '/@' + cafe.lat + ',' + cafe.lng + ',17z'],
-    cafe.neshan_url ? ['نشان', cafe.neshan_url] : null,
-    ['بلد', 'https://balad.ir/location?latitude=' + cafe.lat + '&longitude=' + cafe.lng + '&zoom=17'],
+    ['Google Maps', 'google_maps', cafe.google_url || 'https://www.google.com/maps/search/' + q + '/@' + cafe.lat + ',' + cafe.lng + ',17z'],
+    cafe.neshan_url ? ['نشان', 'neshan', cafe.neshan_url] : null,
+    ['بلد', 'balad', cafe.balad_url || 'https://balad.ir/location?latitude=' + cafe.lat + '&longitude=' + cafe.lng + '&zoom=17'],
   ].filter(Boolean)
   const shown = hover || mine || 0
 
@@ -70,7 +70,7 @@ export function CafeRating({ C, T, cafe, isChecked = false, noPlay = false, show
       )}
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid ' + T.hair }}>
         <span style={{ fontSize: 11, color: C.sub, flexShrink: 0 }}>نظر مردم در نقشه‌های دیگر:</span>
-        {links.map(l => <a key={l[0]} href={l[1]} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, textDecoration: 'none', background: C.card, border: '1px solid ' + T.hair, borderRadius: 99, padding: '3px 10px' }}>{l[0]} ↗</a>)}
+        {links.map(l => <a key={l[0]} href={l[2]} onClick={() => onOut && onOut(l[1])} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, textDecoration: 'none', background: C.card, border: '1px solid ' + T.hair, borderRadius: 99, padding: '3px 10px' }}>{l[0]} ↗</a>)}
       </div>
     </div>
   )
