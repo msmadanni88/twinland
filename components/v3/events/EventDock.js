@@ -14,8 +14,7 @@ import { EventArt } from '@/components/events/EventArt'
 import { useEventFeed } from '@/components/events/useEventFeed'
 import { artTone } from '@/lib/events/art'
 import { RARITY_TONE, districtLabel, faNum, timeLeft } from '@/lib/events/format'
-import { alpha } from '@/components/v2/theme'
-import { onColor } from '@/lib/theme/ui'
+import { alpha, mix } from '@/components/v2/theme'
 import { trackPlace } from '@/lib/track'
 
 // همان منحنی جهش بقیه سایت (دکمه‌ها و گره‌های نقشه) با همان زمان
@@ -23,8 +22,16 @@ const BOUNCE = 'cubic-bezier(.34,1.56,.64,1)'
 const UP_MS = 240
 const OUT_MS = 200
 const ROTATE_MS = 6000
+// اندازه‌ها. فاصله بین نشان‌ها، بین نشان‌ها و نوار، و بین نوار و داک پایین همه برابر DOCK_GAP است، در موبایل و دسکتاپ
+export const DOCK_GAP = 8
 export const DOCK_BAR_H = 29      // 27 × 1.05
-export const DOCK_TRAY_H = 82
+export const DOCK_BADGE_H = 72    // ارتفاع هر نشان. نسبت عرض به ارتفاع حدود 1.1 است و با اندازه صفحه عوض نمی‌شود
+const TRAY_TOP = 14               // جای بالا برای جهش و درخشش
+// بالا آمدن دکمه‌های کنار نقشه در موبایل: بالای بالاترین نشان به اضافه یک فاصله
+export const DOCK_RAIL_LIFT = DOCK_BAR_H + DOCK_GAP + DOCK_BADGE_H + DOCK_GAP - 2
+export const DOCK_SLOTS = { mobile: 4, desktop: 5 }
+// متن روی نشان اصلی همیشه سفید است و زمینه‌اش کمی تیره می‌شود تا روی هر رنگی خوانا بماند
+const hero = (tone) => 'linear-gradient(160deg,' + tone + ',' + mix(tone, '#000000', 0.3) + ')'
 
 function shortText(s, n) {
   const t = String(s || '')
@@ -36,11 +43,11 @@ function badgesFor(ev, max) {
   const t = timeLeft(ev.endsAt)
   const list = []
   list.push({ k: 'main', art: ev.artKey, label: ev.cafeName, sub: districtLabel(ev.district) || 'کافه', tone: artTone(ev.artKey), hero: true })
-  if (ev.rewardLabel) list.push({ k: 'reward', art: ev.discountPct > 0 ? null : 'gift', label: shortText(ev.rewardLabel, 18), sub: 'جایزه', tone: '#e0577a' })
+  if (ev.rewardLabel) list.push({ k: 'reward', art: ev.discountPct > 0 ? null : 'gift', label: shortText(ev.rewardLabel, 26), sub: 'جایزه', tone: '#e0577a' })
   if (ev.discountPct > 0) list.push({ k: 'disc', art: 'tag', label: faNum(ev.discountPct) + '٪', sub: 'تخفیف', tone: '#18a572' })
   if (t) list.push({ k: 'time', art: 'clock', label: t.text, sub: 'مانده', tone: t.urgent ? '#e5484d' : '#6b7a90' })
   if (ev.rewardXp > 0) list.push({ k: 'xp', art: 'star', label: '+' + faNum(ev.rewardXp), sub: 'XP', tone: '#e8a317' })
-  if (ev.collectible) list.push({ k: 'col', art: 'gem', label: shortText(ev.collectible.title || 'آیتم', 12), sub: 'آیتم', tone: RARITY_TONE[ev.collectible.rarity] || '#7c5cff' })
+  if (ev.collectible) list.push({ k: 'col', art: 'gem', label: shortText(ev.collectible.title || 'آیتم', 22), sub: 'آیتم', tone: RARITY_TONE[ev.collectible.rarity] || '#7c5cff' })
   if (ev.target > 1) list.push({ k: 'prog', art: 'pin', label: faNum(ev.target) + ' چک‌این', sub: 'مرحله', tone: '#3aa0e0' })
   // اگر جایزه تخفیف است، نشان تخفیف جای نشان جایزه را می‌گیرد و جایزه بعد از آن می‌آید
   return list.filter(b => b.art !== null).slice(0, max)
@@ -126,48 +133,51 @@ export function EventDock({ C, T, Lay, cafes, getPos, isMobile, onActiveCafeChan
     touchXRef.current = null
   }
 
-  const maxBadges = isMobile ? 4 : 5
-  const badges = badgesFor(ev, maxBadges)
+  const slots = isMobile ? DOCK_SLOTS.mobile : DOCK_SLOTS.desktop
+  const badges = badgesFor(ev, slots)
   const dots = events.length > 1 ? events.map((e, i) => i) : []
   const dotWin = dots.length > 7 ? dots.filter(i => Math.abs(i - safeIdx) <= 3) : dots
-  const bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.aboveDock - 4) + 'px)'
-  const outerStyle = isMobile
-    ? { position: 'absolute', left: Lay.gap, right: Lay.gap, bottom, zIndex: 40, pointerEvents: 'none' }
-    : { position: 'absolute', left: Lay.gap, right: rightInset, bottom, zIndex: 40, pointerEvents: 'none', display: 'flex', justifyContent: 'center', transition: 'right .35s ease' }
-  const innerStyle = isMobile ? { width: '100%' } : { width: '100%', maxWidth: 780 }
+  // نوار درست بالای داک پایین، با همان فاصله DOCK_GAP. کادر بیرونی همان کادر داک است، پس هر دو وسط‌چین و هم‌عرض می‌مانند.
+  const bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.dockBottom + Lay.dockH + DOCK_GAP) + 'px)'
+  const outerStyle = { position: 'absolute', left: Lay.gap, right: rightInset, bottom, zIndex: 40, pointerEvents: 'none', display: 'flex', justifyContent: 'center', transition: 'right .35s ease' }
+  const innerStyle = { width: Lay.dockW || '100%', maxWidth: '100%' }
+  // عرض هر نشان: اندازه ثابت از روی تعداد جایگاه‌ها. جایگاه‌ها کل عرض نوار و داک را پر می‌کنند، پس لبه‌ها با نوار هم‌خط است. با کمتر بودن نشان‌ها کشیده نمی‌شود.
+  const slotW = 'calc((100% - ' + (DOCK_GAP * (slots - 1)) + 'px) / ' + slots + ')'
 
   return (
     <div data-tut="event-banner" style={outerStyle}>
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes tl4Up{from{transform:translateY(${DOCK_TRAY_H + 16}px) scale(.92);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
-        @keyframes tl4Down{from{transform:translateY(0) scale(1);opacity:1}to{transform:translateY(${DOCK_TRAY_H + 16}px) scale(.94);opacity:0}}
+        @keyframes tl4Up{from{transform:translateY(${DOCK_BADGE_H + DOCK_GAP + 12}px) scale(.92);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+        @keyframes tl4Down{from{transform:translateY(0) scale(1);opacity:1}to{transform:translateY(${DOCK_BADGE_H + DOCK_GAP + 12}px) scale(.94);opacity:0}}
         .tl4-b{animation:tl4Up ${UP_MS}ms ${BOUNCE} both}
         .tl4-out .tl4-b{animation:tl4Down ${OUT_MS}ms ease-in both}
         .tl4-b{transition:transform .14s ${BOUNCE}}
         .tl4-b:active{transform:scale(.95)}
+        .tl4-l{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
       ` }} />
       <div style={innerStyle}>
-        {/* سینی نشان‌ها — از زیر نوار بالا می‌آید */}
+        {/* سینی نشان‌ها: از لبه بالای نوار بالا می‌آید. برش فقط لبه پایین است تا درخشش کناره‌ها بریده نشود */}
         <div className={phase === 'out' ? 'tl4-out' : ''} key={ev.id + ':' + phase}
           onPointerEnter={(e) => { if (e.pointerType === 'mouse') holdRef.current = true }} onPointerLeave={(e) => { if (e.pointerType === 'mouse') holdRef.current = false }}
           onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
-          style={{ position: 'relative', height: DOCK_TRAY_H + 22, paddingTop: 14, marginBottom: -12, overflow: 'hidden', display: 'flex', gap: isMobile ? 7 : 10, alignItems: 'flex-end', paddingBottom: 12, pointerEvents: 'auto',
+          style={{ position: 'relative', height: TRAY_TOP + DOCK_BADGE_H + DOCK_GAP, paddingTop: TRAY_TOP, boxSizing: 'border-box', clipPath: 'inset(-40px -40px 0px -40px)', display: 'flex', gap: DOCK_GAP, alignItems: 'flex-start', pointerEvents: 'auto',
             justifyContent: 'center' }}>
           {badges.map((b, i) => {
             const solid = b.hero
+            const long = String(b.label).length > 9
             return (
               <button key={b.k} className="tl4-b" onClick={openCafe} aria-label={b.sub + ': ' + b.label}
-                style={{ animationDelay: (phase === 'out' ? i * 25 : i * 55) + 'ms', flex: '1 1 0', minWidth: 0, maxWidth: isMobile ? 'none' : 128, height: DOCK_TRAY_H - 4, padding: '6px 4px 5px',
-                  borderRadius: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, fontFamily: 'inherit', cursor: 'pointer', position: 'relative',
-                  background: solid ? 'linear-gradient(160deg,' + b.tone + ',' + alpha(b.tone, 0.78) + ')' : T.glassStrong,
+                style={{ animationDelay: (phase === 'out' ? i * 25 : i * 55) + 'ms', flex: '0 0 ' + slotW, width: slotW, minWidth: 0, height: DOCK_BADGE_H, boxSizing: 'border-box', padding: '5px 3px 4px',
+                  borderRadius: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, fontFamily: 'inherit', cursor: 'pointer', position: 'relative',
+                  background: solid ? hero(b.tone) : T.glassStrong,
                   backdropFilter: T.blur, WebkitBackdropFilter: T.blur,
                   border: '1px solid ' + (solid ? alpha(b.tone, 0.9) : T.hair), boxShadow: solid ? T.glow(b.tone, 0.5) : T.shadow1,
-                  color: solid ? onColor(b.tone) : C.text }}>
-                <EventArt artKey={b.art} size={34} plate={!solid} tone={solid ? undefined : b.tone}
-                  style={solid ? { background: 'rgba(255,255,255,.9)', border: 'none', borderRadius: 14 } : undefined} />
-                <div style={{ fontSize: 12, fontWeight: 900, lineHeight: 1.2, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 2px' }}>{b.label}</div>
-                <div style={{ fontSize: 9.5, fontWeight: 700, lineHeight: 1, opacity: solid ? 0.85 : 0.7, color: solid ? 'inherit' : C.sub }}>{b.sub}</div>
-                {solid && ev.promo && <span style={{ position: 'absolute', top: 5, left: 6, fontSize: 8.5, fontWeight: 900, padding: '1px 6px', borderRadius: 99, background: 'rgba(255,255,255,.92)', color: '#2a2118' }}>ویژه</span>}
+                  color: solid ? '#ffffff' : C.text, textShadow: solid ? '0 1px 2px rgba(0,0,0,.35)' : 'none' }}>
+                <EventArt artKey={b.art} size={long ? 24 : 30} plate={!solid} tone={solid ? undefined : b.tone}
+                  style={solid ? { background: 'rgba(255,255,255,.92)', border: 'none', borderRadius: 12 } : undefined} />
+                <div className="tl4-l" style={{ fontSize: long ? 10 : 11, fontWeight: 900, lineHeight: 1.2, maxWidth: '100%', textAlign: 'center', padding: '0 2px', wordBreak: 'break-word' }}>{b.label}</div>
+                <div style={{ fontSize: 9, fontWeight: 700, lineHeight: 1, opacity: solid ? 0.9 : 0.7, color: solid ? 'inherit' : C.sub }}>{b.sub}</div>
+                {solid && ev.promo && <span style={{ position: 'absolute', top: -6, left: 6, fontSize: 8, fontWeight: 900, padding: '1px 5px', borderRadius: 99, background: 'rgba(255,255,255,.94)', color: '#2a2118', textShadow: 'none' }}>ویژه</span>}
               </button>
             )
           })}
