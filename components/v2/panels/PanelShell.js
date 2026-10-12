@@ -4,6 +4,7 @@
 // محتوای تب‌ها همان اجزای مشترک هستند.
 import { ClanTab } from '@/components/panels/ClanTab'
 import { DashboardTab } from '@/components/panels/DashboardTab'
+import { DashboardV3 } from '@/components/v3/dashboard/DashboardV3'
 import { MissionsTab } from '@/components/panels/MissionsTab'
 import { ProfileTab } from '@/components/panels/ProfileTab'
 import { RankTab } from '@/components/panels/RankTab'
@@ -18,7 +19,7 @@ const TABS = [
   { key: 'profile', label: L.profile, img: 'icon_profile' },
 ]
 
-export function PanelShell({ demoTabs = null, demoLeaders = null, C, T, Lay, cafes, checkedIn, coins, docked, filtered, highlightQuestId, levelInfo, live, panelOpen, panelTab, setPanelOpen, setPanelTab, setSearch, setSelCafe, setShowXP, showToast, streak, totalLive, userName, xp }) {
+export function PanelShell({ v3 = false, demoTabs = null, demoLeaders = null, C, T, Lay, cafes, checkedIn, coins, docked, filtered, highlightQuestId, levelInfo, live, panelOpen, panelTab, setPanelOpen, setPanelTab, setSearch, setSelCafe, setShowXP, showToast, streak, totalLive, userName, xp }) {
   const tabsRef = useDragScroll()
   if (!panelOpen) return null
   const frame = docked
@@ -54,8 +55,9 @@ export function PanelShell({ demoTabs = null, demoLeaders = null, C, T, Lay, caf
       </div>
       <div className="tl-vscroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: docked ? 0 : 'env(safe-area-inset-bottom, 0px)' }}>
         {demoTabs && (demoTabs[panelTab] || null)}
-        {!demoTabs && panelTab === 'dashboard' && <DashboardTab C={C} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP} />}
-        {!demoTabs && panelTab === 'missions' && <MissionsTab C={C} cafes={cafes} highlightQuestId={highlightQuestId} setSelCafe={setSelCafe} showToast={showToast} />}
+        {!demoTabs && panelTab === 'dashboard' && v3 && <DashboardV3 C={C} T={T} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} userName={userName} setShowXP={setShowXP} setSelCafe={setSelCafe} setPanelTab={setPanelTab} />}
+        {!demoTabs && panelTab === 'dashboard' && !v3 && <DashboardTab C={C} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP} />}
+        {!demoTabs && panelTab === 'missions' && <MissionsTab v3={v3} C={C} cafes={cafes} highlightQuestId={highlightQuestId} setSelCafe={setSelCafe} showToast={showToast} />}
         {!demoTabs && panelTab === 'rank' && <RankTab C={C} demoRows={demoLeaders} />}
         {!demoTabs && panelTab === 'clan' && <ClanTab C={C} />}
         {!demoTabs && panelTab === 'profile' && <ProfileTab C={C} xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn} userName={userName} coins={coins} />}

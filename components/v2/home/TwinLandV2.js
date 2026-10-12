@@ -4,7 +4,7 @@
 //  منطق همان hookهای مشترک نسخه v1.0 است؛ فقط چیدمان و ظاهر عوض شده:
 //  نقشه تمام‌صفحه، نوار فرمان و داک شناور، پنل شیشه‌ای، پین‌های فانوسی و پنجره تازه کافه.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { UIStyles } from '@/lib/theme/ui'
 import { getLevelInfo } from '@/lib/game/gameSystem'
 import { CITIES } from '@/lib/constants'
@@ -46,6 +46,8 @@ import { PanelShell } from '@/components/v2/panels/PanelShell'
 import { CafeSheet } from '@/components/v2/cafe/CafeSheet'
 import { useHexFog } from '@/components/v3/map/useHexFog'
 import { V3_FLAGS } from '@/components/v3/flags'
+import { useEventFeed } from '@/components/events/useEventFeed'
+import { DOCK_BAR_H, DOCK_TRAY_H } from '@/components/v3/events/EventDock'
 import { HudSquares } from '@/components/v3/home/HudSquares'
 import { useDemoSim } from '@/components/v3/demo/useDemoSim'
 import { DemoLayer } from '@/components/v3/demo/DemoLayer'
@@ -152,6 +154,12 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   const compact = hexFog && V3_FLAGS.compactMobileHud && isMobile
   const showLed = !hexFog || V3_FLAGS.ledBar
   const bannerBottom = hexFog && V3_FLAGS.bottomEventBar ? (isMobile ? (compact ? 'mobile' : null) : 'desktop') : null
+  // نوار رویداد تازه (v3.0): خوراک رویدادها یک بار گرفته می‌شود و با نوار پایین مشترک است
+  const eventWidgets = !!(bannerBottom && V3_FLAGS.eventWidgets)
+  const getPos = useCallback(() => { try { const c = mapInst.current && mapInst.current.getCenter(); return c ? { lat: c.lat, lng: c.lng } : null } catch (e) { return null } }, [mapInst])
+  const dockFeed = useEventFeed({ slot: 'bar', limit: 12, getPos, enabled: eventWidgets })
+  // دکمه‌های کنار نقشه روی موبایل بالاتر می‌روند تا زیر نوار تمام‌عرض نمانند
+  const railLift = eventWidgets && isMobile && dockFeed.events.length > 0 ? DOCK_BAR_H + DOCK_TRAY_H + 6 : 0
   const questCount = useMemo(() => cafes.filter(c => c.active_quest).length, [cafes])
   // کافه‌دار بودن: گزینه‌های مالکیت کافه فقط برای حساب کافه‌دار و مالک اپ دیده می‌شود
   const isBiz = accountType === 'sme'
@@ -201,9 +209,9 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
 
       <ZoneChips C={C} T={T} Lay={Lay} compact={compact} open={filtersOpen} goZone={goZone} isMobile={isMobile} rightInset={rightInset} search={search} setSearch={setSearch} zone={zone} />
 
-      <HudOverlays C={C} T={T} Lay={Lay} bannerBottom={bannerBottom} compact={compact} filtersOpen={filtersOpen} cafes={cafes} checkedIn={checkedIn} clearRegionFilter={clearRegionFilter} filterApplied={filterApplied} filtered={filtered} isMobile={isMobile} regionResults={regionResults} rightInset={rightInset} selectedRegions={selectedRegions} setActiveEventCafeId={setActiveEventCafeId} setSelCafe={setSelCafe} setShowRegionFilter={setShowRegionFilter} setShowRegionResults={setShowRegionResults} showRegionFilter={showRegionFilter} showRegionResults={showRegionResults} streak={streak} totalLive={totalLive} />
+      <HudOverlays C={C} T={T} Lay={Lay} bannerBottom={bannerBottom} eventWidgets={eventWidgets} getPos={getPos} compact={compact} filtersOpen={filtersOpen} cafes={cafes} checkedIn={checkedIn} clearRegionFilter={clearRegionFilter} filterApplied={filterApplied} filtered={filtered} isMobile={isMobile} regionResults={regionResults} rightInset={rightInset} selectedRegions={selectedRegions} setActiveEventCafeId={setActiveEventCafeId} setSelCafe={setSelCafe} setShowRegionFilter={setShowRegionFilter} setShowRegionResults={setShowRegionResults} showRegionFilter={showRegionFilter} showRegionResults={showRegionResults} streak={streak} totalLive={totalLive} />
 
-      <MapToolRail C={C} T={T} Lay={Lay} city={city} hidden={anySheet} isMobile={isMobile} mapInst={mapInst} navOpen={navOpen} panMap={panMap} setNavOpen={setNavOpen} setShowBoundary={setShowBoundary} setShowCity={setShowCity} setShowMode={setShowMode} setShowPalette={setShowPalette} />
+      <MapToolRail C={C} T={T} Lay={Lay} liftBy={railLift} city={city} hidden={anySheet} isMobile={isMobile} mapInst={mapInst} navOpen={navOpen} panMap={panMap} setNavOpen={setNavOpen} setShowBoundary={setShowBoundary} setShowCity={setShowCity} setShowMode={setShowMode} setShowPalette={setShowPalette} />
 
       {compact && !anySheet && (
         <HudSquares C={C} T={T} Lay={Lay} filterActive={zone !== 'all' || !!search} filtersOpen={filtersOpen} hex={hex} questCount={questCount} rightInset={rightInset} setFiltersOpen={setFiltersOpen} streak={streak}
@@ -230,7 +238,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
 
       <Dock C={C} T={T} Lay={Lay} isMobile={isMobile} panelOpen={panelOpen} panelTab={panelTab} rightInset={rightInset} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setTab={setTab} />
 
-      <PanelShell demoTabs={demoTabs} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
+      <PanelShell v3={eventWidgets || (hexFog && !!V3_FLAGS.eventWidgets)} demoTabs={demoTabs} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
 
       {selCafe && <CafeSheet noPlay={isBiz && !effAdmin} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
       {showXP && <XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}

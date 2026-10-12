@@ -4,10 +4,11 @@ import { SB_KEY, SB_URL } from '@/lib/config'
 import { ICON, L, ROUTE } from '@/lib/theme/labels'
 import { onColor } from '@/lib/theme/ui'
 import { getSession, subscribeToChanges, subscribeToTables } from '@/lib/game/gameSystem'
+import { EventArt } from '@/components/events/EventArt'
 
 // ── MISSIONS TAB — حالا کاملاً واقعی: از quests واقعی می‌خونه، claim تکراری امکان نداره ──
 // highlightQuestId: از کلیک روی حباب کمپین روی نقشه می‌آد — همون کارت رو هایلایت و اسکرول می‌کنیم
-export function MissionsTab({C, cafes, highlightQuestId, setSelCafe, showToast}) {
+export function MissionsTab({v3=false, C, cafes, highlightQuestId, setSelCafe, showToast}) {
   const [quests, setQuests] = useState([])
   const [progress, setProgress] = useState({})
   const [redemptions, setRedemptions] = useState({})
@@ -81,7 +82,12 @@ export function MissionsTab({C, cafes, highlightQuestId, setSelCafe, showToast})
         const hl=String(q.id)===String(highlightQuestId)
         return <div key={q.id} id={'quest-'+q.id} style={{background:isDone?C.green+'18':C.card,border:'1px solid '+(hl?C.accent:(isDone?C.green+'55':C.border)),borderRadius:14,padding:12,boxShadow:hl?('0 0 0 3px '+C.accent+'33'):'none',transition:'box-shadow .3s,border-color .3s'}}>
           <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-            <div style={{width:40,height:40,borderRadius:12,flexShrink:0,background:isDone?C.green+'20':C.accent+'15',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{isDone?'✅':(q.icon||'🎯')}</div>
+            {v3
+              ? <div style={{position:'relative',flexShrink:0}}>
+                  <EventArt ev={q} size={44} />
+                  {isDone && <span style={{position:'absolute',right:-4,bottom:-4,width:18,height:18,borderRadius:'50%',background:C.green,color:'#fff',fontSize:11,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center'}}>✓</span>}
+                </div>
+              : <div style={{width:40,height:40,borderRadius:12,flexShrink:0,background:isDone?C.green+'20':C.accent+'15',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>{isDone?'✅':(q.icon||'🎯')}</div>}
             <div style={{flex:1,minWidth:0}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div style={{fontSize:13,fontWeight:700,color:C.text}}>{q.title}</div>

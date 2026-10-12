@@ -8,6 +8,9 @@ import { SB_URL, SB_KEY } from '@/lib/config'
 import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
 import { L, ICON, fa } from '@/lib/theme/labels'
 import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
+import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { V3_FLAGS } from '@/components/v3/flags'
+import { EventArt } from '@/components/events/EventArt'
 
 // «عمومی» عمداً حذف شد — دیگه ماموریت/رویداد بدون دسته نداریم.
 // اگه ماموریت قدیمی‌ای هنوز category='general' داشته باشه، به‌جای اینکه ناپدید
@@ -31,6 +34,8 @@ function diffParts(target) {
 }
 
 export default function QuestsPage() {
+  const { active: uiActive } = useUiVersion()
+  const v3 = uiActive === 'v3.0' && !!V3_FLAGS.eventWidgets   // تصویر ویجت به‌جای ایموجی، فقط در v3.0
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [quests, setQuests] = useState([])
   const [progress, setProgress] = useState({})
@@ -142,7 +147,7 @@ export default function QuestsPage() {
           {tab === 'active' && (
             shown.length === 0
               ? <div style={{ textAlign: 'center', color: C.sub, fontSize: 13, padding: '40px 0' }}>الان ماموریت فعالی نیست. سر بزن یه وقت دیگه ☕</div>
-              : shown.map(({ q, done }, i) => <QuestCard key={q.id} C={C} q={q} prog={progress[q.id]} done={done} idx={i} tick={tick} />)
+              : shown.map(({ q, done }, i) => <QuestCard key={q.id} v3={v3} C={C} q={q} prog={progress[q.id]} done={done} idx={i} tick={tick} />)
           )}
           {tab === 'rewards' && (
             redemptions.length === 0
@@ -176,7 +181,7 @@ function Countdown({ C, endsAt }) {
   )
 }
 
-function QuestCard({ C, q, prog, done, idx, tick }) {
+function QuestCard({ v3 = false, C, q, prog, done, idx, tick }) {
   const cur = prog ? prog.progress : 0
   const target = q.target_count || 1
   const pctv = done ? 100 : Math.min(100, Math.round((cur / target) * 100))
@@ -194,9 +199,11 @@ function QuestCard({ C, q, prog, done, idx, tick }) {
       {!done && <div style={{ position: 'absolute', top: 0, bottom: 0, width: '45%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.10),transparent)', animation: 'qShine 4s ease-in-out infinite', pointerEvents: 'none' }} />}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, position: 'relative' }}>
-        <div style={{ width: 46, height: 46, borderRadius: 14, background: done ? GREEN + '22' : C.accent + '1e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
-          {done ? '✅' : (q.icon || '🎯')}
-        </div>
+        {v3
+          ? <EventArt ev={q} size={52} tone={done ? GREEN : undefined} />
+          : <div style={{ width: 46, height: 46, borderRadius: 14, background: done ? GREEN + '22' : C.accent + '1e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
+              {done ? '✅' : (q.icon || '🎯')}
+            </div>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14.5, fontWeight: 900, color: C.text, textDecoration: done ? 'line-through' : 'none', textDecorationColor: GREEN + '99' }}>{q.title}</div>
           <div style={{ fontSize: 11, color: C.sub, marginTop: 1 }}>☕ {cafeName}{district ? ' · ' + district : ''}</div>

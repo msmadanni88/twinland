@@ -9,6 +9,22 @@ import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
 import { CafeContentEditor } from '@/components/business/CafeContentEditor'
 import { useUiVersion } from '@/components/ui/UiVersionProvider'
 import { BusinessApp } from '@/components/v3/business/BusinessApp'
+import { V3_FLAGS } from '@/components/v3/flags'
+import { EventArt } from '@/components/events/EventArt'
+import { ArtPicker } from '@/components/events/ArtPicker'
+
+// ثبت تصویر ویجت یک رویداد. شکستش نباید ساخت کمپین را خراب کند
+async function saveQuestArt(questId, artKey) {
+  const s = getSession()
+  if (!s || !s.access_token || !questId || !artKey) return false
+  try {
+    const r = await fetch(SB_URL + '/rest/v1/rpc/set_quest_art', {
+      method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_quest_id: questId, p_art_key: artKey }),
+    }).then(x => x.json())
+    return !!(r && r.ok)
+  } catch (e) { return false }
+}
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 const WEEKDAYS = ['شنبه', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'جمعه']
@@ -439,6 +455,9 @@ const CATEGORY_LABEL = { general: 'عمومی', drink: 'نوشیدنی', food: '
 const CATEGORY_ICON = { general: '🎯', drink: '☕', food: '🍰', discount: '🏷️', event: '🎉', collectible: '💎' }
 
 function TabCampaigns({ C, d, biz, isPending, onReload }) {
+  const { active: uiActive } = useUiVersion()
+  const v3 = uiActive === 'v3.0' && !!V3_FLAGS.eventWidgets
+  const [artFor, setArtFor] = useState(null)   // شناسه رویدادی که انتخابگر تصویرش باز است
   const [showForm, setShowForm] = useState(false)
   const [redeemInput, setRedeemInput] = useState('')
   const [redeemMsg, setRedeemMsg] = useState(null)
@@ -509,13 +528,20 @@ function TabCampaigns({ C, d, biz, isPending, onReload }) {
       return (
         <div key={q.id} style={{ background: C.chip, borderRadius: 14, padding: 14, marginBottom: 10, opacity: q.active ? 1 : 0.55 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div style={{ fontSize: 22 }}>{q.icon || '🎯'}</div>
+            {v3
+              ? <button type="button" onClick={() => setArtFor(artFor === q.id ? null : q.id)} title="تغییر تصویر" aria-label="تغییر تصویر ویجت" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}><EventArt ev={q} size={44} /></button>
+              : <div style={{ fontSize: 22 }}>{q.icon || '🎯'}</div>}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 800 }}>{q.title}</div>
               <div style={{ fontSize: 11, color: C.sub }}>{q.reward_label}{q.reward_xp > 0 ? ' · +' + fa(q.reward_xp) + ' XP' : ''}</div>
             </div>
             <button disabled={busy} onClick={() => toggleActive(q)} style={{ fontSize: 10, fontWeight: 700, border: 'none', borderRadius: 8, padding: '6px 10px', background: q.active ? '#10b98122' : C.border, color: q.active ? '#10b981' : C.sub }}>{q.active ? 'فعال' : 'غیرفعال'}</button>
           </div>
+          {v3 && artFor === q.id && (
+            <div style={{ marginBottom: 10 }}>
+              <ArtPicker C={C} category={q.category} value={q.art_key || ''} onChange={async (k) => { if (k) { await saveQuestArt(q.id, k); onReload && onReload() } setArtFor(null) }} />
+            </div>
+          )}
           {q.reward_collectible_code && (
             <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>🎁 جایزه‌ی کلکسیونی متصل به این کمپینه</div>
           )}
@@ -535,7 +561,10 @@ function TabCampaigns({ C, d, biz, isPending, onReload }) {
 }
 
 function NewQuestForm({ C, biz, onDone }) {
+  const { active: uiActive } = useUiVersion()
+  const v3 = uiActive === 'v3.0' && !!V3_FLAGS.eventWidgets
   const [f, setF] = useState({
+    art_key: '',
     title: '', description: '', icon: '🎯', condition_type: 'checkin', target_count: 1,
     reward_label: '', reward_xp: 0, collectible_title: '', collectible_icon: '💎', collectible_rarity: 'common',
     category: 'general', discount_pct: '',
@@ -560,7 +589,11 @@ function NewQuestForm({ C, biz, onDone }) {
       }),
     }).then(r => r.json()).catch(() => null)
     setBusy(false)
-    if (res && res.ok) onDone && onDone()
+    if (res && res.ok) {
+      // تصویر ویجت: اگر انتخاب شده بود ثبت می‌شود. اگر نشد، رویداد با تصویر خودکار (از روی دسته‌بندی) ساخته شده می‌ماند
+      if (v3 && f.art_key && res.quest_id) await saveQuestArt(res.quest_id, f.art_key)
+      onDone && onDone()
+    }
     else {
       const em = {
         not_owner: 'این کافه متعلق به حساب تو نیست',
@@ -590,6 +623,11 @@ function NewQuestForm({ C, biz, onDone }) {
           <button key={k} onClick={() => set('category', k)} style={{ padding: '7px 12px', borderRadius: 9, border: 'none', background: f.category === k ? C.accent : C.chip, color: f.category === k ? '#fff' : C.sub, fontSize: 11.5, fontWeight: 700 }}>{CATEGORY_ICON[k]} {CATEGORY_LABEL[k]}</button>
         ))}
       </div>
+
+      {v3 && <>
+        <label style={labelStyle}>تصویر ویجت (روی نوار رویداد نقشه و داشبورد کاربرها نشان داده می‌شود)</label>
+        <div style={{ marginBottom: 10 }}><ArtPicker C={C} category={f.category} value={f.art_key} onChange={(k) => set('art_key', k)} /></div>
+      </>}
 
       <label style={labelStyle}>درصد تخفیف (اختیاری — اگه رویداد تخفیفیه)</label>
       <input style={inputStyle} type="number" min={0} max={100} value={f.discount_pct} onChange={e => set('discount_pct', e.target.value)} placeholder="مثلاً ۱۰" />

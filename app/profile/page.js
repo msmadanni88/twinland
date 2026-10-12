@@ -8,6 +8,9 @@ import {
 } from '@/lib/game/gameSystem'
 import { L, ICON, fa as faNum } from '@/lib/theme/labels'
 import { UIStyles, useDragScroll, hscroll, onColor, isDarkC } from '@/lib/theme/ui'
+import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { V3_FLAGS } from '@/components/v3/flags'
+import { EventArt } from '@/components/events/EventArt'
 
 // مدال‌های محاسبه‌شده از آمار واقعی (fallback وقتی جدول awards هنوز پر نشده)
 const BADGE_DEFS = [
@@ -62,6 +65,9 @@ function faDateTime(iso) {
 }
 
 export default function ProfilePage() {
+  const { active: uiActive } = useUiVersion()
+  const v3 = uiActive === 'v3.0' && !!V3_FLAGS.eventWidgets   // تاریخچه رویدادها با تصویر ویجت، فقط در v3.0
+  const [questDone, setQuestDone] = useState([])
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [tab, setTab] = useState('badges')
   const [histFilter, setHistFilter] = useState('all')
@@ -124,6 +130,10 @@ export default function ProfilePage() {
     const reloadClanHist=()=>fetch(SB_URL + '/rest/v1/clan_history?user_id=eq.' + uid + '&select=*&order=created_at.desc&limit=100', { headers: h })
       .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setClanHistory(rows) }).catch(() => {})
     reloadClanHist()
+    // رویدادهایی که کامل کرده‌ای، با تصویر و جایزه‌شان (برای تاریخچه v3.0)
+    const reloadQuestDone = () => fetch(SB_URL + '/rest/v1/quest_progress?user_id=eq.' + uid + '&completed=eq.true&select=quest_id,completed_at,updated_at,quests(title,icon,art_key,category,reward_label,reward_xp,discount_pct,cafes(name,district))&order=updated_at.desc&limit=100', { headers: h })
+      .then(r => r.json()).then(rows => { if (alive && Array.isArray(rows)) setQuestDone(rows) }).catch(() => {})
+    reloadQuestDone()
 
     // realtime: پروفایل، بج‌ها، تاریخچه و چک‌این‌ها لحظه‌ای آپدیت شن
     const reloadCheckins = loadCheckins
@@ -139,7 +149,7 @@ export default function ProfilePage() {
     ],(p)=>{
       if(!alive) return
       if(p.table==='profiles' && p.record) setProfile(prev => ({ ...(prev || {}), ...p.record }))
-      if(p.table==='xp_history') fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) })
+      if(p.table==='xp_history') { fetchXpHistory(sess).then(rows => { if (alive) setXpHistory(rows) }); reloadQuestDone() }
       if(p.table==='awards') fetchAwards(sess).then(rows => { if (alive) setAwards(rows) })
       if(p.table==='checkins') reloadCheckins()
       if(p.table==='clan_history') reloadClanHist()
@@ -208,6 +218,7 @@ export default function ProfilePage() {
       const isQuest = h.reason === 'quest'
       const isCheckin = h.reason === 'checkin' || h.reason === 'checkin_first'
       if (isCheckin) return
+      if (isQuest && v3 && questDone.length > 0) return   // در v3.0 رویدادها از quest_progress می‌آیند، با تصویر
       items.push({
         cat: isQuest ? 'quest' : 'xp',
         icon: isQuest ? '🎯' : '⭐',
@@ -218,6 +229,20 @@ export default function ProfilePage() {
         xp: h.amount || 0,
       })
     })
+    // رویدادهای کامل‌شده با تصویر ویجت (v3.0)
+    if (v3) {
+      questDone.forEach(qd => {
+        const q = qd.quests
+        if (!q) return
+        const cf = q.cafes || {}
+        items.push({
+          cat: 'quest', icon: '🎯', q, ts: qd.completed_at || qd.updated_at,
+          title: q.title,
+          sub: [cf.name, cf.district ? 'منطقه ' + cf.district : '', q.reward_label ? '🎁 ' + q.reward_label : ''].filter(Boolean).join(' · '),
+          xp: q.reward_xp || 0,
+        })
+      })
+    }
     // تاریخچه‌ی کلن (عضو شدن/ترک/ساخت)
     const CLAN_EVENT = {
       joined: ['🛡️', 'عضو کلن شدی'], left: ['🚪', 'کلن رو ترک کردی'],
@@ -380,7 +405,7 @@ export default function ProfilePage() {
                 </div>
               ) : filteredTimeline.map((it, i) => (
                 <div key={i} className="tl-row" style={S.historyItem}>
-                  <div style={S.historyIcon}>{it.icon}</div>
+                  {it.q ? <EventArt ev={it.q} size={40} style={{ flexShrink: 0 }} /> : <div style={S.historyIcon}>{it.icon}</div>}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={S.historyCafe}>{it.title}</div>
                     {it.sub && <div style={S.historyArea}>{it.sub}</div>}

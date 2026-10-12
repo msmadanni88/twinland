@@ -3,7 +3,7 @@
 // پوسته نقشه، مرزها، پالت، شهر در موبایل، و کنترل جابه‌جایی و بزرگ‌نمایی.
 import { CITIES } from '@/lib/constants'
 
-export function MapToolRail({ C, T, Lay, city, hidden, isMobile, mapInst, navOpen, panMap, setNavOpen, setShowBoundary, setShowCity, setShowMode, setShowPalette }) {
+export function MapToolRail({ C, T, Lay, city, hidden, liftBy = 0, isMobile, mapInst, navOpen, panMap, setNavOpen, setShowBoundary, setShowCity, setShowMode, setShowPalette }) {
   if (hidden) return null
   const btn = {
     width: 44, height: 44, borderRadius: 14, border: '1px solid ' + T.hair, padding: 0,
@@ -14,7 +14,7 @@ export function MapToolRail({ C, T, Lay, city, hidden, isMobile, mapInst, navOpe
   const small = { ...btn, width: 38, height: 38, borderRadius: 12, fontSize: 15 }
   const recenter = () => { const c = CITIES[city]; mapInst.current?.flyTo([c.lat, c.lng], c.zoom) }
   return (
-    <div style={{ position: 'absolute', left: Lay.gap, bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + Lay.aboveDock + 'px)', zIndex: 60,
+    <div style={{ position: 'absolute', left: Lay.gap, bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.aboveDock + liftBy) + 'px)', zIndex: 60, transition: 'bottom .3s cubic-bezier(.34,1.56,.64,1)',
       display: 'flex', alignItems: 'flex-end', gap: 8, animation: 'tl2Slide .5s .1s both cubic-bezier(.2,.9,.3,1)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button className="tl2-press" title="پوسته نقشه" aria-label="پوسته نقشه" onClick={() => setShowMode(true)} style={btn}>{img('/map_skin.svg', 'پوسته نقشه')}</button>

@@ -2,13 +2,14 @@
 // لایه اطلاعات روی نقشه — نسخه v2.0
 // آمار زنده، نوار رویدادها، استریک و دکمه‌های فیلتر منطقه؛ همه زیر ردیف منطقه‌ها.
 import { EventBanner } from '@/components/map/EventBanner'
+import { EventDock } from '@/components/v3/events/EventDock'
 import { L, ICON } from '@/lib/theme/labels'
 import { onColor } from '@/lib/theme/ui'
 import { alpha } from '@/components/v2/theme'
 
 // compact و filtersOpen فقط در چیدمان تازه موبایل نسخه v3.0 داده می‌شوند
 // bannerBottom: 'mobile' یا 'desktop' یعنی نوار رویدادها پایین صفحه بنشیند، جای نوار LED
-export function HudOverlays({ C, T, Lay, bannerBottom = null, compact = false, filtersOpen = false, cafes, checkedIn, clearRegionFilter, filterApplied, filtered, isMobile, regionResults, rightInset, selectedRegions, setActiveEventCafeId, setSelCafe, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults, streak, totalLive }) {
+export function HudOverlays({ C, T, Lay, bannerBottom = null, eventWidgets = false, getPos, compact = false, filtersOpen = false, cafes, checkedIn, clearRegionFilter, filterApplied, filtered, isMobile, regionResults, rightInset, selectedRegions, setActiveEventCafeId, setSelCafe, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults, streak, totalLive }) {
   // جمع‌وجور: آمار زنده کنار دکمه فیلتر می‌نشیند؛ وقتی ردیف جستجو باز است یک ردیف پایین‌تر
   const top = 'calc(env(safe-area-inset-top, 0px) + ' + (compact ? (filtersOpen ? Lay.hudTop : Lay.chipsTop + 6) : Lay.hudTop) + 'px)'
   // در موبایل جا کم است: آمار زنده ردیف اول، نوار رویدادها ردیف دوم
@@ -45,6 +46,9 @@ export function HudOverlays({ C, T, Lay, bannerBottom = null, compact = false, f
     </div>
 
     {/* نوار رویدادها — بالا سمت چپ؛ جزء مشترک، فقط جایش در v2 عوض شده */}
+    {eventWidgets && bannerBottom ? (
+      <EventDock C={C} T={T} Lay={Lay} cafes={cafes} getPos={getPos} isMobile={isMobile} onActiveCafeChange={setActiveEventCafeId} rightInset={rightInset} setSelCafe={setSelCafe} />
+    ) : (
     <div style={bannerBottom === 'desktop'
       ? { position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.aboveDock + 52) + 'px)', left: 0, right: rightInset, height: 0, zIndex: 40, transition: 'right .35s ease', animation: 'tl2Fade .5s .2s both' }
       : bannerBottom === 'mobile'
@@ -53,6 +57,7 @@ export function HudOverlays({ C, T, Lay, bannerBottom = null, compact = false, f
       <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe} onActiveCafeChange={setActiveEventCafeId}
         rootStyle={bannerBottom === 'desktop' ? { left: '50%', transform: 'translateX(-50%)', alignItems: 'center', maxWidth: 'min(620px, 46vw)', width: 'max-content' } : null} />
     </div>
+    )}
 
     {/* دکمه‌های فیلتر منطقه */}
     {selectedRegions.length > 0 && !showRegionFilter && (

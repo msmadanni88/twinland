@@ -9,4 +9,7 @@ export const V3_FLAGS = {
   bottomEventBar: true,
   // true → نوار امتیاز بالای صفحه رنگی و کشیده‌تر. false → همان نوار ساده v2.0
   prominentXp: true,
+  // true → نوار رویداد تازه با ویجت‌های زیرش (components/v3/events/EventDock.js) و داشبورد تازه (components/v3/dashboard).
+  // false → نوار رویداد قبلی و داشبورد قبلی. بقیه چیزها (صفحه ماموریت‌ها، تاریخچه، پنل کافه‌دار) هم به همین کلید وصل است.
+  eventWidgets: true,
 }
