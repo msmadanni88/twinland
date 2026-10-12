@@ -47,7 +47,7 @@ import { CafeSheet } from '@/components/v2/cafe/CafeSheet'
 import { useHexFog } from '@/components/v3/map/useHexFog'
 import { V3_FLAGS } from '@/components/v3/flags'
 import { useEventFeed } from '@/components/events/useEventFeed'
-import { DOCK_BAR_H, DOCK_TRAY_H } from '@/components/v3/events/EventDock'
+import { DOCK_RAIL_LIFT } from '@/components/v3/events/EventDock'
 import { HudSquares } from '@/components/v3/home/HudSquares'
 import { useDemoSim } from '@/components/v3/demo/useDemoSim'
 import { DemoLayer } from '@/components/v3/demo/DemoLayer'
@@ -159,7 +159,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   const getPos = useCallback(() => { try { const c = mapInst.current && mapInst.current.getCenter(); return c ? { lat: c.lat, lng: c.lng } : null } catch (e) { return null } }, [mapInst])
   const dockFeed = useEventFeed({ slot: 'bar', limit: 12, getPos, enabled: eventWidgets })
   // دکمه‌های کنار نقشه روی موبایل بالاتر می‌روند تا زیر نوار تمام‌عرض نمانند
-  const railLift = eventWidgets && isMobile && dockFeed.events.length > 0 ? DOCK_BAR_H + DOCK_TRAY_H + 6 : 0
+  const railLift = eventWidgets && isMobile && dockFeed.events.length > 0 ? DOCK_RAIL_LIFT : 0
   const questCount = useMemo(() => cafes.filter(c => c.active_quest).length, [cafes])
   // کافه‌دار بودن: گزینه‌های مالکیت کافه فقط برای حساب کافه‌دار و مالک اپ دیده می‌شود
   const isBiz = accountType === 'sme'
@@ -224,7 +224,9 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
       {showConsole && <DemoConsole C={C} demo={demo} onClose={() => setShowConsole(false)} onCafe={demoOpenCafe} />}
 
       {hexFog && !compact && !mapLoading && !demo.on && (
-        <div className="tl3-explore" style={{ position: 'absolute', left: Lay.gap, top: Lay.hudTop + (bannerBottom ? 0 : 78), zIndex: 55, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderRadius: 99, padding: '5px 11px', fontSize: 11, fontWeight: 800, color: C.text, boxShadow: T.shadow1 || T.shadow2, pointerEvents: 'none', maxWidth: 'calc(100vw - 24px)' }}>
+        <div className="tl3-explore" style={{ position: 'absolute', left: Lay.gap, top: isMobile ? Lay.hudTop + (bannerBottom ? 0 : 78) : 'calc(env(safe-area-inset-top, 0px) + ' + (Lay.chipsTop + (Lay.chipsH - (Lay.chipsH - 4)) / 2) + 'px)', zIndex: 55, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderRadius: 99, padding: '5px 11px', fontSize: 11, fontWeight: 800, color: C.text, boxShadow: T.shadow1 || T.shadow2, pointerEvents: 'none', maxWidth: 'calc(100vw - 24px)',
+          // دسکتاپ: هم‌تراز ردیف منطقه‌ها بالای نقشه، با همان ارتفاع و حدود 20 درصد پهن‌تر
+          ...(isMobile ? null : { height: Lay.chipsH - 4, boxSizing: 'border-box', minWidth: 228, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, padding: '0 16px' }) }}>
           {hex.open === 0
             ? '🧭 اولین چک‌این، پایگاهت را می‌سازد'
             : '🧭 کشف نقشه: ' + hex.found.toLocaleString('fa') + ' از ' + hex.total.toLocaleString('fa') + ' خانه'}
