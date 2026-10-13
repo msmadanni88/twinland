@@ -19,7 +19,8 @@ const PAGES = [['about', 'درباره'], ['gallery', 'گالری'], ['menu', '�
 
 // canClaim: دکمه «صاحب این کافه هستید؟» فقط برای حساب کافه‌دار؛ مالک اپ همیشه دکمه مدیریت مستقیم را دارد
 // noPlay: حساب کسب‌وکار بازی نمی‌کند، پس دکمه چک‌این ندارد
-export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, favs, setFavs, checkedIn, isAdmin, onClose, onCheckin, showToast }) {
+// checkedToday فقط در v3.0: دکمه چک‌این فقط برای امروز قفل می‌شود، نه برای همیشه، تا بازدید دوباره و ماموریت وفاداری ممکن باشد
+export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, favs, setFavs, checkedIn, checkedToday = null, isAdmin, onClose, onCheckin, showToast }) {
   const [wide, setWide] = useState(false)
   const [page, setPage] = useState('about')
   useEffect(() => { setPage('about') }, [cafe.id])
@@ -33,9 +34,11 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
 
   const d = useCafeSheetData({ cafe, favs, setFavs, showToast })
   const color = getColor(cafe.name)
-  const isChecked = checkedIn.has(cafe.id)
+  const isChecked = checkedToday ? checkedToday.has(cafe.id) : checkedIn.has(cafe.id)
+  const beenBefore = !!checkedToday && !isChecked && checkedIn.has(cafe.id)
   const isFav = favs.has(cafe.id)
-  const xpAmount = cafe.is_top ? XP_CONFIG.checkin_top : XP_CONFIG.checkin
+  // v3.0 همان عددهای سرور را نشان می‌دهد: 50 برای هر چک‌این و 30 اضافه برای اولین بار در این مکان
+  const xpAmount = checkedToday ? (checkedIn.has(cafe.id) ? 50 : 80) : (cafe.is_top ? XP_CONFIG.checkin_top : XP_CONFIG.checkin)
   const liveNow = live[cafe.id] || 0
   const heroH = wide ? 168 : 150
   const where = cafe.description || cafe.address || cafe.district
@@ -108,6 +111,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '12px 18px 0' }}>
             {cafe.is_top && <span style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 900, background: C.gold, color: onColor(C.gold) }}>★ کافه برتر</span>}
             {isChecked && <span style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', fontSize: 11.5, fontWeight: 900, background: alpha(C.green, 0.16), color: C.green }}>✓ امروز اینجا بودی</span>}
+            {beenBefore && <span style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', fontSize: 11.5, fontWeight: 900, background: alpha(C.accent, 0.14), color: C.accent }}>↺ قبلاً آمده‌ای</span>}
             {(cafe.tags || []).map(t => <span key={t} style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', fontSize: 11.5, fontWeight: 700, background: T.chip, color: C.text, border: '1px solid ' + T.hair }}>{t}</span>)}
           </div>
 
@@ -143,7 +147,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
                 <div style={tile}>
                   <span style={{ fontSize: 22 }}>{ICON.checkin}</span>
                   <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 15, fontWeight: 900, color: isChecked ? C.green : C.text }}>{isChecked ? 'رفتی!' : '+' + xpAmount + ' ' + L.xp}</span>
+                    <span style={{ display: 'block', fontSize: 15, fontWeight: 900, color: isChecked ? C.green : C.text }}>{isChecked ? (checkedToday ? 'امروز رفتی' : 'رفتی!') : '+' + Number(xpAmount).toLocaleString('fa') + ' ' + L.xp}</span>
                     <span style={{ display: 'block', fontSize: 11, color: C.sub }}>پاداش {L.checkin}</span>
                   </span>
                 </div>
@@ -206,7 +210,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
             style={{ width: '100%', height: 54, border: 'none', borderRadius: 18, fontSize: 16, fontWeight: 900,
               background: isChecked ? alpha(C.green, 0.18) : T.grad, color: isChecked ? C.green : T.onAccent,
               boxShadow: isChecked ? 'none' : T.glow(C.accent, 0.6), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            {isChecked ? '✅ امروز ' + L.checkin + ' کردی' : <>{ICON.checkin} {L.checkin} <span style={{ fontSize: 12.5, fontWeight: 900, padding: '3px 9px', borderRadius: 99, background: alpha(T.onAccent, 0.16) }}>+{xpAmount} {L.xp}</span></>}
+            {isChecked ? '✅ امروز ' + L.checkin + ' کردی' : <>{ICON.checkin} {L.checkin} <span style={{ fontSize: 12.5, fontWeight: 900, padding: '3px 9px', borderRadius: 99, background: alpha(T.onAccent, 0.16) }}>+{checkedToday ? Number(xpAmount).toLocaleString('fa') : xpAmount} {L.xp}</span></>}
           </button>}
           {(isAdmin || canClaim) && <button onClick={() => isAdmin ? ownerClaimDirect(cafe, showToast) : claimCafe(cafe, showToast)}
             style={{ width: '100%', marginTop: 8, height: 34, border: 'none', background: 'transparent', color: C.sub, fontSize: 12, fontWeight: 700 }}>

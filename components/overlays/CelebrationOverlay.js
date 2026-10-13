@@ -1,5 +1,7 @@
 'use client'
 import { useEffect, useMemo } from 'react'
+import { districtLabel } from '@/lib/events/format'
+import { faDigits } from '@/components/v3/map/ExploreProgress'
 
 // ── انیمیشن جشن تمام‌صفحه (بعد از چک‌این / لِوِل‌آپ / تکمیل رویداد) ──────────
 // کانفتی CSS خالص، بدون هیچ کتابخانه. داده از پاسخ do_checkin میاد.
@@ -53,7 +55,7 @@ export function CelebrationOverlay({C, data, onClose}) {
           <>
             <div style={{fontSize:48,lineHeight:1,marginBottom:8}}>{data.isNewCafe?'🗺️':'☕'}</div>
             <div style={{fontSize:20,fontWeight:900,color:'#fff'}}>{title}</div>
-            <div style={{fontSize:12.5,color:'rgba(255,255,255,.75)',marginTop:4}}>{data.cafeName}{data.district?' · منطقه '+data.district:''}</div>
+            <div style={{fontSize:12.5,color:'rgba(255,255,255,.75)',marginTop:4}}>{data.cafeName}{data.district?' · '+faDigits(districtLabel(data.district)):''}</div>
           </>
         )}
 
@@ -76,6 +78,32 @@ export function CelebrationOverlay({C, data, onClose}) {
             </div>
           )}
         </div>
+
+        {/* کشف نقشه: خانه تازه، نشان منطقه و یادداشت سقف پاداش — همه از جواب سرور */}
+        {(data.newCell||(data.milestones&&data.milestones.length>0)||data.bonusCapped)&&(
+          <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:7}}>
+            {data.milestones&&data.milestones.map((m,i)=>(
+              <div key={'m'+i} style={{display:'flex',alignItems:'center',gap:10,background:'linear-gradient(135deg,rgba(255,214,10,.28),rgba(255,159,10,.14))',border:'1px solid rgba(255,214,10,.5)',borderRadius:16,padding:'10px 13px',textAlign:'right'}}>
+                <span style={{fontSize:24}}>🏅</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:900,color:'#fff'}}>نشان کاشف {faDigits(districtLabel(m.district))}</div>
+                  <div style={{fontSize:10.5,color:'rgba(255,255,255,.8)',marginTop:2}}>{Number(m.pct)>=90?'کشف این منطقه را کامل کردی':Number(m.pct).toLocaleString('fa')+'٪ مکان‌های این منطقه را دیده‌ای'}</div>
+                </div>
+              </div>
+            ))}
+            {data.newCell&&(
+              <div style={{display:'flex',alignItems:'center',gap:9,background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',borderRadius:14,padding:'9px 12px',textAlign:'right'}}>
+                <span style={{fontSize:18}}>🧭</span>
+                <span style={{fontSize:12,fontWeight:800,color:'#fff'}}>یک خانه تازه روی نقشه‌ات روشن شد</span>
+              </div>
+            )}
+            {data.bonusCapped&&(
+              <div style={{fontSize:10.5,color:'rgba(255,255,255,.62)',lineHeight:1.8}}>
+                {data.bonusCapped==='gap'?'پاداش مکان تازه از ۱۰ دقیقه بعد از چک‌این قبلی حساب می‌شود؛ امتیاز چک‌این ثبت شد':'سقف پاداش مکان تازه برای امروز پر شده؛ امتیاز چک‌این ثبت شد'}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* رویدادهای تکمیل‌شده + آیتم کلکسیونی با گرادیانت کمیابی */}
         {data.quests.length>0&&(

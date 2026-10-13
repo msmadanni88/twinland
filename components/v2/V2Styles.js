@@ -64,10 +64,23 @@ export function V2Styles({ C, T }) {
     .tl2-cafe:hover .tl2-dot,.tl2-pin:hover .tl2-dot{animation:tl2Blink 1.8s ease-in-out infinite .4s}
   }
 
-  /* نسخه v3.0 — پرچم پایگاه و نرم آمدن مه */
-  .tl3-base-flag{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:900;background:${C.card};color:${C.text};border:1.5px solid ${C.text};box-shadow:0 3px 8px rgba(0,0,0,.35)}
-  .tl3-fog-deep,.tl3-fog-ring{animation:tl2Fade .6s ease both}
-  .tl3-fog-open,.tl3-fog-base{animation:tl2Fade .9s ease both}
+  /* نسخه v3.0 — لایه کشف نقشه. نقشه پایه دست نمی‌خورد؛ فقط خانه‌های کشف‌شده و مرز کشف کشیده می‌شوند.
+     رنگ از متغیر --tl3-ink روی همان لایه می‌آید: رنگ هر پوسته، یا رنگ تأکیدی پالت روی پوسته ساده */
+  .tl3-cell,.tl3-edge,.tl3-edge-halo{animation:tl2Fade .7s ease both}
+  .tl3-frontier{animation:tl3Flow 1.4s linear infinite, tl2Fade .6s ease both}
+  .tl3-frontier-far{opacity:.85}
+  .tl3-cell-fresh{animation:tl3Fresh 2.4s cubic-bezier(.2,.8,.3,1) both}
+  .tl3-base{animation:tl2Fade .9s ease both}
+  .tl3-far-zoom .tl3-frontier,.tl3-far-zoom .tl3-base-chip,.tl3-far-zoom .tl3-next-chip{display:none}
+  .tl3-far-zoom .tl3-cell{stroke-opacity:0}
+  .tl3-far-zoom .tl3-edge-halo{stroke-opacity:.08}
+  @keyframes tl3Flow{to{stroke-dashoffset:-16}}
+  @keyframes tl3Fresh{0%{fill-opacity:.42;stroke-opacity:1;stroke-width:5}60%{fill-opacity:.12;stroke-opacity:.6}100%{fill-opacity:0;stroke-opacity:0;stroke-width:2}}
+  .tl3-base-chip{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;white-space:nowrap;padding:3px 9px 3px 8px;border-radius:99px;font-size:10px;font-weight:900;line-height:1.3;color:${C.text};background:${T.glassStrong};-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--tl3-ink);box-shadow:0 6px 18px rgba(0,0,0,.22);animation:tl2Fade .9s ease both}
+  .tl3-base-chip i{width:6px;height:6px;border-radius:50%;background:var(--tl3-ink);box-shadow:0 0 0 3px color-mix(in srgb,var(--tl3-ink) 28%,transparent)}
+  .tl3-next-chip{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;padding:2px 8px;border-radius:99px;font-size:9.5px;font-weight:900;color:var(--tl3-ink);background:${T.glassStrong};border:1px dashed var(--tl3-ink);box-shadow:0 4px 12px rgba(0,0,0,.16);animation:tl3Bob 3s ease-in-out infinite}
+  @keyframes tl3Bob{0%,100%{margin-top:0}50%{margin-top:-3px}}
+  @media (prefers-reduced-motion: reduce){.tl3-frontier,.tl3-cell-fresh,.tl3-next-chip{animation:none}}
 
   /* حالت نمایشی v3.0: پینی که همین الان چک‌این ساختگی گرفته */
   .tl3-demo-pop{animation:tl3Ping .7s ease-out}

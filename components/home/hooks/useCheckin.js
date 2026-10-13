@@ -5,11 +5,15 @@ import { SB_KEY, SB_URL } from '@/lib/config'
 import { getLevelInfo } from '@/lib/game/gameSystem'
 import { getUserPosition } from '@/lib/geo'
 
-export function useCheckin({ checkedIn, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp }) {
+// checkedToday فقط در v3.0 داده می‌شود: آنجا محدودیت «یک چک‌این در هر مکان در هر روز» است، همان قانون سرور.
+// بدون آن، رفتار نسخه‌های قدیمی دست نمی‌خورد.
+export function useCheckin({ checkedIn, checkedToday = null, setCheckedToday, onDone, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp }) {
   const [celebration, setCelebration] = useState(null)          // دیتای انیمیشن جشن بعد از چک‌این
 
   async function doCheckin(cafe){
-    if(!effAdmin && checkedIn.has(cafe.id)){ showToast('قبلاً اینجا بودی!','warn'); return }
+    if(checkedToday){
+      if(checkedToday.has(cafe.id)){ showToast('امروز اینجا چک‌این کردی. فردا برگرد تا دوباره حساب شود','warn'); return }
+    } else if(!effAdmin && checkedIn.has(cafe.id)){ showToast('قبلاً اینجا بودی!','warn'); return }
     if(!session||!session.access_token){ showToast('اول وارد شو','warn'); return }
     setSelCafe(null)
     const prevLevel=getLevelInfo(xp).current.level
@@ -37,7 +41,8 @@ export function useCheckin({ checkedIn, effAdmin, freshToken, isOwner, session, 
     }catch(e){ res=null }
     if(!res||!res.ok){
       const err=res&&res.error
-      if(err==='cooldown') showToast('همین الان اینجا چک‌این کردی!','warn')
+      if(err==='cooldown'){ showToast('امروز اینجا چک‌این کردی. فردا برگرد تا دوباره حساب شود','warn'); if(setCheckedToday) setCheckedToday(prev=>new Set([...prev,cafe.id])) }
+      else if(err==='too_fast') showToast('این چک‌این با چک‌این قبلی‌ات جور درنمی‌آید. کمی بعد دوباره امتحان کن','warn')
       else if(err==='too_far') showToast('برای چک‌این باید در کافه باشی — الان حدود '+Number(res.distance_m||0).toLocaleString('fa')+' متر فاصله داری'+((pos.accuracy||0)>100?'؛ GPS را روشن کن':''),'warn')
       else if(err==='location_required'||err==='invalid_location') showToast('موقعیتت درست خوانده نشد — دوباره امتحان کن','warn')
       else if(err==='not_authenticated'||(res&&res.code==='PGRST301')) showToast('نشستت منقضی شد، یه‌بار خروج و ورود کن','warn')
@@ -46,6 +51,8 @@ export function useCheckin({ checkedIn, effAdmin, freshToken, isOwner, session, 
     }
     setXp(res.xp); setStreak(res.streak); setCoins(res.coins)
     setCheckedIn(prev=>new Set([...prev,cafe.id]))
+    if(setCheckedToday) setCheckedToday(prev=>new Set([...prev,cafe.id]))
+    if(onDone) try{ onDone(res) }catch(e){}
 
     // ── انیمیشن جشن تمام‌صفحه ────────────────────────────────────────────────
     // به‌جای toastهای پراکنده، همه‌ی نتیجه‌ی چک‌این (XP، استریک، کافه‌ی جدید،
@@ -65,6 +72,10 @@ export function useCheckin({ checkedIn, effAdmin, freshToken, isOwner, session, 
       district: res.district||null,
       rank: res.rank||null,
       quests: Array.isArray(res.completed_quests)?res.completed_quests:[],
+      // کشف نقشه، از سرور: خانه تازه، نشان منطقه، و اینکه پاداش مکان تازه امروز پر شده یا نه
+      newCell: !!res.new_cell,
+      milestones: Array.isArray(res.milestones)?res.milestones:[],
+      bonusCapped: res.bonus_capped||null,
     })
   }
   return { celebration, doCheckin, setCelebration }

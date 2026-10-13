@@ -30,7 +30,7 @@ import { AppMenu } from '@/components/home/AppMenu'
 import { CityPicker } from '@/components/home/pickers/CityPicker'
 import { PalettePicker } from '@/components/home/pickers/PalettePicker'
 import { BoundaryPicker } from '@/components/home/pickers/BoundaryPicker'
-import { v2Layout, v2Tokens } from '@/components/v2/theme'
+import { alpha, v2Layout, v2Tokens } from '@/components/v2/theme'
 import { V2Styles } from '@/components/v2/V2Styles'
 import { makePinStyle } from '@/components/v2/map/pins'
 import { MapStage } from '@/components/v2/map/MapStage'
@@ -44,7 +44,8 @@ import { MapToolRail } from '@/components/v2/home/MapToolRail'
 import { Dock } from '@/components/v2/home/Dock'
 import { PanelShell } from '@/components/v2/panels/PanelShell'
 import { CafeSheet } from '@/components/v2/cafe/CafeSheet'
-import { useHexFog } from '@/components/v3/map/useHexFog'
+import { useExploreCells } from '@/components/v3/map/useExploreCells'
+import { ExploreLine, ExploreRing, exploreMessage } from '@/components/v3/map/ExploreProgress'
 import { V3_FLAGS } from '@/components/v3/flags'
 import { useEventFeed } from '@/components/events/useEventFeed'
 import { DOCK_RAIL_LIFT } from '@/components/v3/events/EventDock'
@@ -117,7 +118,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   }, [hexFog])
   const toggleDemo = () => setDemoOn(v => { try { if (v) sessionStorage.removeItem('tl_demo'); else sessionStorage.setItem('tl_demo', '1') } catch (e) {} return !v })
   const [showConsole, setShowConsole] = useState(false)
-  const { accountType, checkedIn: realCheckedIn, coins: realCoins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak: realStreak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp: realXp } = useUserData({ freshToken, session })
+  const { accountType, checkedIn: realCheckedIn, checkedToday, setCheckedToday, coins: realCoins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak: realStreak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp: realXp } = useUserData({ freshToken, session })
   // در حالت نمایشی، نقشه و پنل‌ها از دنیای شبیه‌سازی تغذیه می‌شوند؛ وضعیت واقعی کاربر فقط خوانده می‌شود و دست نمی‌خورد
   const demo = useDemoSim({ cafes: realCafes, enabled: hexFog && demoOn, live: realLive, me: { name: userName, xp: realXp, coins: realCoins, streak: realStreak, checkedIn: realCheckedIn } })
   const cafes = demo.cafes, live = demo.live
@@ -130,7 +131,9 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   function onQuestTap(cafe, questId) { setHighlightQuestId(questId); setPanelTab('missions'); setPanelOpen(true) }
   const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode: 'normal', onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
   const { backfillDistricts, backfilling, claimSecretXP, resetMe, toggleViewMode } = useOwnerTools({ freshToken, session, setViewAsUser, setXp, showToast, viewAsUser })
-  const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn: realCheckedIn, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp: realXp })
+  // v3.0: محدودیت چک‌این «یک بار در روز» است، نه «یک بار برای همیشه»؛ ماموریت‌های وفاداری بدون این کامل نمی‌شوند
+  const exploreRefreshRef = useRef(null)
+  const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn: realCheckedIn, checkedToday: hexFog ? checkedToday : null, setCheckedToday, onDone: () => exploreRefreshRef.current && exploreRefreshRef.current(), effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp: realXp })
   // چک‌این در حالت نمایشی: بدون موقعیت‌یاب و بدون هیچ درخواستی به سرور، فقط در دنیای شبیه‌سازی
   function demoCheckin(cafe) {
     const r = demo.checkinMe(cafe)
@@ -163,7 +166,9 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   const questCount = useMemo(() => cafes.filter(c => c.active_quest).length, [cafes])
   // کافه‌دار بودن: گزینه‌های مالکیت کافه فقط برای حساب کافه‌دار و مالک اپ دیده می‌شود
   const isBiz = accountType === 'sme'
-  const hex = useHexFog({ cafes, checkedIn, city, enabled: hexFog, mapInst, mapLoading, session, showToast, skinId })
+  const hex = useExploreCells({ C, cafes, checkedIn, enabled: hexFog, mapInst, mapLoading, session, skinId, offline: demo.on })
+  exploreRefreshRef.current = hex.refresh
+  const exploreInk = hex.ink || T.accent
 
   // پنل روی دسکتاپ واقعی با ماوس از اول باز است — مثل نسخه قبل
   useEffect(() => {
@@ -216,7 +221,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
       {compact && !anySheet && (
         <HudSquares C={C} T={T} Lay={Lay} filterActive={zone !== 'all' || !!search} filtersOpen={filtersOpen} hex={hex} questCount={questCount} rightInset={rightInset} setFiltersOpen={setFiltersOpen} streak={streak}
           onStreak={() => showToast(streak >= 1 ? '🔥 ' + Number(streak).toLocaleString('fa') + ' روز پشت سر هم چک‌این کردی. فردا هم بیا تا نسوزد!' : '🔥 امروز چک‌این کن تا استریکت شروع شود')}
-          onExplore={() => showToast(hex.open === 0 ? '🧭 اولین چک‌این، پایگاهت را می‌سازد و نقشه را باز می‌کند' : '🧭 کشف نقشه: ' + hex.found.toLocaleString('fa') + ' از ' + hex.total.toLocaleString('fa') + ' خانه. با چک‌این در کافه تازه، خانه بعدی باز می‌شود')}
+          onExplore={() => showToast(exploreMessage(hex.progress))}
           onMissions={() => { setPanelTab('missions'); setPanelOpen(true) }} />
       )}
 
@@ -224,13 +229,16 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
       {showConsole && <DemoConsole C={C} demo={demo} onClose={() => setShowConsole(false)} onCafe={demoOpenCafe} />}
 
       {hexFog && !compact && !mapLoading && !demo.on && (
-        <div className="tl3-explore" style={{ position: 'absolute', left: Lay.gap, top: isMobile ? Lay.hudTop + (bannerBottom ? 0 : 78) : 'calc(env(safe-area-inset-top, 0px) + ' + (Lay.chipsTop + (Lay.chipsH - (Lay.chipsH - 4)) / 2) + 'px)', zIndex: 55, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderRadius: 99, padding: '5px 11px', fontSize: 11, fontWeight: 800, color: C.text, boxShadow: T.shadow1 || T.shadow2, pointerEvents: 'none', maxWidth: 'calc(100vw - 24px)',
-          // دسکتاپ: هم‌تراز ردیف منطقه‌ها بالای نقشه، با همان ارتفاع و حدود 20 درصد پهن‌تر
-          ...(isMobile ? null : { height: Lay.chipsH - 4, boxSizing: 'border-box', minWidth: 228, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, padding: '0 16px' }) }}>
-          {hex.open === 0
-            ? '🧭 اولین چک‌این، پایگاهت را می‌سازد'
-            : '🧭 کشف نقشه: ' + hex.found.toLocaleString('fa') + ' از ' + hex.total.toLocaleString('fa') + ' خانه'}
-        </div>
+        <button className="tl3-explore tl2-press" onClick={() => showToast(exploreMessage(hex.progress))} aria-label="کشف نقشه"
+          style={{ position: 'absolute', left: Lay.gap, top: isMobile ? Lay.hudTop + (bannerBottom ? 0 : 78) : 'calc(env(safe-area-inset-top, 0px) + ' + (Lay.chipsTop + (Lay.chipsH - (Lay.chipsH - 4)) / 2) + 'px)', zIndex: 55, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, borderRadius: 99, padding: '4px 12px 4px 6px', fontSize: 11, fontWeight: 800, color: C.text, boxShadow: T.shadow1 || T.shadow2, maxWidth: 'calc(100vw - 24px)', fontFamily: 'inherit', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
+            // دسکتاپ: هم‌تراز ردیف منطقه‌ها بالای نقشه، با همان ارتفاع و حدود 20 درصد پهن‌تر
+            ...(isMobile ? null : { height: Lay.chipsH - 4, boxSizing: 'border-box', minWidth: 228, justifyContent: 'center', fontSize: 12, padding: '0 16px 0 8px' }) }}>
+          <ExploreRing size={isMobile ? 22 : 24} ring={hex.progress ? hex.progress.ring : 0} color={exploreInk} track={alpha(C.text, 0.14)}>
+            <span style={{ fontSize: isMobile ? 11 : 12, lineHeight: 1 }}>🧭</span>
+          </ExploreRing>
+          <ExploreLine p={hex.progress} />
+        </button>
       )}
 
       {/* نوار تبلیغ LED — جزء مشترک، بالای داک */}
@@ -242,7 +250,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
 
       <PanelShell v3={eventWidgets || (hexFog && !!V3_FLAGS.eventWidgets)} demoTabs={demoTabs} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
 
-      {selCafe && <CafeSheet noPlay={isBiz && !effAdmin} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
+      {selCafe && <CafeSheet noPlay={isBiz && !effAdmin} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} checkedToday={hexFog && !demo.on ? checkedToday : null} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
       {showXP && <XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}
       {showNotif && <NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
       <UIStyles />

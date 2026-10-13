@@ -4,11 +4,19 @@ import { useEffect, useState } from 'react'
 import { SB_KEY, SB_URL } from '@/lib/config'
 import { subscribeToTables } from '@/lib/game/gameSystem'
 
+// تاریخ تقویمی تهران به شکل YYYY-MM-DD، همان مرز روزی که سرور برای محدودیت چک‌این می‌گیرد
+function tehranDay(d){
+  try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(d) }
+  catch(e){ return d.toISOString().slice(0,10) }
+}
+
 export function useUserData({ freshToken, session }) {
   const [notifications, setNotifications] = useState([])
   const [tutorialSeen, setTutorialSeen] = useState({})
   const [tutorialLoaded, setTutorialLoaded] = useState(false)   // تا پروفایل نیومده، تیوتوریال نشون نده (رفع فلشِ هر لاگین)
   const [checkedIn,  setCheckedIn]  = useState(new Set())
+  // چک‌این‌های امروز به وقت تهران: قانون سرور «یک چک‌این در هر مکان در هر روز» است، نه یک بار برای همیشه
+  const [checkedToday, setCheckedToday] = useState(new Set())
   const [favs,       setFavs]       = useState(new Set())
   const [xp,         setXp]         = useState(0)
   const [streak,     setStreak]     = useState(0)
@@ -35,8 +43,12 @@ export function useUserData({ freshToken, session }) {
     // علاقه‌مندی‌ها (قلب‌ها) — حالا واقعی و سمت سرور ذخیره می‌شن
     fetch(SB_URL+'/rest/v1/favorites?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
       .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setFavs(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
-    fetch(SB_URL+'/rest/v1/checkins?user_id=eq.'+uid+'&select=cafe_id',{headers:h})
-      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setCheckedIn(new Set(rows.map(x=>x.cafe_id))) }).catch(()=>{})
+    fetch(SB_URL+'/rest/v1/checkins?user_id=eq.'+uid+'&select=cafe_id,created_at',{headers:h})
+      .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)){
+        setCheckedIn(new Set(rows.map(x=>x.cafe_id)))
+        const today=tehranDay(new Date())
+        setCheckedToday(new Set(rows.filter(x=>x.created_at&&tehranDay(new Date(x.created_at))===today).map(x=>x.cafe_id)))
+      } }).catch(()=>{})
     fetch(SB_URL+'/rest/v1/notifications?user_id=eq.'+uid+'&select=*&order=created_at.desc&limit=40',{headers:h})
       .then(r=>r.json()).then(rows=>{ if(Array.isArray(rows)) setNotifications(rows) }).catch(()=>{})
   },[session])
@@ -58,6 +70,7 @@ export function useUserData({ freshToken, session }) {
       }
       if(p.table==='checkins' && p.record && p.record.cafe_id){
         setCheckedIn(prev=>{ const s=new Set(prev); s.add(p.record.cafe_id); return s })
+        setCheckedToday(prev=>{ const s=new Set(prev); s.add(p.record.cafe_id); return s })
       }
       if(p.table==='notifications' && p.record){
         setNotifications(prev=>[p.record, ...prev].slice(0,60))
@@ -87,5 +100,5 @@ export function useUserData({ freshToken, session }) {
       body:JSON.stringify({read:true})
     }).catch(()=>{})
   }
-  return { accountType, checkedIn, coins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp }
+  return { accountType, checkedIn, checkedToday, setCheckedToday, coins, effAdmin, favs, isOwner, markAllNotifRead, markNotifRead, notifications, setCheckedIn, setCoins, setFavs, setStreak, setTutorialSeen, setViewAsUser, setXp, streak, tutorialLoaded, tutorialSeen, userName, viewAsUser, xp }
 }

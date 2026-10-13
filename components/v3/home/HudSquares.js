@@ -1,8 +1,11 @@
 'use client'
 // ستون دکمه‌های مربعی بالا سمت راست — چیدمان تازه موبایل در نسخه v3.0
 // هم‌شکل دکمه‌های میله ابزار پایین چپ: فیلتر، استریک، کشف نقشه و ماموریت‌های فعال.
+import { alpha } from '@/components/v2/theme'
+import { ExploreRing } from '@/components/v3/map/ExploreProgress'
 export function HudSquares({ C, T, Lay, filterActive, filtersOpen, hex, onExplore, onMissions, onStreak, questCount, rightInset, setFiltersOpen, streak }) {
   const fa = (n) => Number(n || 0).toLocaleString('fa')
+  const p = hex && hex.progress
   const btn = {
     width: 44, height: 44, borderRadius: 14, border: '1px solid ' + T.hair, padding: 0,
     background: T.glass, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, boxShadow: T.shadow1,
@@ -21,8 +24,12 @@ export function HudSquares({ C, T, Lay, filterActive, filtersOpen, hex, onExplor
         style={streak >= 2 ? { ...btn, background: hot ? C.gold : T.glass, color: hot ? '#1b1b1b' : C.text } : btn}>
         <span>🔥</span><span style={num}>{fa(streak)}</span>
       </button>
-      <button className="tl2-press" aria-label="کشف نقشه" title="کشف نقشه" onClick={onExplore} style={btn}>
-        <span>🧭</span><span style={num}>{fa(hex.found)}/{fa(hex.total)}</span>
+      {/* کشف نقشه: حلقه تا نشان بعدی منطقه، و تعداد مکان‌های دیده‌شده در همان منطقه */}
+      <button className="tl2-press" aria-label="کشف نقشه" title="کشف نقشه" onClick={onExplore} style={{ ...btn, position: 'relative' }}>
+        <span style={{ position: 'absolute', inset: 3, pointerEvents: 'none' }}>
+          <ExploreRing size={36} stroke={2.2} ring={p ? p.ring : 0} color={(hex && hex.ink) || C.accent} track={alpha(C.text, 0.12)} />
+        </span>
+        <span style={{ fontSize: 14 }}>🧭</span><span style={num}>{p && p.district ? fa(p.seen) : '•'}</span>
       </button>
       <button className="tl2-press" aria-label="ماموریت‌های فعال" title="ماموریت‌های فعال" onClick={onMissions} style={btn}>
         <span>🎯</span><span style={num}>{fa(questCount)}</span>
