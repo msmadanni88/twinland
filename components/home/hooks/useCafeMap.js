@@ -10,7 +10,16 @@ import { cafeInLayer, digitsOnly } from '@/lib/geo'
 // بدون آن، پین، خوشه و حلقه رویداد دقیقاً همان نسخه v1.0 هستند.
 // basemap و skinId هم اختیاری‌اند: basemap یک زیرنقشه جایگزین با تابع attach است (پوسته‌های برداری نسخه‌های تازه).
 // بدون basemap، یا اگر زیرنقشه جایگزین بالا نیاید، همان کاشی‌های عکسی نسخه v1.0 نشان داده می‌شود.
-export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone }) {
+// رنگ نشانگر رویداد را به چند شفافیت آماده تبدیل می‌کند تا CSS به color-mix وابسته نباشد
+function beaconVars(hex){
+  const h=String(hex||'#888888').replace('#','')
+  const f=h.length===3?h.split('').map(x=>x+x).join(''):h.padEnd(6,'8').slice(0,6)
+  const r=parseInt(f.slice(0,2),16)||0,g=parseInt(f.slice(2,4),16)||0,b=parseInt(f.slice(4,6),16)||0
+  const a=(x)=>'rgba('+r+','+g+','+b+','+x+')'
+  return '--bc:#'+f+';--bc12:'+a(.12)+';--bc30:'+a(.3)+';--bc45:'+a(.45)+';--bc70:'+a(.7)+';'
+}
+
+export function useCafeMap({ C, activeEventCafeId, activeEventTone = null, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone }) {
   const mapRef   = useRef(null)
   const mapInst  = useRef(null)
   const mapCenterRef = useRef(null)
@@ -274,20 +283,23 @@ export function useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes,
     }
   },[mapReady,pinStyle])
 
-  // هایلایت کافه‌ای که الان توی اسلایدشوی رویدادها نشون داده می‌شه — دوربین حرکت نمی‌کنه
-  // برای هر دو حالت (پین/نقطه) یه حلقه‌ی پالس مستقل (divIcon واقعی) دقیقاً روی مختصات کافه اضافه می‌کنیم؛
+  // نشانگر کافه‌ای که الان توی نوار رویدادها نشون داده می‌شه.
+  // برای هر دو حالت (پین/نقطه) یه نشانگر مستقل (divIcon واقعی) دقیقاً روی مختصات کافه اضافه می‌کنیم؛
   // این کار مستقل از نوع رندر مارکر زیرینه (پین=DOM، نقطه=canvas مشترک با preferCanvas) و همیشه کار می‌کنه.
+  // رنگش از رنگ همان رویداد در نوار می‌آید تا چشم بین نوار و نقشه پیوند را ببیند؛ با عوض شدن رویداد می‌پرد و روی کافه بعدی می‌نشیند.
+  // شکل: هسته درخشان با حلقه سفید، دو موج که پخش می‌شوند و یک مدار خط‌چین که آرام می‌چرخد. CSS در HomeGlobalStyles.
   useEffect(()=>{
     if(!activeEventCafeId || !mapReady || !window.L || !mapInst.current) return
     const L=window.L
     const cafe = cafes.find(c=>c.id===activeEventCafeId)
     if(!cafe) return
-    const ringColor = (pinStyle&&pinStyle.pulseColor) || (themeMode==='night' ? '#ffffff' : '#1a1a1a')
-    const icon=L.divIcon({html:'<div class="tl-event-pulse-ring" style="--pulse-color:'+ringColor+'"></div>',iconSize:[36,36],iconAnchor:[18,18],className:''})
-    const ghost=L.marker([cafe.lat,cafe.lng],{icon,interactive:false,zIndexOffset:9999})
+    const col = activeEventTone || (pinStyle&&pinStyle.pulseColor) || (themeMode==='night' ? '#ffffff' : '#1a1a1a')
+    const html='<div class="tl-beacon" style="'+beaconVars(col)+'"><span class="tl-beacon-r"></span><span class="tl-beacon-r tl-beacon-r2"></span><span class="tl-beacon-orbit"></span><span class="tl-beacon-core"></span></div>'
+    const icon=L.divIcon({html,iconSize:[72,72],iconAnchor:[36,36],className:'tl-beacon-wrap'})
+    const ghost=L.marker([cafe.lat,cafe.lng],{icon,interactive:false,keyboard:false,zIndexOffset:9999})
     try{ ghost.addTo(mapInst.current) }catch(e){}
     return ()=>{ try{ mapInst.current.removeLayer(ghost) }catch(e){} }
-  },[activeEventCafeId, mapReady, cafes, themeMode, pinStyle])
+  },[activeEventCafeId, activeEventTone, mapReady, cafes, themeMode, pinStyle])
 
   // بازسازی گروه خوشه‌بندی وقتی شدت cluster یا حالت فیلتر منطقه عوض شه
   useEffect(()=>{

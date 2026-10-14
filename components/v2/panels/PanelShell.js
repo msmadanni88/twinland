@@ -8,6 +8,8 @@ import { DashboardV3 } from '@/components/v3/dashboard/DashboardV3'
 import { MissionsTab } from '@/components/panels/MissionsTab'
 import { ProfileTab } from '@/components/panels/ProfileTab'
 import { RankTab } from '@/components/panels/RankTab'
+import { LeaderboardV3 } from '@/components/v3/rank/LeaderboardV3'
+import { V3_FLAGS } from '@/components/v3/flags'
 import { L } from '@/lib/theme/labels'
 import { useDragScroll } from '@/lib/theme/ui'
 
@@ -58,7 +60,7 @@ export function PanelShell({ v3 = false, demoTabs = null, demoLeaders = null, C,
         {!demoTabs && panelTab === 'dashboard' && v3 && <DashboardV3 C={C} T={T} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} userName={userName} setShowXP={setShowXP} setSelCafe={setSelCafe} setPanelTab={setPanelTab} />}
         {!demoTabs && panelTab === 'dashboard' && !v3 && <DashboardTab C={C} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} setShowXP={setShowXP} />}
         {!demoTabs && panelTab === 'missions' && <MissionsTab v3={v3} C={C} cafes={cafes} highlightQuestId={highlightQuestId} setSelCafe={setSelCafe} showToast={showToast} />}
-        {!demoTabs && panelTab === 'rank' && <RankTab C={C} demoRows={demoLeaders} />}
+        {!demoTabs && panelTab === 'rank' && (v3 && V3_FLAGS.newRank ? <LeaderboardV3 C={C} T={T} /> : <RankTab C={C} demoRows={demoLeaders} />)}
         {!demoTabs && panelTab === 'clan' && <ClanTab C={C} />}
         {!demoTabs && panelTab === 'profile' && <ProfileTab C={C} xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn} userName={userName} coins={coins} />}
       </div>

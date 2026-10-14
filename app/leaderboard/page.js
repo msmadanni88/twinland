@@ -6,8 +6,12 @@ import { SB_URL, SB_KEY } from '@/lib/config'
 import { getLevelInfo, getSession, fetchLeaderboard, subscribeToProfile } from '@/lib/game/gameSystem'
 import { L, ICON, fa } from '@/lib/theme/labels'
 import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
+import { V3_FLAGS } from '@/components/v3/flags'
+import { LeaderboardV3 } from '@/components/v3/rank/LeaderboardV3'
+import { V2Styles } from '@/components/v2/V2Styles'
+import { v2Tokens } from '@/components/v2/theme'
 
-export default function LeaderboardPage() {
+function LegacyLeaderboardPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [rows, setRows] = useState([])
   const [stats, setStats] = useState({})   // user_id -> {checkin_count, cafe_count, fav_count}
@@ -195,3 +199,30 @@ const mkS = (C) => ({
   rowLevel: { fontSize: 12, color: C.sub },
   rowXp: { color: C.accent, fontWeight: 800, fontSize: 13 },
 })
+
+
+// صفحه تازه: همان جزء تب پنل، تمام‌صفحه. با V3_FLAGS.newRank=false صفحه قبلی برمی‌گردد.
+function NewLeaderboardPage() {
+  const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
+  useEffect(() => { setPal(loadPrefs()) }, [])
+  const C = buildC(pal.palette, pal.mode)
+  const T = v2Tokens(C)
+  return (
+    <div className="tl2" style={{ minHeight: '100vh', background: C.bg, direction: 'rtl', color: C.text, fontFamily: 'inherit' }}>
+      <UIStyles />
+      <V2Styles C={C} T={T} />
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, borderBottom: '1px solid ' + T.hair }}>
+        <a href="/" style={{ width: 64, fontSize: 15, color: C.accent, textDecoration: 'none', fontWeight: 700 }}>‹ {L.map}</a>
+        <div style={{ fontWeight: 900, fontSize: 17, color: C.text }}>{ICON.leaderboard} {L.leaderboard}</div>
+        <div style={{ width: 64 }} />
+      </div>
+      <div style={{ maxWidth: 520, margin: '0 auto', paddingTop: 14 }}>
+        <LeaderboardV3 C={C} T={T} full />
+      </div>
+    </div>
+  )
+}
+
+export default function LeaderboardPage() {
+  return V3_FLAGS.newRank ? <NewLeaderboardPage /> : <LegacyLeaderboardPage />
+}

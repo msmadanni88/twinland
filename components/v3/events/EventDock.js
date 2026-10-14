@@ -16,6 +16,7 @@ import { artTone } from '@/lib/events/art'
 import { RARITY_TONE, districtLabel, faNum, timeLeft } from '@/lib/events/format'
 import { alpha, mix } from '@/components/v2/theme'
 import { trackPlace } from '@/lib/track'
+import { track } from '@/lib/analytics'
 
 // همان منحنی جهش بقیه سایت (دکمه‌ها و گره‌های نقشه) با همان زمان
 const BOUNCE = 'cubic-bezier(.34,1.56,.64,1)'
@@ -95,7 +96,8 @@ export function EventDock({ C, T, Lay, cafes, getPos, isMobile, onActiveCafeChan
 
   // کافه فعال روی نقشه هایلایت شود
   useEffect(() => {
-    onActiveCafeChange && onActiveCafeChange(ev ? ev.cafeId : null)
+    // رنگ رویداد هم همراه شناسه می‌رود تا نشانگر روی نقشه با نشان رویداد هم‌رنگ باشد
+    onActiveCafeChange && onActiveCafeChange(ev ? ev.cafeId : null, ev ? artTone(ev.artKey) : null)
     return () => { onActiveCafeChange && onActiveCafeChange(null) }
   }, [ev && ev.id])
 
@@ -120,6 +122,7 @@ export function EventDock({ C, T, Lay, cafes, getPos, isMobile, onActiveCafeChan
   if (!ev) return null
 
   const openCafe = () => {
+    track('event_dock_tap', { event_id: String(ev.id), cafe_id: ev.cafeId })
     const cafe = cafes.find(c => c.id === ev.cafeId)
     if (cafe) setSelCafe({ ...cafe, _from: { source: 'banner', refType: 'quest', refId: String(ev.id) } })
     else if (typeof window !== 'undefined') window.location.href = '/quests'

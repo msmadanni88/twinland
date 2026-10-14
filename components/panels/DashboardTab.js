@@ -69,7 +69,7 @@ export function DashboardTab({C,cafes,filtered,live,totalLive,showToast,setSearc
     <div style={{padding:'12px 12px 0'}}>
       <div style={{fontSize:10,color:C.sub,letterSpacing:.7,marginBottom:8,fontWeight:600}}>آمار زنده</div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-        {[{icon:'☕',val:cafes.length,lbl:'کافه'},{icon:'👥',val:totalLive,lbl:'آنلاین'},{icon:'⭐',val:cafes.filter((c)=>c.is_top).length,lbl:'برتر'},{icon:'✅',val:checkedIn.size,lbl:'رفتم'}].map((item)=>(
+        {[{icon:'☕',val:cafes.length,lbl:'کافه'},{icon:'👥',val:totalLive,lbl:'در کافه'},{icon:'⭐',val:cafes.filter((c)=>c.is_top).length,lbl:'برتر'},{icon:'✅',val:checkedIn.size,lbl:'رفتم'}].map((item)=>(
           <div key={item.lbl} className="tl-tile" style={{background:C.chip,border:'1px solid '+C.border,borderRadius:12,padding:'10px'}}>
             <div style={{fontSize:16}}>{item.icon}</div>
             <div style={{fontSize:18,fontWeight:800,color:C.text,marginTop:2}}>{item.val}</div>

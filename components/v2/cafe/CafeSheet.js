@@ -3,6 +3,8 @@
 // کاور بزرگ، هویت کافه، چهار صفحه، و دکمه چک‌این همیشه پایین و در دسترس.
 // فقط داده واقعی نشان داده می‌شود؛ ساعت کاری و امتیاز ستاره‌ای ساختگی نسخه قبل حذف شد.
 import { CafeRating } from '@/components/v3/cafe/CafeRating'
+import { CafeComments } from '@/components/v3/cafe/CafeComments'
+import { track as ga } from '@/lib/analytics'
 import { trackPlace, withUtm } from '@/lib/track'
 import { useEffect, useState } from 'react'
 import { onColor } from '@/lib/theme/ui'
@@ -15,7 +17,7 @@ import { CafeMyRewards } from '@/components/cafe/CafeMyRewards'
 import { alpha, mix } from '@/components/v2/theme'
 import { useCafeSheetData } from '@/components/v2/cafe/useCafeSheetData'
 
-const PAGES = [['about', 'درباره'], ['gallery', 'گالری'], ['menu', 'منو'], ['rewards', 'جایزه‌های من']]
+const PAGES = [['about', 'درباره'], ['gallery', 'گالری'], ['menu', 'منو'], ['comments', 'نظرها'], ['rewards', 'جایزه‌های من']]
 
 // canClaim: دکمه «صاحب این کافه هستید؟» فقط برای حساب کافه‌دار؛ مالک اپ همیشه دکمه مدیریت مستقیم را دارد
 // noPlay: حساب کسب‌وکار بازی نمی‌کند، پس دکمه چک‌این ندارد
@@ -45,7 +47,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
   // از کجا به این برگه رسیده‌ایم — نقشه، جست‌وجو، یا یک کمپین. همراه هر رویداد ثبت می‌شود تا بعداً اثر هر کمپین جدا دیده شود
   const from = cafe._from || {}
   const track = (type, channel) => trackPlace(cafe.id, type, { channel, source: from.source || 'map', refType: from.refType, refId: from.refId })
-  useEffect(() => { track('view') }, [cafe.id])
+  useEffect(() => { track('view'); ga('cafe_open', { cafe_id: cafe.id, source: from.source || 'map' }) }, [cafe.id])
   // اطلاعات تماس و ساعت کار — فقط وقتی برای این مکان ثبت شده باشد
   const web = cafe.website ? (/^https?:\/\//i.test(cafe.website) ? cafe.website : 'https://' + cafe.website) : null
   const ig = cafe.instagram ? String(cafe.instagram).replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/.*$/, '') : null
@@ -66,7 +68,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
     { icon: ICON.hearts, label: L.hearts, active: isFav, fn: d.toggleFav },
     { icon: '📤', label: 'اشتراک', fn: () => { track('share'); d.share() } },
     { icon: '🗺', label: 'مسیر', fn: () => { track('click', 'directions'); window.open('https://www.google.com/maps?q=' + cafe.lat + ',' + cafe.lng, '_blank', 'noopener') } },
-    { icon: '💬', label: 'نظر', fn: () => showToast('💬 به زودی!') },
+    { icon: '💬', label: 'نظر', fn: () => { ga('comments_open', { cafe_id: cafe.id }); setPage('comments') } },
   ]
 
   return (
@@ -141,6 +143,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
           <div style={{ padding: '16px 18px 18px' }}>
             {page === 'gallery' && <CafeGallery C={C} cafeId={cafe.id} canManageHint={isAdmin} />}
             {page === 'menu' && <CafeMenu C={C} cafeId={cafe.id} canManageHint={isAdmin} />}
+            {page === 'comments' && <CafeComments C={C} T={T} cafe={cafe} token={d.token} uid={d.uid} noPlay={noPlay} showToast={showToast} />}
             {page === 'rewards' && <CafeMyRewards C={C} cafeId={cafe.id} uid={d.uid} token={d.token} showToast={showToast} />}
             {page === 'about' && <>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>

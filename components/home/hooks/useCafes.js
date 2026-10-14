@@ -6,6 +6,8 @@ import { SB_KEY, SB_URL } from '@/lib/config'
 export function useCafes({ showToast }) {
   const [cafes,      setCafes]      = useState([])
   const [live,       setLive]       = useState({})
+  // شمار شهرگیر آدم‌های متمایز در ۲ ساعت اخیر؛ جمع کردن عددهای هر کافه یک نفر را چندبار می‌شمرد
+  const [liveTotal,  setLiveTotal]  = useState(null)
 
   // کافه‌ها فقط از دیتابیس — بدون دادهٔ ساختگی. اگه لود نشد، پیام واقعی + تلاش دوباره.
   useEffect(()=>{
@@ -67,9 +69,19 @@ export function useCafes({ showToast }) {
         if(!alive||!Array.isArray(rows)) return
         const c={}; rows.forEach(r=>{ c[r.cafe_id]=r.live_count||0 }); setLive(c)
       }).catch(()=>{})
+      // تابع live_now: هر نفر فقط یک‌بار شمرده می‌شود، هرچند چند جا چک‌این کرده باشد
+      fetch(SB_URL+'/rest/v1/rpc/live_now',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+        body:'{}'
+      }).then(r=>r.ok?r.json():null).then(n=>{
+        if(!alive) return
+        const v=Array.isArray(n)?n[0]:n
+        if(typeof v==='number') setLiveTotal(v)
+      }).catch(()=>{})
     }
     update(); const t=setInterval(update,60000)
     return ()=>{ alive=false; clearInterval(t) }
   },[cafes])
-  return { cafes, live }
+  return { cafes, live, liveTotal }
 }

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { SB_URL, SB_KEY } from '@/lib/config'
+import { track } from '@/lib/analytics'
 
 // --- Supabase Auth (GoTrue) REST helper ---
 async function gotrue(path, body){
@@ -40,6 +41,41 @@ function faErr(msg){
   return msg ? 'خطا: '+msg : 'یه مشکلی پیش اومد، دوباره امتحان کن'
 }
 
+
+// --- ورود با شماره موبایل: تابع phone-auth در Supabase (کد پیامکی شش‌رقمی، پنج دقیقه اعتبار) ---
+async function phoneCall(body){
+  try{
+    const r = await fetch(SB_URL+'/functions/v1/phone-auth',{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    })
+    const data = await r.json().catch(()=>null)
+    if(!data) return { ok:false, error:'server' }
+    return data
+  }catch(e){
+    return { ok:false, error:'network' }
+  }
+}
+const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹', AR_DIGITS = '٠١٢٣٤٥٦٧٨٩'
+const latinDigits = (v)=>String(v||'').replace(/[۰-۹]/g,d=>String(FA_DIGITS.indexOf(d))).replace(/[٠-٩]/g,d=>String(AR_DIGITS.indexOf(d)))
+function phoneErr(r){
+  switch(r && r.error){
+    case 'network': return 'اتصال برقرار نشد. اینترنتت رو چک کن'
+    case 'bad_phone': return 'شماره معتبر نیست؛ مثل ۰۹۱۲۳۴۵۶۷۸۹ بنویس'
+    case 'wait': return 'تازه کد فرستادیم؛ '+(r.retry_in||60)+' ثانیه دیگه دوباره بزن'
+    case 'too_many': return 'تلاش زیاد شد؛ یک ساعت دیگه امتحان کن یا با ایمیل وارد شو'
+    case 'busy': return 'امروز ظرفیت پیامک پر شده؛ فردا امتحان کن یا با ایمیل وارد شو'
+    case 'sms_failed': return 'پیامک نرفت؛ کمی بعد دوباره امتحان کن'
+    case 'sms_unavailable': return 'ورود با شماره هنوز فعال نشده؛ با ایمیل وارد شو'
+    case 'bad_code': return 'کد شش رقمیه'
+    case 'invalid': return 'کد اشتباهه یا منقضی شده'+(typeof r.left==='number' && r.left>0 ? '؛ '+r.left+' بار دیگه فرصت داری' : '')
+    case 'locked': return 'چند بار اشتباه زدی؛ کد تازه بگیر'
+    case 'origin': return 'از این نشانی نمی‌شود با شماره وارد شد'
+    default: return 'یه مشکلی پیش اومد، دوباره امتحان کن'
+  }
+}
+
 const KEYFRAMES = `
 @keyframes tlPop{0%{transform:scale(.4) translateY(34px);opacity:0}60%{transform:scale(1.08) translateY(0);opacity:1}100%{transform:scale(1)}}
 @keyframes tlUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -66,6 +102,9 @@ export default function AuthGate({ onAuthed }){
   const [msg,setMsg]     = useState(null)    // {type:'err'|'ok', text}
   // ورود کافه‌دار: همان حساب و همان فرم، ولی بعد از ورود نوع حساب «کافه‌دار» می‌شود و مستقیم به پنل کافه‌دار می‌رود
   const [biz,setBiz]     = useState(false)
+  // ورود با شماره: enabled=null یعنی هنوز نپرسیده‌ایم، false یعنی پنل پیامک هنوز وصل نیست
+  const [ph,setPh] = useState({ enabled:null, step:'phone', phone:'', code:'', name:'', left:0 })
+  const setPhF = (patch)=>setPh(p=>({ ...p, ...patch }))
 
   async function finish(data){
     const s = saveSession(data)
@@ -84,12 +123,45 @@ export default function AuthGate({ onAuthed }){
 
   const reset = ()=>setMsg(null)
 
+  useEffect(()=>{
+    if(tab!=='phone' || ph.enabled!==null) return
+    let alive=true
+    phoneCall({ action:'status' }).then(r=>{ if(alive) setPhF({ enabled: !!(r && r.ok && r.enabled) }) })
+    return ()=>{ alive=false }
+  },[tab])
+  // شمارش معکوس دکمه «ارسال دوباره»
+  useEffect(()=>{
+    if(ph.left<=0) return
+    const t=setTimeout(()=>setPh(p=>({ ...p, left:Math.max(0,p.left-1) })),1000)
+    return ()=>clearTimeout(t)
+  },[ph.left])
+
+  async function phoneSend(){
+    const num = latinDigits(ph.phone)
+    if(num.replace(/\D/g,'').length<10){ setMsg({type:'err',text:'شماره موبایلت رو کامل بنویس'}); return }
+    setBusy(true); reset()
+    const r = await phoneCall({ action:'send', phone:num })
+    setBusy(false)
+    track('phone_send', { ok: !!r.ok, error: r.error||null })
+    if(r.ok){ setPh(p=>({ ...p, step:'code', code:'', left:60 })); setMsg({type:'ok',text:'کد شش رقمی به پیامکت رفت'}) }
+    else { if(r.error==='wait') setPhF({ left:r.retry_in||60 }); setMsg({type:'err',text:phoneErr(r)}) }
+  }
+  async function phoneVerify(){
+    const code = latinDigits(ph.code).replace(/\D/g,'')
+    if(code.length!==6){ setMsg({type:'err',text:phoneErr({error:'bad_code'})}); return }
+    setBusy(true); reset()
+    const r = await phoneCall({ action:'verify', phone:latinDigits(ph.phone), code, name:ph.name.trim() })
+    setBusy(false)
+    if(r.ok && r.session && r.session.access_token){ track('login_ok', { method:'phone' }); finish(r.session) }
+    else setMsg({type:'err',text:phoneErr(r)})
+  }
+
   async function doLogin(){
     if(!email||!pass){ setMsg({type:'err',text:'ایمیل و رمز رو وارد کن'}); return }
     setBusy(true); reset()
     const { ok, data } = await gotrue('token?grant_type=password',{ email:email.trim(), password:pass })
     setBusy(false)
-    if(ok && data.access_token) finish(data)
+    if(ok && data.access_token){ track('login_ok', { method:'email' }); finish(data) }
     else setMsg({type:'err',text:faErr(data.error_description||data.msg||data.error)})
   }
   async function doSignup(){
@@ -117,7 +189,7 @@ export default function AuthGate({ onAuthed }){
   const S = {
     root:{position:'fixed',inset:0,zIndex:9999,overflow:'hidden',background:'linear-gradient(160deg,#0b0714 0%,#140a24 45%,#0a0f1e 100%)',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',direction:'rtl',color:'#f1ecff'},
     blob:(c,x,y,s)=>({position:'absolute',width:s,height:s,left:x,top:y,borderRadius:'50%',background:c,filter:'blur(70px)',opacity:.55,animation:'tlBlob 9s ease-in-out infinite'}),
-    card:{position:'relative',zIndex:3,width:'min(380px,90vw)',background:'rgba(18,12,32,.72)',backdropFilter:'blur(22px)',WebkitBackdropFilter:'blur(22px)',border:'1px solid rgba(255,255,255,.10)',borderRadius:24,padding:'26px 22px 24px',boxShadow:'0 24px 60px rgba(0,0,0,.5)'},
+    card:{position:'relative',zIndex:3,boxSizing:'border-box',width:'min(380px,90vw)',background:'rgba(18,12,32,.72)',backdropFilter:'blur(22px)',WebkitBackdropFilter:'blur(22px)',border:'1px solid rgba(255,255,255,.10)',borderRadius:24,padding:'26px 22px 24px',boxShadow:'0 24px 60px rgba(0,0,0,.5)'},
     tabWrap:{display:'flex',gap:6,background:'rgba(255,255,255,.05)',borderRadius:14,padding:5,marginBottom:18},
     tabBtn:(on)=>({flex:1,border:'none',borderRadius:10,padding:'9px 0',fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',color:on?'#0b0714':'#b7aede',background:on?'linear-gradient(135deg,#ff3dd4,#22d3ee)':'transparent',transition:'all .2s'}),
     label:{fontSize:12,color:'#9a91b8',margin:'0 4px 6px',fontWeight:700},
@@ -163,12 +235,43 @@ export default function AuthGate({ onAuthed }){
           </div>
 
           {tab==='phone' ? (
-            <div style={{textAlign:'center',padding:'14px 6px'}}>
-              <div style={{fontSize:34,marginBottom:8}}>🚧</div>
-              <div style={{fontSize:14,fontWeight:800,marginBottom:6}}>ورود با شماره — به‌زودی</div>
-              <div style={{fontSize:12.5,color:'#9a91b8',lineHeight:1.9}}>ارسال کد پیامکی با پنل پیامک ایرانی به‌زودی فعال می‌شه. فعلاً با ایمیل وارد شو.</div>
-              <button style={{...S.link,marginTop:12,fontSize:13}} onClick={()=>{setTab('email');reset()}}>→ ورود با ایمیل</button>
-            </div>
+            ph.enabled===null ? (
+              <div style={{textAlign:'center',padding:'26px 6px'}}><span style={{...S.spinner,borderColor:'rgba(255,255,255,.25)',borderTopColor:'#22d3ee'}}/></div>
+            ) : ph.enabled===false ? (
+              <div style={{textAlign:'center',padding:'14px 6px'}}>
+                <div style={{fontSize:34,marginBottom:8}}>🚧</div>
+                <div style={{fontSize:14,fontWeight:800,marginBottom:6}}>ورود با شماره — به‌زودی</div>
+                <div style={{fontSize:12.5,color:'#9a91b8',lineHeight:1.9}}>ارسال کد پیامکی هنوز فعال نشده. ورود با ایمیل کامل کار می‌کند و بعداً شماره هم اضافه می‌شود.</div>
+                <button style={{...S.link,marginTop:12,fontSize:13}} onClick={()=>{setTab('email');reset()}}>→ ورود با ایمیل</button>
+              </div>
+            ) : (
+              <div>
+                {ph.step==='phone' ? (<>
+                  <div style={S.label}>شماره موبایل</div>
+                  <input className="tl-inp" style={{...S.inp,textAlign:'left',letterSpacing:1}} type="tel" inputMode="numeric" autoComplete="tel" dir="ltr" value={ph.phone} onChange={e=>setPhF({phone:e.target.value})} onKeyDown={e=>{if(e.key==='Enter')phoneSend()}} placeholder="09123456789"/>
+                </>) : (<>
+                  <div style={{fontSize:12.5,color:'#b7aede',textAlign:'center',lineHeight:1.9,marginBottom:10}}>کد شش رقمی که برای <b dir="ltr" style={{color:'#f1ecff'}}>{latinDigits(ph.phone)}</b> رفت را بنویس</div>
+                  <input className="tl-inp" style={{...S.inp,textAlign:'center',fontSize:22,letterSpacing:8,fontWeight:900}} type="text" inputMode="numeric" autoComplete="one-time-code" dir="ltr" maxLength={8} value={ph.code} onChange={e=>setPhF({code:e.target.value})} onKeyDown={e=>{if(e.key==='Enter')phoneVerify()}} placeholder="------" autoFocus/>
+                  <div style={S.label}>نام نمایشی، فقط برای حساب تازه، اختیاری</div>
+                  <input className="tl-inp" style={S.inp} maxLength={24} value={ph.name} onChange={e=>setPhF({name:e.target.value})} placeholder="مثلاً دانی"/>
+                </>)}
+
+                {msg && (
+                  <div style={{fontSize:12.5,fontWeight:700,padding:'9px 12px',borderRadius:10,marginBottom:12,textAlign:'center',color:msg.type==='ok'?'#34d399':'#fb7185',background:msg.type==='ok'?'rgba(52,211,153,.12)':'rgba(251,113,133,.12)',border:'1px solid '+(msg.type==='ok'?'rgba(52,211,153,.3)':'rgba(251,113,133,.3)')}}>{msg.text}</div>
+                )}
+
+                <button className="tl-cta" style={S.cta} disabled={busy||(ph.step==='phone'&&ph.left>0)} onClick={ph.step==='phone'?phoneSend:phoneVerify}>
+                  {busy ? <span style={S.spinner}/> : ph.step==='phone' ? (ph.left>0 ? 'ارسال دوباره تا '+ph.left+' ثانیه' : 'دریافت کد') : 'ورود'}
+                </button>
+                {ph.step==='code' && (
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12}}>
+                    <button style={S.link} onClick={()=>{setPhF({step:'phone',code:''});reset()}}>→ تغییر شماره</button>
+                    <button style={{...S.link,opacity:ph.left>0?.5:1}} disabled={ph.left>0||busy} onClick={phoneSend}>{ph.left>0 ? 'ارسال دوباره، '+ph.left+' ثانیه' : 'ارسال دوباره'}</button>
+                  </div>
+                )}
+                <div style={{fontSize:11,color:'#7f7799',textAlign:'center',marginTop:14,lineHeight:1.9}}>شمارهات فقط برای ورود است و به‌صورت رمزشده نگه‌داری می‌شود، نه خودِ شماره. ورود با ایمیل هم همیشه هست.</div>
+              </div>
+            )
           ) : (
             <div>
               {mode==='signup' && (<>

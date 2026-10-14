@@ -36,7 +36,7 @@ export function HudOverlays({ C, T, Lay, bannerBottom = null, eventWidgets = fal
         <span style={{ width: 1, height: 14, background: T.hairStrong }} />
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.green, boxShadow: '0 0 0 3px ' + alpha(C.green, 0.2) }} />
-          <b style={{ color: C.text }}>{Number(totalLive || 0).toLocaleString('fa')}</b> آنلاین
+          <b style={{ color: C.text }}>{Number(totalLive || 0).toLocaleString('fa')}</b> در کافه
         </span>
         {checkedIn.size > 0 && <>
           <span style={{ width: 1, height: 14, background: T.hairStrong }} />

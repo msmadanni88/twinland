@@ -216,7 +216,7 @@ export function PulseWidget({ ctx }) {
   const max = top.length ? top[0].n : 1
   return (
     <Section ctx={ctx} title="نبض شهر" hint="چند ساعت اخیر"
-      action={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 900, color: C.text }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, boxShadow: '0 0 0 3px ' + C.green + '33' }} />{faNum(totalLive)} آنلاین</span>}>
+      action={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 900, color: C.text }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, boxShadow: '0 0 0 3px ' + C.green + '33' }} />{faNum(totalLive)} در کافه</span>}>
       {top.length === 0
         ? <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.8 }}>الان شهر آرام است. اولین چک‌این را تو بزن.</div>
         : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

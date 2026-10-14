@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { SB_KEY, SB_URL } from '@/lib/config'
 import { getLevelInfo } from '@/lib/game/gameSystem'
 import { getUserPosition } from '@/lib/geo'
+import { track } from '@/lib/analytics'
 
 // checkedToday فقط در v3.0 داده می‌شود: آنجا محدودیت «یک چک‌این در هر مکان در هر روز» است، همان قانون سرور.
 // بدون آن، رفتار نسخه‌های قدیمی دست نمی‌خورد.
@@ -26,6 +27,7 @@ export function useCheckin({ checkedIn, checkedToday = null, setCheckedToday, on
       showToast(pos.error==='denied'?'برای چک‌این باید اجازه‌ی موقعیت مکانی را بدهی'
         :pos.error==='unsupported'?'این مرورگر موقعیت مکانی را پشتیبانی نمی‌کند'
         :'موقعیتت پیدا نشد — GPS گوشی را روشن کن و دوباره امتحان کن','warn')
+      track('checkin_fail', { reason: pos.error })
       return
     }
     const body={p_cafe_id:cafe.id}
@@ -41,6 +43,7 @@ export function useCheckin({ checkedIn, checkedToday = null, setCheckedToday, on
     }catch(e){ res=null }
     if(!res||!res.ok){
       const err=res&&res.error
+      track('checkin_fail', { reason: err||'unknown' })
       if(err==='cooldown'){ showToast('امروز اینجا چک‌این کردی. فردا برگرد تا دوباره حساب شود','warn'); if(setCheckedToday) setCheckedToday(prev=>new Set([...prev,cafe.id])) }
       else if(err==='too_fast') showToast('این چک‌این با چک‌این قبلی‌ات جور درنمی‌آید. کمی بعد دوباره امتحان کن','warn')
       else if(err==='too_far') showToast('برای چک‌این باید در کافه باشی — الان حدود '+Number(res.distance_m||0).toLocaleString('fa')+' متر فاصله داری'+((pos.accuracy||0)>100?'؛ GPS را روشن کن':''),'warn')
@@ -50,6 +53,8 @@ export function useCheckin({ checkedIn, checkedToday = null, setCheckedToday, on
       return
     }
     setXp(res.xp); setStreak(res.streak); setCoins(res.coins)
+    track('checkin_ok', { cafe_id: cafe.id, awarded: res.awarded||0, streak: res.streak||0, new_cafe: !!res.is_new_cafe, new_cell: !!res.new_cell, level_up: res.level>prevLevel })
+    if(Array.isArray(res.completed_quests)&&res.completed_quests.length) track('quest_complete', { count: res.completed_quests.length })
     setCheckedIn(prev=>new Set([...prev,cafe.id]))
     if(setCheckedToday) setCheckedToday(prev=>new Set([...prev,cafe.id]))
     if(onDone) try{ onDone(res) }catch(e){}

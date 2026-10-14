@@ -3,7 +3,7 @@
 // پوسته نقشه، مرزها، پالت، شهر در موبایل، و کنترل جابه‌جایی و بزرگ‌نمایی.
 import { CITIES } from '@/lib/constants'
 
-export function MapToolRail({ C, T, Lay, city, hidden, liftBy = 0, isMobile, mapInst, navOpen, panMap, setNavOpen, setShowBoundary, setShowCity, setShowMode, setShowPalette }) {
+export function MapToolRail({ C, T, Lay, city, hidden, liftBy = 0, isMobile, follow = false, onToggleFollow = null, mapInst, navOpen, panMap, setNavOpen, setShowBoundary, setShowCity, setShowMode, setShowPalette }) {
   if (hidden) return null
   const btn = {
     width: 44, height: 44, borderRadius: 14, border: '1px solid ' + T.hair, padding: 0,
@@ -21,6 +21,16 @@ export function MapToolRail({ C, T, Lay, city, hidden, liftBy = 0, isMobile, map
         <button data-tut="boundary-btn" className="tl2-press" title="مرزها" aria-label="مرزها" onClick={() => setShowBoundary(true)} style={btn}>{img('/boundaries@256.png', 'مرزها')}</button>
         <button className="tl2-press" title="پالت رنگ" aria-label="پالت رنگ" onClick={() => setShowPalette(true)} style={btn}>{img('/theme@256.png', 'پالت')}</button>
         {isMobile && <button className="tl2-press" title="شهر" aria-label="شهر" onClick={() => setShowCity(true)} style={{ ...btn, fontSize: 10.5, lineHeight: 1.2, flexDirection: 'column' }}>📍<span>{CITIES[city].name}</span></button>}
+        {onToggleFollow && (
+          <button data-tut="map-follow" className="tl2-press" title={follow ? 'دنبال کردن رویداد روشن است' : 'دنبال کردن رویداد خاموش است'} aria-label="دنبال کردن رویداد" aria-pressed={follow} onClick={onToggleFollow}
+            style={{ ...btn, background: follow ? C.accent : T.glass, color: follow ? T.onAccent : C.text, boxShadow: follow ? T.glow(C.accent) : T.shadow1 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3.2" fill={follow ? 'currentColor' : 'none'} />
+              <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" />
+              {!follow && <path d="M4 4l16 16" strokeWidth="2.4" />}
+            </svg>
+          </button>
+        )}
         <button data-tut="map-nav" className="tl2-press" title={navOpen ? 'بستن کنترل‌ها' : 'کنترل نقشه'} aria-label="کنترل نقشه" onClick={() => setNavOpen(v => !v)}
           style={{ ...btn, background: navOpen ? C.accent : T.glass, color: navOpen ? T.onAccent : C.text, boxShadow: navOpen ? T.glow(C.accent) : T.shadow1 }}>🎮</button>
       </div>

@@ -52,7 +52,9 @@ import { DOCK_RAIL_LIFT } from '@/components/v3/events/EventDock'
 import { HudSquares } from '@/components/v3/home/HudSquares'
 import { useDemoSim } from '@/components/v3/demo/useDemoSim'
 import { DemoLayer } from '@/components/v3/demo/DemoLayer'
+import { useMapFollow } from '@/components/v3/map/useMapFollow'
 import { setTracking } from '@/lib/track'
+import { identifyUser, initAnalytics, track } from '@/lib/analytics'
 import { DemoConsole, SimClan, SimDashboard, SimMissions, SimProfile, SimRank } from '@/components/v3/demo/DemoPanels'
 
 // hexFog فقط در نسخه v3.0 روشن است؛ بدون آن این صفحه دقیقاً همان v2.0 است
@@ -65,7 +67,13 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   const [search, setSearch] = useState('')
   const logoTapRef = useRef({ count: 0, timer: null })
   const [selCafe, setSelCafe] = useState(null)
-  const [activeEventCafeId, setActiveEventCafeId] = useState(null)
+  // رویداد فعال نوار: شناسه کافه و رنگ نشان رویداد. رنگ را نشانگر روی نقشه می‌گیرد تا با نشان هم‌رنگ باشد
+  const [activeEvent, setActiveEvent] = useState({ id: null, tone: null })
+  const activeEventCafeId = activeEvent.id
+  const setActiveEventCafeId = useCallback((id, tone) => setActiveEvent(p => (p.id === id && p.tone === (tone || null) ? p : { id, tone: tone || null })), [])
+  // دنبال کردن رویداد روی نقشه؛ پیش‌فرض روشن و انتخاب کاربر روی همین دستگاه می‌ماند
+  const [follow, setFollow] = useState(true)
+  useEffect(() => { try { if (localStorage.getItem('tl_follow') === '0') setFollow(false) } catch (e) {} }, [])
   const [tab, setTab] = useState('map')
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelTab, setPanelTab] = useState('dashboard')
@@ -104,7 +112,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   const { showToast, toast } = useToast()
   const { mapDisplay, setMapDisplay } = useMapDisplay()
   const { freshToken } = useFreshToken({ session })
-  const { cafes: realCafes, live: realLive } = useCafes({ showToast })
+  const { cafes: realCafes, live: realLive, liveTotal: realLiveTotal } = useCafes({ showToast })
   // حالت نمایشی: فقط در v3.0، فقط روی همین تب، بدون هیچ نوشتنی در دیتابیس. با /?demo=1 روشن و با /?demo=0 خاموش می‌شود
   const [demoOn, setDemoOn] = useState(false)
   useEffect(() => {
@@ -129,7 +137,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   const streak = demo.on ? demo.me.streak : realStreak
   const checkedIn = demo.on ? demo.me.checkedIn : realCheckedIn
   function onQuestTap(cafe, questId) { setHighlightQuestId(questId); setPanelTab('missions'); setPanelOpen(true) }
-  const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode: 'normal', onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
+  const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, activeEventTone: activeEvent.tone, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode: 'normal', onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
   const { backfillDistricts, backfilling, claimSecretXP, resetMe, toggleViewMode } = useOwnerTools({ freshToken, session, setViewAsUser, setXp, showToast, viewAsUser })
   // v3.0: محدودیت چک‌این «یک بار در روز» است، نه «یک بار برای همیشه»؛ ماموریت‌های وفاداری بدون این کامل نمی‌شوند
   const exploreRefreshRef = useRef(null)
@@ -170,6 +178,14 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
   exploreRefreshRef.current = hex.refresh
   const exploreInk = hex.ink || T.accent
 
+  // تحلیل رفتار: یک بار در شروع، با شناسه ناشناس کاربر. حالت نمایشی چیزی نمی‌فرستد
+  useEffect(() => {
+    initAnalytics()
+    if (session && session.user && session.user.id) identifyUser(session.user.id)
+    track('app_open', { ui: hexFog ? 'v3' : 'v2', mobile: isMobile })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session && session.user && session.user.id])
+
   // پنل روی دسکتاپ واقعی با ماوس از اول باز است — مثل نسخه قبل
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -198,8 +214,29 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
 
   const docked = isDesktop
   const rightInset = docked && panelOpen ? Lay.panelW + Lay.gap * 2 : Lay.gap
-  const totalLive = Object.values(live).reduce((a, b) => a + b, 0)
+  // آنلاین: تعداد آدم‌های متمایز شهر. جمع عددهای کافه‌ها یک نفر را در هر کافه جدا می‌شمرد و با هر چک‌این بالا می‌رفت
+  const sumLive = Object.values(live).reduce((a, b) => a + b, 0)
+  const totalLive = demo.on ? sumLive : (realLiveTotal != null ? realLiveTotal : sumLive)
   const anySheet = showRegionFilter || showRegionResults || showXP || showMenu || showCity || showMode || showBoundary || showPalette || showMapSettings || (!docked && panelOpen)
+  const followOn = hexFog && V3_FLAGS.mapFollow && eventWidgets && follow
+  const eventCafe = useMemo(() => (activeEventCafeId ? cafes.find(c => c.id === activeEventCafeId) || null : null), [cafes, activeEventCafeId])
+  // جای دیدنیِ نقشه: پنل راست روی دسکتاپ، نوار بالا، و داک و سینی رویداد در پایین
+  const followInsets = useCallback(() => ({
+    top: Lay.hudTop + 44,
+    right: docked && panelOpen ? Lay.panelW + Lay.gap * 2 : 0,
+    bottom: Lay.aboveDock + 112,
+    left: isMobile ? 0 : 64,
+  }), [Lay.hudTop, Lay.panelW, Lay.gap, Lay.aboveDock, docked, panelOpen, isMobile])
+  useMapFollow({ enabled: followOn && !demo.on, mapInst, target: eventCafe, blocked: anySheet || !!selCafe || showNotif || showConsole, getInsets: followInsets })
+  function toggleFollow() {
+    setFollow(v => {
+      const nv = !v
+      try { localStorage.setItem('tl_follow', nv ? '1' : '0') } catch (e) {}
+      track('follow_toggle', { on: nv })
+      showToast(nv ? 'نقشه حالا رویداد روشن را دنبال می‌کند' : 'دنبال کردن رویداد خاموش شد')
+      return nv
+    })
+  }
 
   return (
     <div className="tl2" data-skin={skinId}
@@ -216,7 +253,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
 
       <HudOverlays C={C} T={T} Lay={Lay} bannerBottom={bannerBottom} eventWidgets={eventWidgets} getPos={getPos} compact={compact} filtersOpen={filtersOpen} cafes={cafes} checkedIn={checkedIn} clearRegionFilter={clearRegionFilter} filterApplied={filterApplied} filtered={filtered} isMobile={isMobile} regionResults={regionResults} rightInset={rightInset} selectedRegions={selectedRegions} setActiveEventCafeId={setActiveEventCafeId} setSelCafe={setSelCafe} setShowRegionFilter={setShowRegionFilter} setShowRegionResults={setShowRegionResults} showRegionFilter={showRegionFilter} showRegionResults={showRegionResults} streak={streak} totalLive={totalLive} />
 
-      <MapToolRail C={C} T={T} Lay={Lay} liftBy={railLift} city={city} hidden={anySheet} isMobile={isMobile} mapInst={mapInst} navOpen={navOpen} panMap={panMap} setNavOpen={setNavOpen} setShowBoundary={setShowBoundary} setShowCity={setShowCity} setShowMode={setShowMode} setShowPalette={setShowPalette} />
+      <MapToolRail C={C} T={T} Lay={Lay} follow={followOn} onToggleFollow={hexFog && V3_FLAGS.mapFollow && eventWidgets ? toggleFollow : null} liftBy={railLift} city={city} hidden={anySheet} isMobile={isMobile} mapInst={mapInst} navOpen={navOpen} panMap={panMap} setNavOpen={setNavOpen} setShowBoundary={setShowBoundary} setShowCity={setShowCity} setShowMode={setShowMode} setShowPalette={setShowPalette} />
 
       {compact && !anySheet && (
         <HudSquares C={C} T={T} Lay={Lay} filterActive={zone !== 'all' || !!search} filtersOpen={filtersOpen} hex={hex} questCount={questCount} rightInset={rightInset} setFiltersOpen={setFiltersOpen} streak={streak}
