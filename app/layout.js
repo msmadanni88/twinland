@@ -1,13 +1,25 @@
 import { Analytics } from '@vercel/analytics/react'
 import { UiVersionProvider } from '@/components/ui/UiVersionProvider'
 import { fetchSiteUiVersion } from '@/lib/ui/siteVersion'
+import { PwaBoot } from '@/components/pwa/PwaBoot'
 
 // نسخه ظاهر سایت هر 30 ثانیه از دیتابیس تازه می‌شود — lib/ui/siteVersion.js
 export const revalidate = 30
 
 export const metadata = {
-  title: 'TwinLand',
-  description: 'کشف کافه‌های تهران',
+  metadataBase: new URL('https://twinland.ir'),
+  title: { default: 'TwinLand · نقشه بازی‌وار کافه‌های تهران', template: '%s · TwinLand' },
+  description: 'کافه‌های تهران را روی نقشه پیدا کن، چک‌این کن، ماموریت بزن و از کافه‌ها جایزه و تخفیف واقعی بگیر.',
+  applicationName: 'TwinLand',
+  appleWebApp: { capable: true, title: 'TwinLand', statusBarStyle: 'black-translucent' },
+  icons: { icon: '/icons/icon-192.png', apple: '/icons/apple-touch-icon.png' },
+  openGraph: { type: 'website', siteName: 'TwinLand', locale: 'fa_IR', images: ['/icons/icon-512.png'] },
+}
+
+export const viewport = {
+  themeColor: '#0f1222',
+  width: 'device-width',
+  initialScale: 1,
 }
 
 // Global CSS is injected as raw HTML on purpose. Passing it as a text child
@@ -41,7 +53,7 @@ export default async function RootLayout({ children }) {
         />
         <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       </head>
-      <body><UiVersionProvider site={siteUi}>{children}</UiVersionProvider><Analytics /></body>
+      <body><UiVersionProvider site={siteUi}>{children}</UiVersionProvider><PwaBoot /><Analytics /></body>
     </html>
   )
 }

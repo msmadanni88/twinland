@@ -4,6 +4,8 @@
 //  • کارت «جایگاه من» با فاصله تا نفر بالاتر. اگر وارد نشده‌ای، دعوت به ورود.
 //  • داده فقط از تابع‌های دیتابیس می‌آید (leaderboard_get، leaderboard_me، leaderboard_regions)؛ حساب کسب‌وکار در جدول نیست.
 //  • نمونه‌ها فقط در «همیشه» و فقط تا وقتی کمتر از ۱۰ بازیکن واقعی هست می‌آیند و برچسب «نمونه» دارند.
+//  • لیگ هفتگی: در دامنه «این هفته» جایزه سه نفر اول و برنده‌های هفته قبل از league_status می‌آید.
+//    هفته تمام‌شده همان لحظه که کسی این تابع را صدا بزند بسته و جایزه‌ها داده می‌شود.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SB_KEY, SB_URL } from '@/lib/config'
 import { LEVELS, SAMPLE_USERS, getLevelInfo, getSession } from '@/lib/game/gameSystem'
@@ -160,6 +162,8 @@ export function LeaderboardV3({ C, T, full = false }) {
         )}
       </div>
 
+      {scope === 'week' && <div style={{ padding: pad, marginTop: 12 }}><LeagueCard C={C} T={T} token={token} ready={ready} card={card} /></div>}
+
       {/* جایگاه من */}
       <div style={{ padding: pad, marginTop: 14 }}>
         <MyCard C={C} T={T} loggedIn={loggedIn} me={me} mineRow={mineInList} scope={scope} card={card} />
@@ -236,6 +240,57 @@ function PodiumCol({ p, C, T, full }) {
 
 function Tag({ bg, fg, children }) {
   return <span style={{ fontSize: 9.5, fontWeight: 800, background: bg, color: fg, borderRadius: 99, padding: '1px 7px', flexShrink: 0 }}>{children}</span>
+}
+
+const PRIZE_ICON = { 1: '🥇', 2: '🥈', 3: '🥉' }
+function LeagueCard({ C, T, token, ready, card }) {
+  const [st, setSt] = useState(null)
+  useEffect(() => {
+    if (!ready) return () => {}
+    let alive = true
+    const get = () => rpc('league_status', {}, token).then(r => { if (alive && r && r.prizes) setSt(r) })
+    get()
+    const t = setInterval(() => { if (!document.hidden) get() }, 300000)
+    return () => { alive = false; clearInterval(t) }
+  }, [ready, token])
+  if (!st) return null
+  const last = (st.last && st.last.winners) || []
+  const myWin = last.find(w => w.me)
+  return (
+    <div style={{ ...card, overflow: 'hidden', position: 'relative', background: 'linear-gradient(150deg, ' + alpha(MEDAL[1], 0.16) + ', ' + C.card + ' 58%)' }}>
+      <div style={{ padding: '13px 14px 4px', display: 'flex', alignItems: 'center', gap: 9 }}>
+        <span style={{ fontSize: 22 }}>🏆</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 900, color: C.text }}>لیگ هفتگی</div>
+          <div style={{ fontSize: 11.5, color: C.sub, marginTop: 1 }}>سه نفر اول این هفته جایزه می‌گیرند · حداقل {fa(st.min_pts || 50)} امتیاز</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 12px 12px' }}>
+        {(st.prizes || []).map(p => (
+          <div key={p.rank} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 14, background: alpha(MEDAL[p.rank], 0.12), border: '1px solid ' + alpha(MEDAL[p.rank], 0.35) }}>
+            <span style={{ fontSize: 20, width: 24, textAlign: 'center' }}>{PRIZE_ICON[p.rank]}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+              {p.cafe_name && <div style={{ fontSize: 11, color: C.sub, marginTop: 1 }}>در {p.cafe_name}</div>}
+            </div>
+            {p.xp_bonus > 0 && <span style={{ fontSize: 11.5, fontWeight: 900, color: C.text, background: C.card, borderRadius: 99, padding: '3px 9px', flexShrink: 0 }}>{fa(p.xp_bonus)} امتیاز</span>}
+          </div>
+        ))}
+      </div>
+      {last.length > 0 && (
+        <div style={{ borderTop: '1px solid ' + T.hair, padding: '10px 14px 12px' }}>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: C.sub, marginBottom: 6 }}>{myWin ? 'هفته پیش تو هم جزو برنده‌ها بودی 🎉' : 'برنده‌های هفته پیش'}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {last.map(w => (
+              <span key={w.rank} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: C.text, background: w.me ? alpha(C.accent, 0.14) : T.chip, borderRadius: 99, padding: '4px 10px 4px 8px' }}>
+                <span>{PRIZE_ICON[w.rank]}</span><span>{w.avatar && w.avatar.length <= 4 ? w.avatar + ' ' : ''}{w.name}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function Row({ p, i, C, T, scope }) {

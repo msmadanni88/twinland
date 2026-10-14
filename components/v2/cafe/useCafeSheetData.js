@@ -86,7 +86,8 @@ export function useCafeSheetData({ cafe, favs, setFavs, showToast }) {
   async function share() {
     const where = cafe.description || cafe.district
     const text = cafe.name + (where ? ' — ' + where : '') + ' | TwinLand'
-    const url = typeof window !== 'undefined' ? window.location.origin + '/' : 'https://twinland.ir/'
+    // صفحه عمومی همان کافه: برای کسی که هنوز وارد نشده هم باز می‌شود و دکمه «باز کردن روی نقشه» دارد
+    const url = (typeof window !== 'undefined' ? window.location.origin : 'https://twinland.ir') + '/cafe/' + cafe.id
     try {
       if (navigator.share) { await navigator.share({ title: cafe.name, text, url }); return }
       await navigator.clipboard.writeText(text + '\n' + url)

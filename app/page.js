@@ -3,12 +3,15 @@ import { useEffect, useState } from 'react'
 import { useUiVersion } from '@/components/ui/UiVersionProvider'
 import { resolveSurface } from '@/lib/ui/surfaces'
 import { SB_KEY, SB_URL } from '@/lib/config'
+import { claimPendingReferral, rememberEntryParams } from '@/lib/growth/entry'
 
 export default function Page(){
   const [session,   setSession]   = useState(null)
   const [authReady, setAuthReady] = useState(false)
   const { active, recheck } = useUiVersion()   // نسخه ظاهر فعال — lib/ui/versions.js
   useEffect(()=>{
+    // پیوند دعوت ?ref= و پیوند مستقیم کافه ?cafe= پیش از ورود نگه داشته می‌شوند تا بعد از ورود به کار بیایند
+    rememberEntryParams()
     try{
       const raw = localStorage.getItem('tl_session')
       if(raw){ const s = JSON.parse(raw); if(s && s.access_token && (!s.expires_at || s.expires_at > Date.now())) setSession(s); else localStorage.removeItem('tl_session') }
@@ -16,6 +19,8 @@ export default function Page(){
     setAuthReady(true)
   },[])
   useEffect(()=>{ recheck() },[session, recheck])
+  // کد دعوت فقط یک بار و فقط بعد از ورود ثبت می‌شود؛ قاعده‌ها سمت سرور است
+  useEffect(()=>{ if(session&&session.access_token) claimPendingReferral(session) },[session])
 
   // حساب کافه‌دار جای بازی، مستقیم به پنل کافه‌دار می‌رود. اگر خودش از پنل «نقشه» را بزند (/?play=1)
   // در همین تب بازی را می‌بیند. مالک اپ همیشه بازی را می‌بیند. این فقط مسیر است، نه امنیت.

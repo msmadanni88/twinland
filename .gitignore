@@ -1,0 +1,15 @@
+# dependencies and build output
+node_modules/
+.next/
+out/
+.vercel/
+
+# local env files and logs
+.env*.local
+.env
+npm-debug.log*
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

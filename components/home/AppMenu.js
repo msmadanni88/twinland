@@ -1,10 +1,16 @@
 'use client'
 // منوی اصلی: صفحه‌ها، ابزارهای مالک و خروج — جداشده از TwinLand.js
+import { useState } from 'react'
 import { ICON, L, ROUTE } from '@/lib/theme/labels'
+import { InstallSheet, ReferralSheet } from '@/components/v3/growth/GrowthSheets'
 
 // showBusiness اختیاری است: نسخه‌های تازه آن را false می‌دهند تا کاربر عادی «پنل کافه‌دار» را نبیند. بدون آن مثل قبل برای همه هست.
-export function AppMenu({ demoOn, toggleDemo, showBusiness, C, TH, backfillDistricts, backfilling, effAdmin, isOwner, onLogout, resetMe, setPanelOpen, setPanelTab, setShowMapSettings, setShowMenu, setShowXP, setTab, setTutorialReplay, showMenu, showToast, toggleViewMode, viewAsUser }) {
+export function AppMenu({ demoOn, toggleDemo, showBusiness, growth = false, C, TH, backfillDistricts, backfilling, effAdmin, isOwner, onLogout, resetMe, setPanelOpen, setPanelTab, setShowMapSettings, setShowMenu, setShowXP, setTab, setTutorialReplay, showMenu, showToast, toggleViewMode, viewAsUser }) {
+  // برگه‌های دعوت دوست و نصب روی گوشی؛ فقط وقتی growth روشن است (نسخه v3.0)
+  const [sheet, setSheet] = useState(null)
   return (<>
+      {sheet === 'invite' && <ReferralSheet C={C} showToast={showToast} onClose={() => setSheet(null)} />}
+      {sheet === 'install' && <InstallSheet C={C} showToast={showToast} onClose={() => setSheet(null)} />}
       {showMenu&&(
         <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(0,0,0,.3)',backdropFilter:'blur(8px)'}} onClick={()=>setShowMenu(false)}>
           <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:TH+8,right:14,left:14,maxHeight:'calc(100dvh - '+(TH+28)+'px)',overflowY:'auto',WebkitOverflowScrolling:'touch',background:'linear-gradient(165deg, '+C.accent+'26, transparent 55%), '+C.glassDark,backdropFilter:'blur(24px)',borderRadius:18,border:'1px solid '+C.border,boxShadow:'0 8px 40px rgba(0,0,0,.15)',animation:'fadeIn .2s ease'}}>
@@ -29,6 +35,7 @@ export function AppMenu({ demoOn, toggleDemo, showBusiness, C, TH, backfillDistr
               </div>
             )}
             {[
+              ...(growth?[{key:'invite',icon:'🎁',label:'دعوت دوست · ۱۵۰ امتیاز برای هر دو',href:null,userOnly:true},{key:'install',icon:'📲',label:'نصب روی گوشی و اعلان',href:null}]:[]),
               {key:'map',icon:'🗺',img:'/icon_map_active@2x.png',label:'نقشه',href:null},
               {key:'missions',icon:'📋',img:'/icon_mission_active@2x.png',label:'ماموریت‌ها',href:null},
               {key:'profile',icon:ICON.profile,img:'/icon_profile_active@2x.png',label:L.profile,href:ROUTE.profile},
@@ -49,7 +56,7 @@ export function AppMenu({ demoOn, toggleDemo, showBusiness, C, TH, backfillDistr
               {key:'reset',icon:'♻️',label:'ریست حساب (تست)',href:null,adminOnly:true},
               {key:'backfill',icon:'🗺️',label:'پرکردن منطقه کافه‌ها',href:null,adminOnly:true},
               {key:'logout',icon:ICON.logout,label:L.logout,href:null},
-            ].filter(item=>(!item.adminOnly||effAdmin)&&(item.key!=='business'||showBusiness!==false)).map((item,i,arr)=>{
+            ].filter(item=>(!item.adminOnly||effAdmin)&&(item.key!=='business'||showBusiness!==false)&&(!item.userOnly||!showBusiness||isOwner)).map((item,i,arr)=>{
               const style={width:'100%',display:'flex',alignItems:'center',gap:14,background:'transparent',border:'none',padding:'13px 18px',color:C.text,fontSize:14,fontFamily:'inherit',fontWeight:500,borderBottom:i<arr.length-1?'1px solid '+C.border:'none',textDecoration:'none'}
               if(item.href){
                 return <a key={item.key} className="tl-row" href={item.href} style={style}>
@@ -57,7 +64,7 @@ export function AppMenu({ demoOn, toggleDemo, showBusiness, C, TH, backfillDistr
                   <span style={{marginRight:'auto',color:C.sub,fontSize:13}}>›</span>
                 </a>
               }
-              return <button key={item.key} className="tl-row" onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='demo'){toggleDemo&&toggleDemo();return}if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='tutorial'){setTutorialReplay(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
+              return <button key={item.key} className="tl-row" onClick={()=>{if(item.key==='backfill'){backfillDistricts();return}setShowMenu(false);if(item.key==='demo'){toggleDemo&&toggleDemo();return}if(item.key==='reset'){resetMe();return}if(item.key==='logout'){onLogout&&onLogout();return}if(item.key==='xp'){setShowXP(true);return}if(item.key==='tutorial'){setTutorialReplay(true);return}if(item.key==='settings'){setShowMapSettings(true);return}if(item.key==='missions'){setPanelOpen(true);setPanelTab('missions');return}if(item.key==='map'){setTab('map');setPanelOpen(false);return}if(item.key==='invite'||item.key==='install'){setSheet(item.key);return}showToast('📣 '+item.label+' به زودی!')}} style={style}>
                 {item.img?<img src={item.img} alt={item.label} width={26} height={26} style={{objectFit:'contain',display:'block',flexShrink:0}}/>:<span style={{fontSize:20,width:28,textAlign:'center'}}>{item.icon}</span>}{item.key==='backfill'&&backfilling?'در حال پردازش…':item.label}
               </button>
             })}

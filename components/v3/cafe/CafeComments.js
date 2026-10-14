@@ -4,6 +4,7 @@
 //  • حداکثر ۵ نظر تازه در ۲۴ ساعت، و بین دو ویرایش ۲۰ ثانیه. پیوند، شناسه و شماره تلفن در متن مجاز نیست.
 //  • سه گزارش از سه نفر مختلف، نظر را پنهان می‌کند. نویسنده نظر خودش را می‌تواند بردارد.
 //  • کنار نام کسانی که در همین کافه چک‌این کرده‌اند نشان «اینجا بوده» می‌آید.
+//  • جواب صاحب کافه زیر هر نظر می‌آید؛ مدیر سایت می‌تواند نظر را پنهان یا برگرداند.
 import { useCallback, useEffect, useState } from 'react'
 import { SB_KEY, SB_URL } from '@/lib/config'
 import { alpha } from '@/components/v2/theme'
@@ -22,6 +23,7 @@ const ERR = {
   no_links: 'پیوند و شناسه شبکه‌های اجتماعی در نظر مجاز نیست',
   no_phone: 'شماره تلفن در نظر مجاز نیست',
   rate: 'کمی صبر کن؛ پشت‌سرهم نمی‌شود نظر گذاشت',
+  blocked: 'این نظر را مدیر سایت برداشته و دوباره باز نمی‌شود',
 }
 
 function ago(iso) {
@@ -62,7 +64,7 @@ export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast
   const PAGE = 20
 
   const load = useCallback((offset) => {
-    return rpc('cafe_comments_list', { p_cafe: cafe.id, p_limit: PAGE + 1, p_offset: offset }, token).then(r => {
+    return rpc('cafe_comments_feed', { p_cafe: cafe.id, p_limit: PAGE + 1, p_offset: offset }, token).then(r => {
       if (!Array.isArray(r)) { setFail(true); if (!offset) setRows([]); return }
       setFail(false)
       const page = r.slice(0, PAGE)
@@ -148,6 +150,12 @@ export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast
             </div>
           </div>
           <div style={{ fontSize: 13.5, color: C.text, lineHeight: 2, marginTop: 8, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{r.body}</div>
+          {r.reply_body && (
+            <div style={{ marginTop: 8, padding: '8px 11px', borderRadius: 12, background: alpha(C.accent, 0.08), borderRight: '3px solid ' + C.accent }}>
+              <div style={{ fontSize: 11, fontWeight: 900, color: C.accent }}>پاسخ {cafe.name || 'کافه'}{r.reply_at ? <span style={{ color: C.sub, fontWeight: 700 }}> · {ago(r.reply_at)}</span> : null}</div>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.9, marginTop: 3, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{r.reply_body}</div>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 14, marginTop: 6 }}>
             {r.mine ? <>
               <button onClick={() => { setText(r.body); setEditing(true) }} style={{ border: 'none', background: 'none', padding: 0, color: C.accent, fontSize: 12, fontWeight: 800, fontFamily: 'inherit' }}>ویرایش</button>

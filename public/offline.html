@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f1222">
+<title>TwinLand · بدون اینترنت</title>
+<style>
+  :root{--bg:#f6f7fb;--card:#fff;--text:#1e293b;--sub:#64748b;--accent:#0284c7}
+  @media (prefers-color-scheme:dark){:root{--bg:#0f1222;--card:#181c33;--text:#f8fafc;--sub:#94a3b8;--accent:#38bdf8}}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--bg);color:var(--text);font-family:Tahoma,system-ui,sans-serif}
+  .c{max-width:360px;width:100%;background:var(--card);border-radius:22px;padding:28px 22px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.12)}
+  img{width:72px;height:72px;border-radius:18px}
+  h1{font-size:18px;margin:16px 0 8px}
+  p{font-size:14px;line-height:2;color:var(--sub);margin:0 0 18px}
+  button{border:0;border-radius:12px;background:var(--accent);color:#fff;font:inherit;font-size:14px;font-weight:700;padding:11px 22px;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="c">
+    <img src="/icons/icon-192.png" alt="TwinLand">
+    <h1>اینترنت در دسترس نیست</h1>
+    <p>نقشه و چک‌این به اینترنت نیاز دارند. وقتی دوباره وصل شدی، صفحه را تازه کن.</p>
+    <button onclick="location.reload()">تلاش دوباره</button>
+  </div>
+</body>
+</html>

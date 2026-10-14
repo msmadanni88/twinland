@@ -16,11 +16,12 @@ import { Clans, Collab, Customers, DemoCampaigns, Overview, Timing } from '@/com
 import { AreaMap } from '@/components/v3/business/AreaMap'
 import { useBizSim } from '@/components/v3/demo/useBizSim'
 import { Traffic } from '@/components/v3/business/Traffic'
+import { Reviews, useBizReviewCount } from '@/components/v3/business/Reviews'
 
 const OWNER_EMAIL = 'msmadani88@gmail.com'
 const NAV = [
   ['overview', '🏠', 'نمای کلی'], ['customers', '👥', 'مشتری‌ها'], ['traffic', '📈', 'بازدید و کلیک'], ['timing', '⏰', 'زمان‌بندی'], ['area', '🗺', 'نقشه و محله'],
-  ['campaigns', '🎯', 'کمپین‌ها'], ['clans', '🛡', 'کلن‌ها'], ['collab', '🤝', 'همکاری'], ['storefront', '🏪', 'ویترین و منو'], ['account', '⚙️', 'حساب'],
+  ['campaigns', '🎯', 'کمپین‌ها'], ['reviews', '💬', 'نظرها'], ['clans', '🛡', 'کلن‌ها'], ['collab', '🤝', 'همکاری'], ['storefront', '🏪', 'ویترین و منو'], ['account', '⚙️', 'حساب'],
 ]
 
 export function BusinessApp({ slots }) {
@@ -112,6 +113,7 @@ export function BusinessApp({ slots }) {
   const K = bizTokens(C)
   const view = demoOn && demo ? { biz: demo.biz, d: demo.d, area: demo.area, collab: demo.collab, state: 'ready' } : { biz: current, d: dash, area, collab, state: dashState }
   const pendingIn = ((view.collab && view.collab.items) || []).filter(i => i.incoming && i.status === 'pending').length
+  const unanswered = useBizReviewCount(!demoOn && current && current.status === 'verified' ? current.id : null)
 
   async function propose(p) {
     if (demoOn) { setDemo(s => ({ ...s, collab: { ...s.collab, items: [{ id: 'n' + Date.now(), kind: p.kind, title: p.title, message: p.message || null, status: 'pending', incoming: false, other_name: (s.collab.directory.find(x => x.business_id === p.to) || {}).name || '', other_district: '' }].concat(s.collab.items) } })); return { ok: true } }
@@ -140,6 +142,7 @@ export function BusinessApp({ slots }) {
           : { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 99, border: '1px solid ' + (on ? 'transparent' : C.border), background: on ? C.accent : C.card, color: on ? onColor(C.accent) : C.text, fontSize: 12.5, fontWeight: on ? 900 : 700, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}>
         <span style={{ fontSize: wide ? 16 : 14 }}>{icon}</span><span style={{ flex: wide ? 1 : 'none' }}>{label}</span>
         {k === 'collab' && pendingIn > 0 && <span style={{ background: '#d03b3b', color: '#fff', borderRadius: 99, fontSize: 10.5, fontWeight: 900, padding: '1px 7px' }}>{fa(pendingIn)}</span>}
+        {k === 'reviews' && unanswered > 0 && <span style={{ background: '#f59e0b', color: '#fff', borderRadius: 99, fontSize: 10.5, fontWeight: 900, padding: '1px 7px' }}>{fa(unanswered)}</span>}
       </button>
     )
   }
@@ -214,6 +217,8 @@ export function BusinessApp({ slots }) {
     if (tab === 'timing') return <Timing C={C} K={K} d={view.d} area={view.area} />
     if (tab === 'area') return view.area ? <AreaMap C={C} K={K} area={view.area} /> : <Card C={C} K={K}><Empty C={C} icon="🗺" title="داده محله در دسترس نیست" /></Card>
     if (tab === 'clans') return <Clans C={C} K={K} d={view.d} go={setTab} />
+    if (tab === 'reviews') return demoOn ? <Card C={C} K={K}><Empty C={C} icon="💬" title="نظرها در حالت نمایشی باز نیست" text="نظر و جواب فقط با کسب‌وکار واقعی دیده می‌شود." /></Card>
+      : <Reviews C={C} K={K} biz={view.biz} />
     if (tab === 'collab') return <Collab C={C} K={K} collab={view.collab} onPropose={propose} onRespond={respond} busy={busy} />
     if (tab === 'campaigns') return demoOn ? <DemoCampaigns C={C} K={K} d={view.d} />
       : <Card C={C} K={K} title="کمپین‌ها و کد جایزه" hint="کمپین فعال روی نقشه برای همه دیده می‌شود">{slots && slots.Campaigns ? <slots.Campaigns C={C} d={view.d} biz={view.biz} isPending={false} onReload={() => { loadList(); loadData(current, true) }} /> : null}</Card>

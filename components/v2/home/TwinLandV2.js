@@ -55,6 +55,7 @@ import { DemoLayer } from '@/components/v3/demo/DemoLayer'
 import { useMapFollow } from '@/components/v3/map/useMapFollow'
 import { setTracking } from '@/lib/track'
 import { identifyUser, initAnalytics, track } from '@/lib/analytics'
+import { takeOpenCafe, takeReferralMessage } from '@/lib/growth/entry'
 import { DemoConsole, SimClan, SimDashboard, SimMissions, SimProfile, SimRank } from '@/components/v3/demo/DemoPanels'
 
 // hexFog فقط در نسخه v3.0 روشن است؛ بدون آن این صفحه دقیقاً همان v2.0 است
@@ -186,6 +187,30 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session && session.user && session.user.id])
 
+  // پیوند مستقیم کافه (/?cafe=<id>، مثلاً از صفحه عمومی هر کافه): بعد از آمدن فهرست مکان‌ها همان کافه باز می‌شود
+  const openCafeRef = useRef(undefined)
+  useEffect(() => {
+    if (openCafeRef.current === undefined) openCafeRef.current = takeOpenCafe()
+    const id = openCafeRef.current
+    if (!id || mapLoading || !realCafes || !realCafes.length) return
+    openCafeRef.current = null
+    const c = realCafes.find(x => x.id === id)
+    if (!c) return
+    setSelCafe(c)
+    track('cafe_deeplink', { cafe_id: id })
+    try { if (mapInst.current && c.lat && c.lng) mapInst.current.flyTo([c.lat, c.lng], Math.max(mapInst.current.getZoom(), 16), { duration: 1.2 }) } catch (e) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realCafes, mapLoading])
+
+  // نتیجه ثبت کد دعوت، یک بار به شکل پیام کوتاه
+  useEffect(() => {
+    const show = () => { const m = takeReferralMessage(); if (m && m.msg) showToast(m.msg, m.ok ? undefined : 'warn') }
+    show()
+    window.addEventListener('tl-referral', show)
+    return () => window.removeEventListener('tl-referral', show)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // پنل روی دسکتاپ واقعی با ماوس از اول باز است — مثل نسخه قبل
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -294,7 +319,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
       <TutorialCoach C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} tutorialLoaded={tutorialLoaded} replay={tutorialReplay} onReplayEnd={() => setTutorialReplay(false)} isMobile={isMobile} />
       {celebration && <CelebrationOverlay C={C} data={celebration} onClose={() => setCelebration(null)} />}
 
-      <AppMenu demoOn={demo.on} toggleDemo={hexFog ? toggleDemo : null} showBusiness={isBiz || isOwner || effAdmin} C={C} TH={Lay.barTop + Lay.barH} backfillDistricts={backfillDistricts} backfilling={backfilling} effAdmin={effAdmin} isOwner={isOwner} onLogout={onLogout} resetMe={resetMe} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setShowMapSettings={setShowMapSettings} setShowMenu={setShowMenu} setShowXP={setShowXP} setTab={setTab} setTutorialReplay={setTutorialReplay} showMenu={showMenu} showToast={showToast} toggleViewMode={toggleViewMode} viewAsUser={viewAsUser} />
+      <AppMenu growth={hexFog} demoOn={demo.on} toggleDemo={hexFog ? toggleDemo : null} showBusiness={isBiz || isOwner || effAdmin} C={C} TH={Lay.barTop + Lay.barH} backfillDistricts={backfillDistricts} backfilling={backfilling} effAdmin={effAdmin} isOwner={isOwner} onLogout={onLogout} resetMe={resetMe} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setShowMapSettings={setShowMapSettings} setShowMenu={setShowMenu} setShowXP={setShowXP} setTab={setTab} setTutorialReplay={setTutorialReplay} showMenu={showMenu} showToast={showToast} toggleViewMode={toggleViewMode} viewAsUser={viewAsUser} />
       <CityPicker C={C} city={city} setCity={setCity} setShowCity={setShowCity} showCity={showCity} showToast={showToast} />
       <PalettePicker C={C} paletteKey={paletteKey} pickPalette={pickPalette} setShowPalette={setShowPalette} showPalette={showPalette} themeMode={themeMode} toggleMode={toggleMode} />
       {showMapSettings && <MapSettingsPopup C={C} value={mapDisplay} setValue={setMapDisplay} onClose={() => setShowMapSettings(false)} />}
