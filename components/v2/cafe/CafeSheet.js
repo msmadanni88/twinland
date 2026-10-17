@@ -22,7 +22,9 @@ const PAGES = [['about', 'درباره'], ['gallery', 'گالری'], ['menu', '�
 // canClaim: دکمه «صاحب این کافه هستید؟» فقط برای حساب کافه‌دار؛ مالک اپ همیشه دکمه مدیریت مستقیم را دارد
 // noPlay: حساب کسب‌وکار بازی نمی‌کند، پس دکمه چک‌این ندارد
 // checkedToday فقط در v3.0: دکمه چک‌این فقط برای امروز قفل می‌شود، نه برای همیشه، تا بازدید دوباره و ماموریت وفاداری ممکن باشد
-export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, favs, setFavs, checkedIn, checkedToday = null, isAdmin, onClose, onCheckin, showToast }) {
+// tint و headTint اختیاری‌اند: نسخه v4.0 برای نشان کافه همان سبز ثابت نشانگرها و برای سر برگه رنگ خنثی می‌دهد.
+// بدون آن‌ها رنگ هر کافه از نامش می‌آید، مثل قبل.
+export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headTint = null, C, T, cafe, live, favs, setFavs, checkedIn, checkedToday = null, isAdmin, onClose, onCheckin, showToast }) {
   const [wide, setWide] = useState(false)
   const [page, setPage] = useState('about')
   useEffect(() => { setPage('about') }, [cafe.id])
@@ -35,7 +37,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
   }, [onClose])
 
   const d = useCafeSheetData({ cafe, favs, setFavs, showToast })
-  const color = getColor(cafe.name)
+  const color = tint || getColor(cafe.name)
   const isChecked = checkedToday ? checkedToday.has(cafe.id) : checkedIn.has(cafe.id)
   const beenBefore = !!checkedToday && !isChecked && checkedIn.has(cafe.id)
   const isFav = favs.has(cafe.id)
@@ -80,7 +82,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, C, T, cafe, live, 
         <div className="tl-vscroll" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {/* کاور */}
           <div style={{ position: 'relative', height: heroH, flexShrink: 0, overflow: 'hidden',
-            background: 'radial-gradient(120% 140% at 85% -10%,' + mix(color, C.card, 0.05) + ',' + mix(color, C.bg, 0.45) + ' 55%,' + mix(color, C.bg, 0.8) + ')' }}>
+            background: 'radial-gradient(120% 140% at 85% -10%,' + mix(headTint || color, C.card, 0.05) + ',' + mix(headTint || color, C.bg, 0.45) + ' 55%,' + mix(headTint || color, C.bg, 0.8) + ')' }}>
             {d.cover
               ? <img src={d.cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
               : <div aria-hidden style={{ position: 'absolute', left: -10, top: -18, fontSize: 150, opacity: 0.16, transform: 'rotate(-14deg)', lineHeight: 1 }}>☕</div>}

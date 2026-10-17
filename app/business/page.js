@@ -8,6 +8,7 @@ import { L, ICON } from '@/lib/theme/labels'
 import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
 import { CafeContentEditor } from '@/components/business/CafeContentEditor'
 import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { uiAtLeast } from '@/lib/ui/versions'
 import { BusinessApp } from '@/components/v3/business/BusinessApp'
 import { V3_FLAGS } from '@/components/v3/flags'
 import { EventArt } from '@/components/events/EventArt'
@@ -35,7 +36,7 @@ const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
 const V3_SLOTS = { Campaigns: (p) => <TabCampaigns {...p} />, Content: (p) => <CafeContentEditor {...p} />, EmptyState: (p) => <EmptyState {...p} /> }
 export default function BusinessRoute() {
   const { active } = useUiVersion()
-  if (active === 'v3.0') return <BusinessApp slots={V3_SLOTS} />
+  if (uiAtLeast(active, 'v3.0')) return <BusinessApp slots={V3_SLOTS} />
   return <LegacyBusinessPage />
 }
 
@@ -456,7 +457,7 @@ const CATEGORY_ICON = { general: '🎯', drink: '☕', food: '🍰', discount: '
 
 function TabCampaigns({ C, d, biz, isPending, onReload }) {
   const { active: uiActive } = useUiVersion()
-  const v3 = uiActive === 'v3.0' && !!V3_FLAGS.eventWidgets
+  const v3 = uiAtLeast(uiActive, 'v3.0') && !!V3_FLAGS.eventWidgets
   const [artFor, setArtFor] = useState(null)   // شناسه رویدادی که انتخابگر تصویرش باز است
   const [showForm, setShowForm] = useState(false)
   const [redeemInput, setRedeemInput] = useState('')
@@ -562,7 +563,7 @@ function TabCampaigns({ C, d, biz, isPending, onReload }) {
 
 function NewQuestForm({ C, biz, onDone }) {
   const { active: uiActive } = useUiVersion()
-  const v3 = uiActive === 'v3.0' && !!V3_FLAGS.eventWidgets
+  const v3 = uiAtLeast(uiActive, 'v3.0') && !!V3_FLAGS.eventWidgets
   const [f, setF] = useState({
     art_key: '',
     title: '', description: '', icon: '🎯', condition_type: 'checkin', target_count: 1,

@@ -182,7 +182,7 @@ function cloudNode(text, seed, fill, ink, textColor) {
 }
 
 // cx, cy: مرکز پین داخل جعبه خودش — گره‌ها نسبت به همین نقطه چیده می‌شوند
-function renderSatellites(cafe, C, cx, cy) {
+export function renderSatellites(cafe, C, cx, cy) {
   const q = cafe.active_quest
   if (!cafe.motto && !cafe.featured_item_name && !q && !cafe.is_full) return ''
   const seed = seedOf(cafe)

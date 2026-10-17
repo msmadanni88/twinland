@@ -9,6 +9,7 @@ import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
 import { L, ICON, fa } from '@/lib/theme/labels'
 import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
 import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { uiAtLeast } from '@/lib/ui/versions'
 import { V3_FLAGS } from '@/components/v3/flags'
 import { EventArt } from '@/components/events/EventArt'
 
@@ -35,7 +36,7 @@ function diffParts(target) {
 
 export default function QuestsPage() {
   const { active: uiActive } = useUiVersion()
-  const v3 = uiActive === 'v3.0' && !!V3_FLAGS.eventWidgets   // تصویر ویجت به‌جای ایموجی، فقط در v3.0
+  const v3 = uiAtLeast(uiActive, 'v3.0') && !!V3_FLAGS.eventWidgets   // تصویر ویجت به‌جای ایموجی، فقط در v3.0
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [quests, setQuests] = useState([])
   const [progress, setProgress] = useState({})

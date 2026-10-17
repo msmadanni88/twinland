@@ -1,10 +1,25 @@
 // TwinLand service worker
 // • صفحه‌ها همیشه اول از شبکه می‌آیند؛ فقط اگر اینترنت نبود صفحه آفلاین نشان داده می‌شود.
 // • فایل‌های ساخته‌شده Next در /_next/static/ نام یکتا دارند و از حافظه داده می‌شوند.
-// • درخواست به Supabase، نقشه و API هرگز دست نمی‌خورد.
+// • درخواست به Supabase و API هرگز دست نمی‌خورد، جز داده نقشه برداری:
+//   تکه‌های نقشه، فونت نوشته‌ها و کتابخانه نقشه از /api/mapkit/ یک بار گرفته و روی دستگاه نگه داشته می‌شوند
+//   تا نقشه با اینترنت ضعیف هم فوری باز شود و با کشیدنش خالی نماند. سقف تعداد دارد و قدیمی‌ترها پاک می‌شوند.
 // • اعلان روی گوشی: متن را از تابع push-send می‌گیرد و با لمس، همان صفحه مربوط را باز می‌کند.
-const VERSION = 'tl-sw-1'
+const VERSION = 'tl-sw-2'
 const STATIC = VERSION + '-static'
+// حافظه نقشه نام جدا دارد تا با هر نسخه تازه این فایل پاک نشود
+const MAPCACHE = 'tl-map-1'
+const MAP_MAX = 2500
+const MAP_PATHS = ['/api/mapkit/tiles/', '/api/mapkit/fonts/', '/api/mapkit/lib/']
+let trimming = false
+function trimMap() {
+  if (trimming) return
+  trimming = true
+  caches.open(MAPCACHE).then((c) => c.keys().then((keys) => {
+    const extra = keys.length - MAP_MAX
+    return extra > 0 ? Promise.all(keys.slice(0, extra + 200).map((k) => c.delete(k))) : null
+  })).catch(() => {}).then(() => { trimming = false })
+}
 const SHELL = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/badge-72.png']
 
 self.addEventListener('install', (event) => {
@@ -14,7 +29,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION) && k !== MAPCACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   )
 })
@@ -24,6 +39,16 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return
+  if (MAP_PATHS.some((p) => url.pathname.startsWith(p))) {
+    // اول از حافظه دستگاه؛ اگر نبود از شبکه و نگه داشتن پاسخ سالم
+    event.respondWith(
+      caches.open(MAPCACHE).then((c) => c.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res && res.ok && res.status === 200) { c.put(req, res.clone()).then(() => { if (Math.random() < 0.02) trimMap() }).catch(() => {}) }
+        return res
+      })))
+    )
+    return
+  }
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ingest')) return
 
   if (req.mode === 'navigate') {

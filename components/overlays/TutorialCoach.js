@@ -73,7 +73,9 @@ const TUTORIAL_STEPS = [
     text:'حالا برو روی نقشه، نزدیک‌ترین کافه رو بزن و اولین چک‌اینت رو ثبت کن. اگه چیزی یادت رفت، از منو → «'+L.tutorial+'» دوباره همین راهنما رو باز کن.' },
 ]
 
-export function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, tutorialLoaded, replay, onReplayEnd, isMobile}) {
+// neon اختیاری است: نسخه v4.0 آن را سفید می‌دهد تا با ظاهر سیاه و سفید جور باشد. بدون آن همان سبز فسفری همیشگی است.
+export function TutorialCoach({C, session, accountType, tutorialSeen, setTutorialSeen, tutorialLoaded, replay, onReplayEnd, isMobile, neon}) {
+  const NEON = neon || TUT_NEON
   const [replayIdx, setReplayIdx] = useState(0)
   const [rect, setRect] = useState(null)
   const roleSteps = TUTORIAL_STEPS.filter(s => s.forRole==='any' || s.forRole===accountType)
@@ -167,25 +169,25 @@ export function TutorialCoach({C, session, accountType, tutorialSeen, setTutoria
         <div style={{position:'fixed',top:rect.top-7,left:rect.left-7,width:rect.width+14,height:rect.height+14,zIndex:4001,borderRadius:16,pointerEvents:'none',animation:'tlSpotPulse 1.6s ease-in-out infinite'}}/>
       )}
       <div style={{...cardStyle,animation:'coachPop .32s ease'}}>
-        <div style={{background:'rgba(18,18,22,.97)',border:'2px solid '+TUT_NEON,borderRadius:20,padding:'15px 17px',boxShadow:'0 0 26px '+TUT_NEON+'55, 0 12px 40px rgba(0,0,0,.45)',maxWidth:430,margin:'0 auto'}}>
+        <div style={{background:'rgba(18,18,22,.97)',border:'2px solid '+NEON,borderRadius:20,padding:'15px 17px',boxShadow:'0 0 26px '+NEON+'55, 0 12px 40px rgba(0,0,0,.45)',maxWidth:430,margin:'0 auto'}}>
           <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
             <span style={{fontSize:24,flexShrink:0}}>{step.emoji||'💡'}</span>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:900,color:TUT_NEON,lineHeight:1.4}}>{step.title}</div>
+              <div style={{fontSize:15,fontWeight:900,color:NEON,lineHeight:1.4}}>{step.title}</div>
               <div style={{fontSize:9.5,color:'rgba(255,255,255,.45)',marginTop:1}}>قدم {(stepNum).toLocaleString('fa')} از {roleSteps.length.toLocaleString('fa')}</div>
             </div>
           </div>
           <div style={{fontSize:12.5,color:'#EDEDEF',lineHeight:1.85}}>{step.text}</div>
           <div style={{display:'flex',gap:7,marginTop:14,alignItems:'center'}}>
             {stepNum>1 && <button onClick={prev} style={{background:'none',border:'1px solid rgba(255,255,255,.25)',color:'#ccc',borderRadius:12,padding:'9px 13px',fontSize:12,fontWeight:800,fontFamily:'inherit',flexShrink:0}}>→ قبلی</button>}
-            <button onClick={next} style={{flex:1,background:TUT_NEON,color:'#111',border:'none',borderRadius:12,padding:'10px 16px',fontSize:13,fontWeight:900,fontFamily:'inherit'}}>{isLast?'بزن بریم! 🚀':'بعدی ←'}</button>
+            <button onClick={next} style={{flex:1,background:NEON,color:'#111',border:'none',borderRadius:12,padding:'10px 16px',fontSize:13,fontWeight:900,fontFamily:'inherit'}}>{isLast?'بزن بریم! 🚀':'بعدی ←'}</button>
             <button onClick={skipAll} style={{background:'none',border:'1px solid rgba(255,255,255,.2)',color:'#999',borderRadius:12,padding:'9px 12px',fontSize:11.5,fontWeight:700,fontFamily:'inherit',flexShrink:0}}>رد شو</button>
           </div>
           <div style={{display:'flex',gap:3,justifyContent:'center',marginTop:12,flexWrap:'wrap'}}>
             {roleSteps.map((st,i)=>{
               const active = i===stepIdx
               const done = i<stepIdx
-              return <span key={st.key} style={{width:active?14:4,height:4,borderRadius:99,background:active?TUT_NEON:done?TUT_NEON+'66':'rgba(255,255,255,.2)',transition:'all .3s'}}/>
+              return <span key={st.key} style={{width:active?14:4,height:4,borderRadius:99,background:active?NEON:done?NEON+'66':'rgba(255,255,255,.2)',transition:'all .3s'}}/>
             })}
           </div>
         </div>

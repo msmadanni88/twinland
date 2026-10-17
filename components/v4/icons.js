@@ -1,0 +1,86 @@
+// آیکون‌های خطی نسخه v4.0 — همه روی شبکه 24 در 24، خط گرد با رنگ متن.
+// هیچ کتابخانه بیرونی لازم نیست؛ هر آیکون چند خط و دایره ساده است.
+// path با d، دایره با c=[cx,cy,r]، مستطیل با r=[x,y,w,h,rx]. f یعنی توپر، dash یعنی خط‌چین.
+const I = {
+  menu: [{ d: 'M4 7h16M4 12h16M4 17h10' }],
+  search: [{ c: [11, 11, 6.5] }, { d: 'M20 20l-4.2-4.2' }],
+  bell: [{ d: 'M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.8h-15z' }, { d: 'M10 20.5a2 2 0 0 0 4 0' }],
+  pin: [{ d: 'M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z' }, { c: [12, 10, 2.3] }],
+  layers: [{ d: 'M12 3.5 3.5 8.2 12 13l8.5-4.8z' }, { d: 'M3.5 12.4 12 17.2l8.5-4.8' }, { d: 'M3.5 16.4 12 21.2l8.5-4.8' }],
+  type: [{ d: 'M5 7V5h14v2M12 5v14M9 19h6' }],
+  typeOff: [{ d: 'M5 7V5h14v2M12 5v14M9 19h6' }, { d: 'M3.5 3.5l17 17' }],
+  polygon: [{ d: 'M12 3.5l7.9 5.8-3 9.2H7.1l-3-9.2z', dash: '2.6 2.4' }, { c: [12, 3.5, 1.3], f: 1 }, { c: [19.9, 9.3, 1.3], f: 1 }, { c: [4.1, 9.3, 1.3], f: 1 }],
+  crosshair: [{ c: [12, 12, 7] }, { d: 'M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4' }, { c: [12, 12, 1.7], f: 1 }],
+  crosshairOff: [{ c: [12, 12, 7] }, { d: 'M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4' }, { d: 'M4 4l16 16' }],
+  sun: [{ c: [12, 12, 4] }, { d: 'M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4' }],
+  moon: [{ d: 'M20 14.6A8 8 0 1 1 9.4 4a6.6 6.6 0 0 0 10.6 10.6z' }],
+  plus: [{ d: 'M12 5v14M5 12h14' }],
+  minus: [{ d: 'M5 12h14' }],
+  focus: [{ d: 'M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15' }, { c: [12, 12, 2.3] }],
+  sidebar: [{ r: [3.5, 4.5, 17, 15, 3] }, { d: 'M9.5 4.5v15' }],
+  chevronLeft: [{ d: 'M14.5 6 8.5 12l6 6' }],
+  chevronRight: [{ d: 'M9.5 6l6 6-6 6' }],
+  chevronDown: [{ d: 'M6 9.5l6 6 6-6' }],
+  map: [{ d: 'M3.5 6.5 9 4.5l6 2 5.5-2v13L15 19.5l-6-2-5.5 2z' }, { d: 'M9 4.5v13M15 6.5v13' }],
+  grid: [{ r: [4, 4, 6.5, 6.5, 1.8] }, { r: [13.5, 4, 6.5, 6.5, 1.8] }, { r: [4, 13.5, 6.5, 6.5, 1.8] }, { r: [13.5, 13.5, 6.5, 6.5, 1.8] }],
+  target: [{ c: [12, 12, 8.5] }, { c: [12, 12, 5] }, { c: [12, 12, 1.5], f: 1 }],
+  users: [{ c: [9, 8.5, 3.2] }, { d: 'M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5' }, { d: 'M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.7c1.9.6 3.1 2.2 3.5 4.8' }],
+  trophy: [{ d: 'M8 4.5h8v5a4 4 0 0 1-8 0z' }, { d: 'M8 6.2H5a3 3 0 0 0 3.2 3.3M16 6.2h3a3 3 0 0 1-3.2 3.3M12 13.5V17M8.5 20h7M9.5 17h5' }],
+  user: [{ c: [12, 8.5, 3.8] }, { d: 'M4.5 20.5c.9-3.7 3.9-6 7.5-6s6.6 2.3 7.5 6' }],
+  x: [{ d: 'M6 6l12 12M18 6 6 18' }],
+  check: [{ d: 'M5 12.5l4.5 4.5L19 7.5' }],
+  flame: [{ d: 'M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.4 2.5-5.2 3.6-8.3.9 1.6 1.6 2.4 2.8 3 .2-2.7 1.3-4.8 3.1-6.5.3 3.1 3.5 5.6 3.5 10.6C18.5 18.1 15.9 21 12 21z' }],
+  compass: [{ c: [12, 12, 8.5] }, { d: 'M15.5 8.5l-2 5-5 2 2-5z' }],
+  coffee: [{ d: 'M5 9h11v5.5A4.5 4.5 0 0 1 11.5 19h-2A4.5 4.5 0 0 1 5 14.5z' }, { d: 'M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8.5 3.5c-.8 1 .8 1.7 0 2.8M12 3.5c-.8 1 .8 1.7 0 2.8' }],
+  gift: [{ r: [4, 9.5, 16, 4, 1] }, { d: 'M5.5 13.5V20h13v-6.5M12 9.5V20' }, { d: 'M12 9.5C10.5 6 7 5.5 7.5 8c.3 1.4 2.5 1.5 4.5 1.5zM12 9.5c1.5-3.5 5-4 4.5-1.5-.3 1.4-2.5 1.5-4.5 1.5z' }],
+  phone: [{ r: [7, 3, 10, 18, 2.5] }, { d: 'M11 18h2' }],
+  store: [{ d: 'M4 9.5 5.5 4.5h13L20 9.5' }, { d: 'M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0' }, { d: 'M5.5 11.5V20h13v-8.5M10 20v-4.5h4V20' }],
+  shield: [{ d: 'M12 3.5 5 6v5.5c0 4.4 3 7.7 7 9 4-1.3 7-4.6 7-9V6z' }],
+  star: [{ d: 'M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z' }],
+  help: [{ c: [12, 12, 8.5] }, { d: 'M9.6 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2-2.4 3.5' }, { c: [12, 17, 0.9], f: 1 }],
+  sliders: [{ d: 'M4 7h9M17 7h3M4 17h3M11 17h9' }, { c: [15, 7, 2] }, { c: [9, 17, 2] }],
+  film: [{ r: [4, 5, 16, 14, 2.5] }, { d: 'M8 5v14M16 5v14M4 9.5h4M4 14.5h4M16 9.5h4M16 14.5h4' }],
+  refresh: [{ d: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3' }, { d: 'M19.5 4.5V9H15' }],
+  logout: [{ d: 'M10 4.5H6.5A1.5 1.5 0 0 0 5 6v12a1.5 1.5 0 0 0 1.5 1.5H10' }, { d: 'M14 8l4 4-4 4M18 12H9.5' }],
+  crown: [{ d: 'M4.5 17.5 3.5 7.5l5 4 3.5-6 3.5 6 5-4-1 10z' }, { d: 'M5 20.5h14' }],
+  image: [{ r: [3.5, 5, 17, 14, 2.5] }, { c: [9, 10, 1.6] }, { d: 'M20.5 15.5l-5-5-9 8.5' }],
+  list: [{ d: 'M9 6.5h11M9 12h11M9 17.5h11' }, { c: [4.8, 6.5, 1.1], f: 1 }, { c: [4.8, 12, 1.1], f: 1 }, { c: [4.8, 17.5, 1.1], f: 1 }],
+  arrowUp: [{ d: 'M12 19V5M6 11l6-6 6 6' }],
+  bolt: [{ d: 'M13 3 5.5 13.5H12L11 21l7.5-10.5H12z' }],
+  live: [{ c: [12, 12, 3], f: 1 }, { d: 'M7.5 7.5a6.4 6.4 0 0 0 0 9M16.5 7.5a6.4 6.4 0 0 1 0 9' }],
+  share: [{ c: [17.5, 5.5, 2.5] }, { c: [6.5, 12, 2.5] }, { c: [17.5, 18.5, 2.5] }, { d: 'M8.7 10.8l6.6-4M8.7 13.2l6.6 4' }],
+}
+
+const SW = (s) => ({ fill: 'none', stroke: 'currentColor', strokeWidth: s, strokeLinecap: 'round', strokeLinejoin: 'round' })
+
+export function Icon({ name, size = 20, stroke = 1.75, color, style, title }) {
+  const els = I[name] || I.help
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden={title ? undefined : 'true'} role={title ? 'img' : undefined}
+      style={{ display: 'block', flexShrink: 0, color, ...style }} {...SW(stroke)}>
+      {title && <title>{title}</title>}
+      {els.map((e, i) => {
+        const extra = e.f ? { fill: 'currentColor', stroke: 'none' } : e.dash ? { strokeDasharray: e.dash } : null
+        if (e.d) return <path key={i} d={e.d} {...extra} />
+        if (e.c) return <circle key={i} cx={e.c[0]} cy={e.c[1]} r={e.c[2]} {...extra} />
+        if (e.r) return <rect key={i} x={e.r[0]} y={e.r[1]} width={e.r[2]} height={e.r[3]} rx={e.r[4]} {...extra} />
+        return null
+      })}
+    </svg>
+  )
+}
+
+// همان آیکون به شکل رشته SVG، برای HTML نشانگرهای نقشه
+export function iconSvg(name, size = 18, color = 'currentColor', stroke = 2) {
+  const els = I[name] || I.help
+  const body = els.map(e => {
+    const paint = e.f ? 'fill="' + color + '" stroke="none"' : e.dash ? 'stroke-dasharray="' + e.dash + '"' : ''
+    if (e.d) return '<path d="' + e.d + '" ' + paint + '/>'
+    if (e.c) return '<circle cx="' + e.c[0] + '" cy="' + e.c[1] + '" r="' + e.c[2] + '" ' + paint + '/>'
+    if (e.r) return '<rect x="' + e.r[0] + '" y="' + e.r[1] + '" width="' + e.r[2] + '" height="' + e.r[3] + '" rx="' + e.r[4] + '" ' + paint + '/>'
+    return ''
+  }).join('')
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + color + '" stroke-width="' + stroke + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block">' + body + '</svg>'
+}
+
+export const ICON_NAMES = Object.keys(I)

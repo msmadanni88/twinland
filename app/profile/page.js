@@ -9,6 +9,7 @@ import {
 import { L, ICON, fa as faNum } from '@/lib/theme/labels'
 import { UIStyles, useDragScroll, hscroll, onColor, isDarkC } from '@/lib/theme/ui'
 import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { uiAtLeast } from '@/lib/ui/versions'
 import { V3_FLAGS } from '@/components/v3/flags'
 import { EventArt } from '@/components/events/EventArt'
 
@@ -66,7 +67,7 @@ function faDateTime(iso) {
 
 export default function ProfilePage() {
   const { active: uiActive } = useUiVersion()
-  const v3 = uiActive === 'v3.0' && !!V3_FLAGS.eventWidgets   // تاریخچه رویدادها با تصویر ویجت، فقط در v3.0
+  const v3 = uiAtLeast(uiActive, 'v3.0') && !!V3_FLAGS.eventWidgets   // تاریخچه رویدادها با تصویر ویجت، فقط در v3.0
   const [questDone, setQuestDone] = useState([])
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [tab, setTab] = useState('badges')
