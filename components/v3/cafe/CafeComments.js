@@ -46,7 +46,7 @@ function rpc(name, body, token) {
 function Avatar({ a, name, C, T }) {
   const isUrl = a && /^(https?:)?\/\//.test(a)
   return (
-    <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 900,
+    <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: (T.r || 12), overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 900,
       background: T.accentSoft, color: C.accent, border: '1px solid ' + T.hair }}>
       {isUrl ? <img src={a} alt="" width={36} height={36} style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
         : (a && a.length <= 4 ? a : String(name || '؟').trim().slice(0, 1))}
@@ -54,7 +54,10 @@ function Avatar({ a, name, C, T }) {
   )
 }
 
-export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast }) {
+// نسخه v4.0 دو ورودی اختیاری می‌دهد: AuthorAvatar (چهره مشترک سایت) و onAuthor (باز کردن پروفایل نویسنده).
+// با این دو، فهرست از comments_feed_v4 خوانده می‌شود که کارت عمومی نویسنده را طبق حریم خصوصی‌اش دارد.
+// بدون آن‌ها رفتار همان نسخه قبل است.
+export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast, AuthorAvatar = null, onAuthor = null }) {
   const [rows, setRows] = useState(null)       // null = در حال بارگذاری
   const [fail, setFail] = useState(false)
   const [more, setMore] = useState(false)
@@ -64,14 +67,16 @@ export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast
   const PAGE = 20
 
   const load = useCallback((offset) => {
-    return rpc('cafe_comments_feed', { p_cafe: cafe.id, p_limit: PAGE + 1, p_offset: offset }, token).then(r => {
+    const fn = AuthorAvatar ? 'comments_feed_v4' : 'cafe_comments_feed'
+    return rpc(fn, { p_cafe: cafe.id, p_limit: PAGE + 1, p_offset: offset }, token).then(r0 => {
+      const r = AuthorAvatar && Array.isArray(r0) ? r0.map(x => ({ ...x, author: x.author || null, name: (x.author && x.author.name) || 'کاربر', level: (x.author && x.author.level) || 0 })) : r0
       if (!Array.isArray(r)) { setFail(true); if (!offset) setRows([]); return }
       setFail(false)
       const page = r.slice(0, PAGE)
       setMore(r.length > PAGE)
       setRows(prev => (offset ? [...(prev || []), ...page] : page))
     })
-  }, [cafe.id, token])
+  }, [cafe.id, token, AuthorAvatar])
 
   useEffect(() => { setRows(null); setText(''); setEditing(false); load(0) }, [cafe.id, load])
 
@@ -108,7 +113,7 @@ export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast
     showToast && showToast(ok === true ? 'گزارشت ثبت شد. ممنون' : 'گزارش ثبت نشد', ok === true ? undefined : 'warn')
   }
 
-  const box = { borderRadius: 16, border: '1px solid ' + T.hair, background: T.chip, padding: 12 }
+  const box = { borderRadius: T.r || 16, border: '1px solid ' + T.hair, background: T.chip, padding: 12 }
 
   return (
     <div>
@@ -123,9 +128,9 @@ export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
             <span style={{ fontSize: 11, color: text.length > MAX - 40 ? C.danger : C.sub }}>{fa(text.length)} از {fa(MAX)}</span>
             <span style={{ flex: 1 }} />
-            {editing && <button className="tl2-press" onClick={() => { setEditing(false); setText('') }} style={{ height: 34, padding: '0 12px', border: 'none', borderRadius: 11, background: 'transparent', color: C.sub, fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit' }}>انصراف</button>}
+            {editing && <button className="tl2-press" onClick={() => { setEditing(false); setText('') }} style={{ height: 34, padding: '0 12px', border: 'none', borderRadius: (T.r || 11), background: 'transparent', color: C.sub, fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit' }}>انصراف</button>}
             <button className="tl2-press" onClick={submit} disabled={busy || text.trim().length < 2}
-              style={{ height: 34, padding: '0 16px', border: 'none', borderRadius: 11, background: C.accent, color: T.onAccent, fontSize: 12.5, fontWeight: 900, fontFamily: 'inherit', opacity: busy || text.trim().length < 2 ? 0.5 : 1 }}>
+              style={{ height: 34, padding: '0 16px', border: 'none', borderRadius: (T.r || 11), background: C.accent, color: T.onAccent, fontSize: 12.5, fontWeight: 900, fontFamily: 'inherit', opacity: busy || text.trim().length < 2 ? 0.5 : 1 }}>
               {busy ? '…' : mine ? 'ذخیره' : 'ثبت نظر'}
             </button>
           </div>
@@ -139,10 +144,12 @@ export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast
       {rows && rows.map(r => (
         <div key={r.id} style={{ ...box, marginBottom: 8, background: r.mine ? alpha(C.accent, 0.08) : T.chip, borderColor: r.mine ? alpha(C.accent, 0.35) : T.hair, opacity: r.hidden ? 0.6 : 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Avatar a={r.avatar} name={r.name} C={C} T={T} />
+            {AuthorAvatar ? <AuthorAvatar person={r.author || { name: r.name }} /> : <Avatar a={r.avatar} name={r.name} C={C} T={T} />}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, fontWeight: 900, color: C.text }}>{r.name || 'کاربر'}</span>
+                {onAuthor && r.author && r.author.id
+                  ? <button type="button" onClick={() => onAuthor(r.author)} style={{ border: 'none', background: 'none', padding: 0, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13, fontWeight: 900, color: C.text }}>{r.name || 'کاربر'}</button>
+                  : <span style={{ fontSize: 13, fontWeight: 900, color: C.text }}>{r.name || 'کاربر'}</span>}
                 {r.level > 0 && <span style={{ fontSize: 10.5, fontWeight: 800, color: C.sub }}>سطح {fa(r.level)}</span>}
                 {r.visited && <span style={{ fontSize: 10.5, fontWeight: 900, padding: '2px 8px', borderRadius: 99, background: alpha(C.green, 0.16), color: C.green }}>اینجا بوده</span>}
               </div>
@@ -151,7 +158,7 @@ export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast
           </div>
           <div style={{ fontSize: 13.5, color: C.text, lineHeight: 2, marginTop: 8, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{r.body}</div>
           {r.reply_body && (
-            <div style={{ marginTop: 8, padding: '8px 11px', borderRadius: 12, background: alpha(C.accent, 0.08), borderRight: '3px solid ' + C.accent }}>
+            <div style={{ marginTop: 8, padding: '8px 11px', borderRadius: (T.r || 12), background: alpha(C.accent, 0.08), borderRight: '3px solid ' + C.accent }}>
               <div style={{ fontSize: 11, fontWeight: 900, color: C.accent }}>پاسخ {cafe.name || 'کافه'}{r.reply_at ? <span style={{ color: C.sub, fontWeight: 700 }}> · {ago(r.reply_at)}</span> : null}</div>
               <div style={{ fontSize: 13, color: C.text, lineHeight: 1.9, marginTop: 3, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{r.reply_body}</div>
             </div>
@@ -166,7 +173,7 @@ export function CafeComments({ C, T, cafe, token, uid, noPlay = false, showToast
           </div>
         </div>
       ))}
-      {more && <button className="tl2-press" onClick={() => load(rows.length)} style={{ width: '100%', height: 40, border: '1px solid ' + T.hair, borderRadius: 12, background: T.chip, color: C.text, fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit' }}>نظرهای بیشتر</button>}
+      {more && <button className="tl2-press" onClick={() => load(rows.length)} style={{ width: '100%', height: 40, border: '1px solid ' + T.hair, borderRadius: (T.r || 12), background: T.chip, color: C.text, fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit' }}>نظرهای بیشتر</button>}
     </div>
   )
 }

@@ -1,27 +1,27 @@
 'use client'
 // داشبورد کاربر — نسخه v4.0
-// همان ساختار داشبورد v3.0 (داده یک بار گرفته می‌شود و در ctx به همه ویجت‌ها می‌رسد)،
-// با کارت سلام تازه (حلقه لول رنگی و کمان روزها) و کارت «حلقه تو». بقیه ویجت‌ها همان ویجت‌های v3.0 هستند
-// و چون پالت سیاه و سفید است، خودشان سیاه و سفید دیده می‌شوند. «پیشنهاد امروز» عمداً رنگی می‌ماند.
+// همان ساختار داشبورد v3.0 (داده یک بار گرفته می‌شود و در ctx به همه ویجت‌ها می‌رسد).
+// همه ویجت‌ها نسخه v4 خودشان را دارند و از کیت v4 ساخته شده‌اند: یک کارت، یک گوشه، یک نوار پیشرفت و چهره‌های یکسان.
+// ویجت‌های v3.0 دست نخورده‌اند و نسخه v3.0 همان‌ها را نشان می‌دهد.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { fetchLeaderboard, getSession, subscribeToChanges } from '@/lib/game/gameSystem'
+import { subscribeToChanges } from '@/lib/game/gameSystem'
+import { fetchLeaderboardCards } from '@/lib/profile/people'
 import { useEventFeed } from '@/components/events/useEventFeed'
-import { CityWidget, EventsWidget, ExploreWidget, PulseWidget, QuestsWidget, RankWidget, ShortcutsWidget, TodayWidget } from '@/components/v3/dashboard/widgets'
-import { CircleWidget, HeroV4 } from '@/components/v4/dashboard/widgetsV4'
+import { CircleWidget, CityV4, EventsV4, ExploreV4, HeroV4, PulseV4, QuestsV4, RankV4, ShortcutsV4, TodayV4 } from '@/components/v4/dashboard/widgetsV4'
 import { useCheckinDays } from '@/components/v4/home/useCheckinDays'
 import { dayKey } from '@/components/v4/ui/DayArc'
 
 export const DASHBOARD_WIDGETS_V4 = {
   hero: HeroV4,
   circle: CircleWidget,
-  today: TodayWidget,
-  events: EventsWidget,
-  quests: QuestsWidget,
-  city: CityWidget,
-  pulse: PulseWidget,
-  rank: RankWidget,
-  explore: ExploreWidget,
-  shortcuts: ShortcutsWidget,
+  today: TodayV4,
+  events: EventsV4,
+  quests: QuestsV4,
+  city: CityV4,
+  pulse: PulseV4,
+  rank: RankV4,
+  explore: ExploreV4,
+  shortcuts: ShortcutsV4,
 }
 export const DASHBOARD_LAYOUT_V4 = {
   user: ['hero', 'today', 'circle', 'events', 'quests', 'city', 'pulse', 'rank', 'explore', 'shortcuts'],
@@ -34,7 +34,7 @@ export function DashboardV4({ role = 'user', C, T, cafes, filtered, live, totalL
 
   useEffect(() => {
     let alive = true
-    const load = () => fetchLeaderboard(getSession()).then(list => { if (alive) setBoard(list) })
+    const load = () => fetchLeaderboardCards('all', null, 100).then(list => { if (alive && Array.isArray(list)) setBoard(list) })
     load()
     const unsub = subscribeToChanges(['profiles'], load)
     return () => { alive = false; unsub() }

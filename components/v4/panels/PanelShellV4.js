@@ -3,15 +3,16 @@
 // دسکتاپ: کارت شیشه‌ای شناور سمت راست. موبایل: برگه پایین‌رونده.
 // زبانه‌ها آیکون خطی دارند و فقط زبانه فعال نامش را نشان می‌دهد؛ زبانه فعال یک قرص توپر است که با دو گوشه وارونه روی خط زیر زبانه‌ها می‌نشیند.
 import { useState } from 'react'
-import { ClanTab } from '@/components/panels/ClanTab'
-import { MissionsTab } from '@/components/panels/MissionsTab'
-import { ProfileTab } from '@/components/panels/ProfileTab'
-import { LeaderboardV3 } from '@/components/v3/rank/LeaderboardV3'
+import { ClanTabV4 } from '@/components/v4/panels/ClanTabV4'
+import { MissionsV4 } from '@/components/v4/panels/MissionsV4'
+import { ProfileTabV4 } from '@/components/v4/panels/ProfileTabV4'
+import { LeaderboardV4 } from '@/components/v4/rank/LeaderboardV4'
 import { L } from '@/lib/theme/labels'
 import { useDragScroll } from '@/lib/theme/ui'
 import { Icon } from '@/components/v4/icons'
 import { DashboardV4 } from '@/components/v4/dashboard/DashboardV4'
-import { ReferralSheet } from '@/components/v3/growth/GrowthSheets'
+import { ReferralSheetV4 } from '@/components/v4/growth/Referral'
+import { R } from '@/components/v4/theme'
 
 const TABS = [
   { key: 'dashboard', label: 'داشبورد', icon: 'grid' },
@@ -32,13 +33,13 @@ export function PanelShellV4({ demoTabs = null, C, T, Lay, cafes, checkedIn, coi
         height: 'min(72dvh, calc(100dvh - env(safe-area-inset-top, 0px) - ' + (Lay.barTop + Lay.barH + 20) + 'px - ' + (Lay.dockBottom + Lay.dockH + 10) + 'px))',
         borderRadius: T.radius.xl, animation: 'tl2Sheet .35s cubic-bezier(.2,.9,.3,1)' }
   return (<>
-    {invite && <ReferralSheet C={C} showToast={showToast} onClose={() => setInvite(false)} />}
+    {invite && <ReferralSheetV4 showToast={showToast} onClose={() => setInvite(false)} />}
     {!docked && <div onClick={() => setPanelOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 900, background: T.dark ? 'rgba(0,0,0,.4)' : 'rgba(20,20,22,.16)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', animation: 'tl2Fade .25s' }} />}
     <aside aria-label="پنل" style={{ ...frame, zIndex: docked ? 250 : 901, display: 'flex', flexDirection: 'column', overflow: 'hidden', color: C.text,
       background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, boxShadow: T.shadow2 + ',' + T.highlight }}>
       {!docked && <div style={{ width: 38, height: 4, borderRadius: 99, background: T.hairStrong, margin: '9px auto 0', flexShrink: 0 }} />}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '10px 10px 0', flexShrink: 0, borderBottom: '2px solid ' + C.accent }}>
-        <div ref={tabsRef} role="tablist" className="tl2-noscroll" style={{ flex: 1, minWidth: 0, display: 'flex', gap: 4, overflowX: 'auto', padding: '0 10px', ['--fr']: '10px' }}>
+        <div ref={tabsRef} role="tablist" className="tl2-noscroll" style={{ flex: 1, minWidth: 0, display: 'flex', gap: 4, overflowX: 'auto', padding: '0 10px', ['--fr']: R.box + 'px' }}>
           {TABS.map(t => {
             const on = panelTab === t.key
             return (
@@ -52,17 +53,17 @@ export function PanelShellV4({ demoTabs = null, C, T, Lay, cafes, checkedIn, coi
           })}
         </div>
         <button className="tl4-btn" aria-label="بستن پنل" onClick={() => setPanelOpen(false)}
-          style={{ width: 34, height: 34, flexShrink: 0, marginBottom: 4, borderRadius: 11, border: '1px solid ' + T.hair, background: T.chip, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer' }}>
+          style={{ width: 34, height: 34, flexShrink: 0, marginBottom: 4, borderRadius: R.box, border: '1px solid ' + T.hair, background: T.chip, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer' }}>
           <Icon name="x" size={16} />
         </button>
       </div>
       <div className="tl-vscroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: docked ? 0 : 'env(safe-area-inset-bottom, 0px)' }}>
         {demoTabs && (demoTabs[panelTab] || null)}
         {!demoTabs && panelTab === 'dashboard' && <DashboardV4 C={C} T={T} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} userName={userName} setShowXP={setShowXP} setSelCafe={setSelCafe} setPanelTab={setPanelTab} onInvite={() => setInvite(true)} />}
-        {!demoTabs && panelTab === 'missions' && <MissionsTab v3 C={C} cafes={cafes} highlightQuestId={highlightQuestId} setSelCafe={setSelCafe} showToast={showToast} />}
-        {!demoTabs && panelTab === 'rank' && <LeaderboardV3 C={C} T={T} />}
-        {!demoTabs && panelTab === 'clan' && <ClanTab C={C} />}
-        {!demoTabs && panelTab === 'profile' && <ProfileTab C={C} xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn} userName={userName} coins={coins} />}
+        {!demoTabs && panelTab === 'missions' && <MissionsV4 cafes={cafes} highlightQuestId={highlightQuestId} setSelCafe={setSelCafe} showToast={showToast} />}
+        {!demoTabs && panelTab === 'rank' && <LeaderboardV4 />}
+        {!demoTabs && panelTab === 'clan' && <ClanTabV4 />}
+        {!demoTabs && panelTab === 'profile' && <ProfileTabV4 xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn} userName={userName} showToast={showToast} />}
       </div>
     </aside>
   </>)

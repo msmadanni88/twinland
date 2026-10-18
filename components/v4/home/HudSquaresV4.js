@@ -7,6 +7,7 @@ import { ExploreRing } from '@/components/v3/map/ExploreProgress'
 import { Icon } from '@/components/v4/icons'
 import { V4_COLOR } from '@/components/v4/theme'
 import { StreakPopover } from '@/components/v4/home/HudV4'
+import { R } from '@/components/v4/theme'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 
@@ -14,13 +15,13 @@ export function HudSquaresV4({ C, T, Lay, checkinDays, filterActive, filtersOpen
   const [arc, setArc] = useState(false)
   const p = hex && hex.progress
   const btn = {
-    width: 42, height: 42, borderRadius: 12, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+    width: 42, height: 42, borderRadius: R.box, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, color: C.text, position: 'relative',
   }
   const num = { fontSize: 10, fontWeight: 900, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }
   return (
     <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + ' + Lay.chipsTop + 'px)', right: rightInset, zIndex: 291, animation: 'tl2Fade .5s .1s both' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: 4, borderRadius: 16, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, boxShadow: T.shadow1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: 4, borderRadius: R.box, background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, boxShadow: T.shadow1 }}>
         <button className={'tl4-btn' + (filtersOpen || filterActive ? ' is-on' : '')} aria-label="جستجو و فیلتر منطقه" aria-expanded={!!filtersOpen} onClick={() => setFiltersOpen(v => !v)} style={btn}>
           <Icon name={filtersOpen ? 'x' : 'search'} size={19} />
         </button>

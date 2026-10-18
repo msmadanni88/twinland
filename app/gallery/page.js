@@ -8,8 +8,21 @@ import { SB_URL, SB_KEY } from '@/lib/config'
 import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
 import { L, ICON, RARITY_LOCKED, rarityOf, fa, SOURCE_LABEL } from '@/lib/theme/labels'
 import { UIStyles, useDragScroll, hscroll, onColor } from '@/lib/theme/ui'
+import dynamic from 'next/dynamic'
+import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { uiAtLeast } from '@/lib/ui/versions'
+import { V4Blank } from '@/lib/ui/v4Blank'
+
+// نسخه v4.0 گالری جدا بار می‌شود؛ کد نسخه قبل دست نخورده
+const GalleryV4 = dynamic(() => import('@/components/v4/gallery/GalleryV4'), { ssr: false, loading: V4Blank })
 
 export default function GalleryPage() {
+  const { active } = useUiVersion()
+  if (uiAtLeast(active, 'v4.0')) return <GalleryV4 />
+  return <LegacyGalleryPage />
+}
+
+function LegacyGalleryPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [defs, setDefs] = useState([])        // کاتالوگ کامل
   const [owned, setOwned] = useState({})      // code -> ردیف کامل award

@@ -4,6 +4,7 @@
 // بخش فعال یک قرص توپر سیاه یا سفید است.
 import { NAV } from '@/lib/constants'
 import { Icon } from '@/components/v4/icons'
+import { R } from '@/components/v4/theme'
 
 const PANEL_OF = { missions: 'missions', clan: 'clan', rank: 'rank', profile: 'profile' }
 const ICONS = { missions: 'target', clan: 'users', rank: 'trophy', profile: 'user' }
@@ -36,7 +37,7 @@ export function DockV4({ C, T, Lay, isMobile, leftInset, panelOpen, panelTab, ri
               aria-current={active ? 'page' : undefined}
               aria-pressed={toggle ? !panelOpen : undefined}
               aria-label={toggle ? (panelOpen ? 'نمایش نقشه' : 'باز کردن پنل') : item.label}
-              style={{ flex: 1, position: 'relative', border: toggle ? '1px solid ' + T.hair : '1px solid transparent', borderRadius: 17, padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+              style={{ flex: 1, position: 'relative', border: toggle ? '1px solid ' + T.hair : '1px solid transparent', borderRadius: R.box, padding: 0, cursor: 'pointer', fontFamily: 'inherit',
                 background: toggle ? T.chip : 'transparent', color: active || toggle ? C.text : C.sub,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
                 fontSize: isMobile ? 10 : 10.5, fontWeight: active ? 900 : (toggle ? 800 : 650) }}>

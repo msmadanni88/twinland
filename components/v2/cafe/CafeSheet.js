@@ -24,7 +24,7 @@ const PAGES = [['about', 'درباره'], ['gallery', 'گالری'], ['menu', '�
 // checkedToday فقط در v3.0: دکمه چک‌این فقط برای امروز قفل می‌شود، نه برای همیشه، تا بازدید دوباره و ماموریت وفاداری ممکن باشد
 // tint و headTint اختیاری‌اند: نسخه v4.0 برای نشان کافه همان سبز ثابت نشانگرها و برای سر برگه رنگ خنثی می‌دهد.
 // بدون آن‌ها رنگ هر کافه از نامش می‌آید، مثل قبل.
-export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headTint = null, C, T, cafe, live, favs, setFavs, checkedIn, checkedToday = null, isAdmin, onClose, onCheckin, showToast }) {
+export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headTint = null, commentAvatar = null, onPerson = null, C, T, cafe, live, favs, setFavs, checkedIn, checkedToday = null, isAdmin, onClose, onCheckin, showToast }) {
   const [wide, setWide] = useState(false)
   const [page, setPage] = useState('about')
   useEffect(() => { setPage('about') }, [cafe.id])
@@ -62,10 +62,10 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
   ].filter(Boolean)
 
   const sheet = wide
-    ? { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(92vw,460px)', maxHeight: '88dvh', borderRadius: T.radius.xl + 4, animation: 'tl2Pop .3s cubic-bezier(.2,.9,.3,1)' }
-    : { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '90dvh', borderRadius: (T.radius.xl + 4) + 'px ' + (T.radius.xl + 4) + 'px 0 0', animation: 'tl2Sheet .34s cubic-bezier(.2,.9,.3,1)' }
+    ? { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(92vw,460px)', maxHeight: '88dvh', borderRadius: T.r || T.radius.xl + 4, animation: 'tl2Pop .3s cubic-bezier(.2,.9,.3,1)' }
+    : { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '90dvh', borderRadius: (T.r || T.radius.xl + 4) + 'px ' + (T.r || T.radius.xl + 4) + 'px 0 0', animation: 'tl2Sheet .34s cubic-bezier(.2,.9,.3,1)' }
 
-  const tile = { flex: 1, minWidth: 0, background: T.chip, border: '1px solid ' + T.hair, borderRadius: 16, padding: '11px 12px', display: 'flex', alignItems: 'center', gap: 10 }
+  const tile = { flex: 1, minWidth: 0, background: T.chip, border: '1px solid ' + T.hair, borderRadius: (T.r || 16), padding: '11px 12px', display: 'flex', alignItems: 'center', gap: 10 }
   const actions = [
     { icon: ICON.hearts, label: L.hearts, active: isFav, fn: d.toggleFav },
     { icon: '📤', label: 'اشتراک', fn: () => { track('share'); d.share() } },
@@ -102,7 +102,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
 
           {/* هویت کافه */}
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, padding: '0 18px', marginTop: -44, position: 'relative' }}>
-            <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32,
+            <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: (T.r || 22), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32,
               background: 'radial-gradient(circle at 30% 25%,' + mix(isChecked ? C.green : color, '#FFFFFF', 0.25) + ',' + (isChecked ? C.green : color) + ')',
               border: '3px solid ' + C.card, boxShadow: T.glow(isChecked ? C.green : color, 0.6), color: onColor(isChecked ? C.green : color) }}>
               {isChecked ? '✓' : '☕'}
@@ -132,11 +132,11 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
 
           {/* صفحه‌ها */}
           <div style={{ padding: '14px 18px 0' }}>
-            <div className="tl2-noscroll" style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 16, background: T.chip, overflowX: 'auto' }}>
+            <div className="tl2-noscroll" style={{ display: 'flex', gap: 4, padding: 3, borderRadius: (T.r || 16), background: T.chip, overflowX: 'auto' }}>
               {PAGES.map(([k, label]) => {
                 const on = page === k
                 return <button key={k} className="tl2-press" onClick={() => setPage(k)}
-                  style={{ flex: 1, flexShrink: 0, height: 36, padding: '0 10px', border: 'none', borderRadius: 13, fontSize: 12.5, fontWeight: on ? 900 : 700, whiteSpace: 'nowrap',
+                  style={{ flex: 1, flexShrink: 0, height: 36, padding: '0 10px', border: 'none', borderRadius: (T.r || 13), fontSize: 12.5, fontWeight: on ? 900 : 700, whiteSpace: 'nowrap',
                     background: on ? C.card : 'transparent', color: on ? C.text : C.sub, boxShadow: on ? T.shadow1 : 'none' }}>{label}</button>
               })}
             </div>
@@ -145,7 +145,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
           <div style={{ padding: '16px 18px 18px' }}>
             {page === 'gallery' && <CafeGallery C={C} cafeId={cafe.id} canManageHint={isAdmin} />}
             {page === 'menu' && <CafeMenu C={C} cafeId={cafe.id} canManageHint={isAdmin} />}
-            {page === 'comments' && <CafeComments C={C} T={T} cafe={cafe} token={d.token} uid={d.uid} noPlay={noPlay} showToast={showToast} />}
+            {page === 'comments' && <CafeComments C={C} T={T} cafe={cafe} token={d.token} uid={d.uid} noPlay={noPlay} showToast={showToast} AuthorAvatar={commentAvatar} onAuthor={onPerson ? (a) => onPerson(a.id) : null} />}
             {page === 'rewards' && <CafeMyRewards C={C} cafeId={cafe.id} uid={d.uid} token={d.token} showToast={showToast} />}
             {page === 'about' && <>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -175,16 +175,16 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
                     const enrolled = !!prog && !done
                     const busy = d.joiningId === ev.id
                     return (
-                      <div key={ev.id} style={{ borderRadius: 18, padding: 12, marginBottom: 8, background: T.accentSoft, border: '1px solid ' + alpha(C.accent, 0.3) }}>
+                      <div key={ev.id} style={{ borderRadius: (T.r || 18), padding: 12, marginBottom: 8, background: T.accentSoft, border: '1px solid ' + alpha(C.accent, 0.3) }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                          <span style={{ width: 42, height: 42, borderRadius: 14, background: C.card, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0, boxShadow: T.shadow1 }}>{(cd && cd.icon) || ev.icon || ICON.events}</span>
+                          <span style={{ width: 42, height: 42, borderRadius: (T.r || 14), background: C.card, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0, boxShadow: T.shadow1 }}>{(cd && cd.icon) || ev.icon || ICON.events}</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 900, color: C.text }}>{ev.title}{cd ? ' — ' + cd.title : ''}</div>
                             <div style={{ fontSize: 11.5, color: C.sub, marginTop: 3 }}>🎁 {ev.reward_label}{ev.reward_xp > 0 ? ' · +' + ev.reward_xp + ' ' + L.xp : ''}{ev.discount_pct > 0 ? ' · 🏷️' + ev.discount_pct + '٪' : ''}</div>
                           </div>
                         </div>
                         <button className="tl2-press" onClick={() => d.joinEvent(ev)} disabled={done || enrolled || busy}
-                          style={{ width: '100%', marginTop: 10, height: 38, border: 'none', borderRadius: 12, fontSize: 12.5, fontWeight: 900, opacity: busy ? 0.6 : 1,
+                          style={{ width: '100%', marginTop: 10, height: 38, border: 'none', borderRadius: (T.r || 12), fontSize: 12.5, fontWeight: 900, opacity: busy ? 0.6 : 1,
                             background: done ? C.green : enrolled ? C.chip : C.accent, color: done ? onColor(C.green) : enrolled ? C.text : T.onAccent }}>
                           {done ? '✅ جایزه‌ت رو گرفتی'
                             : enrolled ? ('📍 ثبت‌نام شدی — ' + L.checkin + ' ' + (prog.progress || 0).toLocaleString('fa') + ' از ' + (ev.target_count || 1).toLocaleString('fa'))
@@ -199,7 +199,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
                 {actions.map(a => (
                   <button key={a.label} className="tl2-press" onClick={a.fn}
-                    style={{ height: 66, borderRadius: 16, border: '1px solid ' + (a.active ? alpha(C.danger, 0.5) : T.hair), background: a.active ? alpha(C.danger, 0.12) : T.chip,
+                    style={{ height: 66, borderRadius: (T.r || 16), border: '1px solid ' + (a.active ? alpha(C.danger, 0.5) : T.hair), background: a.active ? alpha(C.danger, 0.12) : T.chip,
                       color: a.active ? C.danger : C.text, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 11.5, fontWeight: a.active ? 900 : 700 }}>
                     <span style={{ fontSize: 21, lineHeight: 1 }}>{a.icon}</span>{a.label}
                   </button>
@@ -212,7 +212,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
         {/* دکمه‌های ثابت پایین */}
         <div style={{ flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom, 0px) + 14px)', borderTop: '1px solid ' + T.hair, background: C.card }}>
           {noPlay ? <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: C.sub, lineHeight: 1.9, padding: '6px 4px' }}>🏪 با حساب کسب‌وکار وارد شده‌ای. چک‌این و امتیاز فقط برای حساب کاربری است.</div> : <button className="tl2-press" onClick={onCheckin} disabled={isChecked}
-            style={{ width: '100%', height: 54, border: 'none', borderRadius: 18, fontSize: 16, fontWeight: 900,
+            style={{ width: '100%', height: 54, border: 'none', borderRadius: (T.r || 18), fontSize: 16, fontWeight: 900,
               background: isChecked ? alpha(C.green, 0.18) : T.grad, color: isChecked ? C.green : T.onAccent,
               boxShadow: isChecked ? 'none' : T.glow(C.accent, 0.6), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {isChecked ? '✅ امروز ' + L.checkin + ' کردی' : <>{ICON.checkin} {L.checkin} <span style={{ fontSize: 12.5, fontWeight: 900, padding: '3px 9px', borderRadius: 99, background: alpha(T.onAccent, 0.16) }}>+{checkedToday ? Number(xpAmount).toLocaleString('fa') : xpAmount} {L.xp}</span></>}

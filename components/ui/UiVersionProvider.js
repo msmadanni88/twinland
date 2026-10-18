@@ -59,6 +59,8 @@ export function UiVersionProvider({ site, children }) {
   const active = preview || site
   useEffect(() => {
     try { document.documentElement.dataset.ui = active } catch (e) {}
+    // صفحه بدون اینترنت (public/offline.html) از همین می‌فهمد ظاهر کدام نسخه را نشان دهد
+    try { if (active) localStorage.setItem('tl_ui_active', active) } catch (e) {}
   }, [active])
 
   const value = useMemo(() => ({ site, active, preview, recheck }), [site, active, preview, recheck])

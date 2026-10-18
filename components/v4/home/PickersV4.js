@@ -5,12 +5,13 @@ import { CITIES } from '@/lib/constants'
 import { SKINS_V4, MINI } from '@/components/v4/map/skinsV4'
 import { SheetV4 } from '@/components/v4/ui/Sheet'
 import { Icon } from '@/components/v4/icons'
+import { R } from '@/components/v4/theme'
 
 function Preview({ s, dark }) {
   const sw = s.id === MINI ? (dark ? ['#0D0D0F', '#2A2A2F', '#060607', '#121413'] : ['#F2F2F3', '#FFFFFF', '#D8DBE0', '#E5E7E5']) : s.swatch
   const [land, road, water, green] = sw
   return (
-    <svg viewBox="0 0 120 70" width="100%" height="64" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style={{ display: 'block', borderRadius: 12 }}>
+    <svg viewBox="0 0 120 70" width="100%" height="64" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style={{ display: 'block', borderRadius: R.box }}>
       <rect width="120" height="70" fill={land} />
       <path d="M-4 52 C20 40 30 62 58 56 S100 60 126 44 V74 H-4 Z" fill={water} />
       <circle cx="26" cy="20" r="13" fill={green} />
@@ -22,7 +23,7 @@ function Preview({ s, dark }) {
 }
 
 const card = (C, T, on) => ({
-  position: 'relative', textAlign: 'right', padding: 8, borderRadius: 18, cursor: 'pointer', fontFamily: 'inherit',
+  position: 'relative', textAlign: 'right', padding: 8, borderRadius: R.box, cursor: 'pointer', fontFamily: 'inherit',
   background: on ? T.accentSoft : T.chip, color: C.text, border: '1.5px solid ' + (on ? C.accent : 'transparent'),
 })
 
@@ -55,7 +56,7 @@ export function CityPickerV4({ C, T, show, setShow, city, setCity, showToast }) 
           const on = city === k
           return (
             <button key={k} className={'tl4-btn' + (on ? ' is-on' : '')} onClick={() => { setCity(k); setShow(false); showToast(v.name) }}
-              style={{ background: T.chip, border: '1px solid ' + T.hair, borderRadius: 14, padding: '12px 6px', fontSize: 12.5, fontWeight: on ? 900 : 600, color: C.text, fontFamily: 'inherit', cursor: 'pointer' }}>{v.name}</button>
+              style={{ background: T.chip, border: '1px solid ' + T.hair, borderRadius: R.box, padding: '12px 6px', fontSize: 12.5, fontWeight: on ? 900 : 600, color: C.text, fontFamily: 'inherit', cursor: 'pointer' }}>{v.name}</button>
           )
         })}
       </div>
@@ -78,7 +79,7 @@ export function BoundaryPickerV4({ C, T, show, setShow, boundaryMode, setBoundar
           return (
             <button key={o.key} className={'tl4-btn' + (on ? ' is-on' : '')}
               onClick={() => { setBoundaryMode(o.key); setShow(false); if (o.key !== 'off') showToast((BOUNDARY_SOURCES[o.key] && BOUNDARY_SOURCES[o.key].label) + ' فعال شد') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, background: T.chip, border: '1px solid ' + T.hair, borderRadius: 14, padding: '13px 14px', fontSize: 14, fontWeight: on ? 900 : 600, color: C.text, fontFamily: 'inherit', textAlign: 'right', cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 12, background: T.chip, border: '1px solid ' + T.hair, borderRadius: R.box, padding: '13px 14px', fontSize: 14, fontWeight: on ? 900 : 600, color: C.text, fontFamily: 'inherit', textAlign: 'right', cursor: 'pointer' }}>
               <Icon name={o.icon} size={19} />{o.label}
             </button>
           )

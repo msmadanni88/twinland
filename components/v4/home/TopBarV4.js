@@ -5,16 +5,16 @@
 import { CITIES } from '@/lib/constants'
 import { L } from '@/lib/theme/labels'
 import { Icon } from '@/components/v4/icons'
-import { SegmentBar } from '@/components/v4/ui/SegmentBar'
+import { LevelBadge, XpBar } from '@/components/v4/kit/Meter'
+import { R } from '@/components/v4/theme'
 import { V4_FLAGS } from '@/components/v4/flags'
-import { alpha } from '@/components/v2/theme'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 
 export function TopBarV4({ C, T, Lay, city, isMobile, levelInfo, notifications, onLogoTap, search, setSearch, setShowCity, setShowMenu, setShowNotif, setShowXP, showMenu, showNotif, xp }) {
   const unread = notifications.some(n => !n.read)
   const sq = (on) => ({
-    width: 40, height: 40, borderRadius: 13, flexShrink: 0, padding: 0, cursor: 'pointer',
+    width: 40, height: 40, borderRadius: R.box, flexShrink: 0, padding: 0, cursor: 'pointer',
     border: '1px solid ' + (on ? 'transparent' : T.hair), background: on ? C.accent : T.chip, color: on ? T.onAccent : C.text,
     display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
   })
@@ -36,7 +36,7 @@ export function TopBarV4({ C, T, Lay, city, isMobile, levelInfo, notifications, 
 
       {!isMobile && (
         <button className="tl4-btn" onClick={() => setShowCity(true)}
-          style={{ flexShrink: 0, height: 36, padding: '0 12px 0 10px', borderRadius: T.radius.pill, border: '1px solid ' + T.hair, background: T.chip, color: C.text, fontSize: 12.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', cursor: 'pointer' }}>
+          style={{ flexShrink: 0, height: 36, padding: '0 12px 0 10px', borderRadius: R.box, border: '1px solid ' + T.hair, background: T.chip, color: C.text, fontSize: 12.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', cursor: 'pointer' }}>
           <Icon name="pin" size={16} />{CITIES[city].name}<Icon name="chevronDown" size={14} color={C.sub} />
         </button>
       )}
@@ -45,7 +45,7 @@ export function TopBarV4({ C, T, Lay, city, isMobile, levelInfo, notifications, 
         <div style={{ flex: 1, minWidth: 0, maxWidth: 420, position: 'relative', display: 'flex', alignItems: 'center' }}>
           <span style={{ position: 'absolute', right: 13, pointerEvents: 'none', color: C.sub }}><Icon name="search" size={17} /></span>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={'جستجوی ' + L.cafe + '…'} aria-label={'جستجوی ' + L.cafe}
-            style={{ width: '100%', height: 40, borderRadius: T.radius.pill, border: '1px solid ' + (search ? C.accent : T.hair), background: T.chip,
+            style={{ width: '100%', height: 40, borderRadius: R.box, border: '1px solid ' + (search ? C.accent : T.hair), background: T.chip,
               color: C.text, fontSize: 13, padding: '0 40px 0 36px', outline: 'none', fontFamily: 'inherit', transition: 'border-color .2s' }} />
           {search && (
             <button className="tl4-btn" aria-label="پاک کردن جستجو" onClick={() => setSearch('')}
@@ -60,14 +60,13 @@ export function TopBarV4({ C, T, Lay, city, isMobile, levelInfo, notifications, 
 
       {/* امتیاز و لول: نشان لول رنگی، نوار پنج‌تکه‌ای تا لول بعد */}
       <button className="tl4-btn" onClick={() => setShowXP(true)} aria-label={L.xpSystem + '، ' + fa(xp) + ' امتیاز'}
-        style={{ flexShrink: 0, height: 40, minWidth: isMobile ? 0 : 300, borderRadius: T.radius.pill, border: '1px solid ' + T.hair, background: T.chip,
+        style={{ flexShrink: 0, height: 40, minWidth: isMobile ? 0 : 300, borderRadius: R.box, border: '1px solid ' + T.hair, background: T.chip,
           padding: isMobile ? '0 10px 0 6px' : '0 14px 0 6px', display: 'flex', alignItems: 'center', gap: isMobile ? 7 : 10, color: C.text, fontFamily: 'inherit', cursor: 'pointer' }}>
-        <span style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
-          background: alpha(lv.color || C.accent, 0.16), boxShadow: 'inset 0 0 0 2px ' + (lv.color || C.accent) }}>{lv.icon}</span>
+        <LevelBadge level={lv} size={30} C={C} T={T} />
         {isMobile ? (
           <span style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'stretch', width: 58 }}>
             <span style={{ fontSize: 12, fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{fa(xp)}</span>
-            <SegmentBar value={pct} segments={5} height={4} gap={2} color={C.text} track={T.hairStrong} />
+            <XpBar levelInfo={levelInfo} size="sm" C={C} T={T} />
           </span>
         ) : (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -75,7 +74,7 @@ export function TopBarV4({ C, T, Lay, city, isMobile, levelInfo, notifications, 
               <span style={{ fontWeight: 900, whiteSpace: 'nowrap' }}>{lv.name}</span>
               <span style={{ color: C.sub, fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fa(xp)} {L.xp} · {fa(Math.round(pct))}٪</span>
             </span>
-            <SegmentBar value={pct} segments={5} height={5} gap={3} color={C.text} track={T.hairStrong} />
+            <XpBar levelInfo={levelInfo} size="md" C={C} T={T} />
           </span>
         )}
       </button>

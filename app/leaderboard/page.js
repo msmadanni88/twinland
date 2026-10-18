@@ -10,6 +10,13 @@ import { V3_FLAGS } from '@/components/v3/flags'
 import { LeaderboardV3 } from '@/components/v3/rank/LeaderboardV3'
 import { V2Styles } from '@/components/v2/V2Styles'
 import { v2Tokens } from '@/components/v2/theme'
+import dynamic from 'next/dynamic'
+import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { uiAtLeast } from '@/lib/ui/versions'
+import { V4Blank } from '@/lib/ui/v4Blank'
+
+// نسخه v4.0 جدا بار می‌شود: همان قاب صفحه‌های v4 و همان رتبه‌بندی پنل
+const LeaderboardPageV4 = dynamic(() => import('@/components/v4/rank/LeaderboardPageV4'), { ssr: false, loading: V4Blank })
 
 function LegacyLeaderboardPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
@@ -224,5 +231,7 @@ function NewLeaderboardPage() {
 }
 
 export default function LeaderboardPage() {
+  const { active } = useUiVersion()
+  if (uiAtLeast(active, 'v4.0')) return <LeaderboardPageV4 />
   return V3_FLAGS.newRank ? <NewLeaderboardPage /> : <LegacyLeaderboardPage />
 }

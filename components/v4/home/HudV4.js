@@ -9,6 +9,7 @@ import { alpha } from '@/components/v2/theme'
 import { Icon } from '@/components/v4/icons'
 import { V4_COLOR } from '@/components/v4/theme'
 import { DayArc } from '@/components/v4/ui/DayArc'
+import { R } from '@/components/v4/theme'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 
@@ -36,7 +37,7 @@ export function StreakPopover({ C, T, days, streak, onClose, style }) {
   }, [onClose])
   return (
     <div ref={ref} role="dialog" aria-label="روزهای چک‌این"
-      style={{ position: 'absolute', zIndex: 320, width: 320, maxWidth: 'calc(100vw - 20px)', padding: '14px 10px 12px', borderRadius: 22, color: C.text,
+      style={{ position: 'absolute', zIndex: 320, width: 320, maxWidth: 'calc(100vw - 20px)', padding: '14px 10px 12px', borderRadius: R.box, color: C.text,
         background: T.glassMenu, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, boxShadow: T.shadow2 + ',' + T.highlight, animation: 'tl4Pop .22s ease', ...style }}>
       <DayArc C={C} T={T} days={days} streak={streak} width={300} />
       <div style={{ fontSize: 11, color: C.sub, textAlign: 'center', marginTop: 6, lineHeight: 1.7 }}>

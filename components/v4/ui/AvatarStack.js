@@ -1,11 +1,15 @@
 'use client'
 // «حلقه تو» — نسخه v4.0
 // چهره‌های روی هم‌افتاده از آدم‌هایی که به تو وصل‌اند: کسانی که دعوت کردی، کسی که دعوتت کرد، و هم‌کلنی‌ها.
-// داده از تابع my_circle در سرور می‌آید که فقط نام، چهره و لول برمی‌گرداند؛ شناسه هیچ‌کس به مرورگر نمی‌رسد.
+// داده از تابع my_circle در سرور می‌آید که کارت عمومی هر نفر را طبق حریم خصوصی‌اش برمی‌گرداند.
+// چهره هر نفر همان UserAvatar کل سایت است.
 import { useEffect, useState } from 'react'
 import { SB_KEY, SB_URL } from '@/lib/config'
 import { getSession } from '@/lib/game/gameSystem'
 import { Icon } from '@/components/v4/icons'
+import { UserAvatar } from '@/components/v4/kit/UserAvatar'
+import { R } from '@/components/v4/theme'
+import { inviteHeadline, useReferral } from '@/components/v4/growth/Referral'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 let cache = null, cacheAt = 0
@@ -50,7 +54,9 @@ export function AvatarStack({ C, T, people = [], total = 0, max = 5, size = 32, 
   return (
     <div style={{ display: 'flex', alignItems: 'center' }} aria-label={fa(total || people.length) + ' نفر در حلقه تو'}>
       {shown.map((p, i) => (
-        <span key={i} title={p.name} style={{ ...disc(i), background: T.dark ? '#1D1D20' : '#F1F1F3', fontSize: size * 0.5, lineHeight: 1 }}>{p.avatar || '☕'}</span>
+        <span key={p.id || i} title={p.name} style={{ ...disc(i), background: 'transparent', padding: 0, overflow: 'hidden' }}>
+          <UserAvatar person={p} size={size - 4} C={C} T={T} style={{ boxShadow: 'none' }} />
+        </span>
       ))}
       {extra > 0 && <span style={{ ...disc(shown.length), background: C.accent, color: T.onAccent, fontSize: size * 0.34, fontWeight: 900 }}>+{fa(extra)}</span>}
     </div>
@@ -64,8 +70,9 @@ export function CircleCard({ C, T, onInvite, onOpen, compact = false, style }) {
   const total = (d && d.total) || 0
   const kinds = { invited: 0, inviter: 0, clan: 0 }
   people.forEach(p => { if (kinds[p.kind] != null) kinds[p.kind]++ })
+  const ref = useReferral(!!onInvite)
   const hint = !d ? 'در حال خواندن…'
-    : total === 0 ? 'هنوز کسی در حلقه‌ات نیست. یک دوست دعوت کن؛ هر دو امتیاز می‌گیرید.'
+    : total === 0 ? (onInvite && ref && ref.ok ? inviteHeadline(ref.reward) + '.' : 'هنوز کسی در حلقه‌ات نیست.')
     : fa(total) + ' نفر · ' + [kinds.clan ? 'هم‌کلنی' : null, kinds.invited || kinds.inviter ? 'دعوتی' : null].filter(Boolean).join(' و ')
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, ...style }}>
@@ -79,7 +86,7 @@ export function CircleCard({ C, T, onInvite, onOpen, compact = false, style }) {
       </div>
       {onInvite && (
         <button className="tl4-press" onClick={onInvite}
-          style={{ flexShrink: 0, height: 34, padding: '0 12px', borderRadius: 99, border: '1px solid ' + T.hair, background: C.accent, color: T.onAccent, fontFamily: 'inherit', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          style={{ flexShrink: 0, height: 34, padding: '0 12px', borderRadius: R.box, border: '1px solid ' + T.hair, background: C.accent, color: T.onAccent, fontFamily: 'inherit', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
           <Icon name="gift" size={15} stroke={2} />دعوت
         </button>
       )}

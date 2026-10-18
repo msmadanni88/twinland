@@ -5,24 +5,22 @@
 // و یک کلید حالت روشن و تیره؛ انتخاب پالت رنگ در این نسخه نیست (کدش در نسخه‌های قبل سر جایش مانده).
 import { useState } from 'react'
 import { L, ROUTE } from '@/lib/theme/labels'
-import { InstallSheet, ReferralSheet } from '@/components/v3/growth/GrowthSheets'
+import { ReferralSheetV4 } from '@/components/v4/growth/Referral'
+import { InstallSheetV4 } from '@/components/v4/growth/InstallSheetV4'
+import { Toggle } from '@/components/v4/kit/kit'
 import { Icon } from '@/components/v4/icons'
 import { CircleCard } from '@/components/v4/ui/AvatarStack'
+import { R } from '@/components/v4/theme'
 
+// کلید روشن و خاموش همان Toggle کیت v4 است
 function Switch({ on, C, T, onClick, label }) {
-  return (
-    <button onClick={onClick} role="switch" aria-checked={!!on} aria-label={label} className="tl4-press"
-      style={{ position: 'relative', width: 44, height: 26, borderRadius: 99, border: '1px solid ' + T.hair, cursor: 'pointer', flexShrink: 0, padding: 0,
-        background: on ? C.accent : T.chip, transition: 'background .25s ease' }}>
-      <span style={{ position: 'absolute', top: 2, right: on ? 20 : 2, width: 20, height: 20, borderRadius: '50%', background: on ? T.onAccent : C.card, boxShadow: '0 1px 4px rgba(0,0,0,.3)', transition: 'right .25s cubic-bezier(.2,.9,.3,1)' }} />
-    </button>
-  )
+  return <Toggle on={on} onChange={() => onClick && onClick()} label={label} C={C} T={T} />
 }
 
 export function MenuV4({ C, T, TH, isMobile, demoOn, toggleDemo, showBusiness, backfillDistricts, backfilling, effAdmin, isOwner, onLogout, resetMe, setPanelOpen, setPanelTab, setShowMapSettings, setShowMenu, setShowXP, setTab, setTutorialReplay, showMenu, showToast, themeMode, toggleMode, toggleViewMode, viewAsUser }) {
   const [sheet, setSheet] = useState(null)
   const items = [
-    { key: 'invite', icon: 'gift', label: 'دعوت دوست · ۱۵۰ امتیاز برای هر دو', userOnly: true },
+    { key: 'invite', icon: 'gift', label: 'دعوت دوست', userOnly: true },
     { key: 'install', icon: 'phone', label: 'نصب روی گوشی و اعلان' },
     { key: 'map', icon: 'map', label: 'نقشه' },
     { key: 'missions', icon: 'target', label: 'ماموریت‌ها' },
@@ -62,21 +60,21 @@ export function MenuV4({ C, T, TH, isMobile, demoOn, toggleDemo, showBusiness, b
     color: C.text, fontSize: 13.5, fontFamily: 'inherit', fontWeight: 600, textDecoration: 'none', cursor: 'pointer', textAlign: 'right',
   }
   return (<>
-    {sheet === 'invite' && <ReferralSheet C={C} showToast={showToast} onClose={() => setSheet(null)} />}
-    {sheet === 'install' && <InstallSheet C={C} showToast={showToast} onClose={() => setSheet(null)} />}
+    {sheet === 'invite' && <ReferralSheetV4 showToast={showToast} onClose={() => setSheet(null)} />}
+    {sheet === 'install' && <InstallSheetV4 showToast={showToast} onClose={() => setSheet(null)} />}
     {showMenu && (
       <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: T.dark ? 'rgba(0,0,0,.32)' : 'rgba(20,20,22,.12)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', animation: 'tl4Fade .18s' }} onClick={() => setShowMenu(false)}>
         <div onClick={e => e.stopPropagation()} role="menu" aria-label="منو"
           style={{ position: 'absolute', top: TH + 8, right: isMobile ? 10 : 12, left: isMobile ? 10 : 'auto', width: isMobile ? 'auto' : 340, maxHeight: 'calc(100dvh - ' + (TH + 24) + 'px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
             padding: '12px 10px 14px 0', boxSizing: 'border-box', color: C.text,
-            background: T.glassMenu, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, borderRadius: 22, border: '1px solid ' + T.hair, boxShadow: T.shadow2 + ',' + T.highlight, animation: 'tl4Pop .2s ease' }}>
+            background: T.glassMenu, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, borderRadius: R.box, border: '1px solid ' + T.hair, boxShadow: T.shadow2 + ',' + T.highlight, animation: 'tl4Pop .2s ease' }}>
 
-          <div style={{ margin: '2px 4px 10px 12px', padding: 12, borderRadius: 16, background: T.chip, border: '1px solid ' + T.hair }}>
+          <div style={{ margin: '2px 4px 10px 12px', padding: 12, borderRadius: R.box, background: T.chip, border: '1px solid ' + T.hair }}>
             <CircleCard C={C} T={T} compact onInvite={() => setSheet('invite')} onOpen={() => { setShowMenu(false); setPanelOpen(true); setPanelTab('clan') }} />
           </div>
 
           {isOwner && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 4px 8px 12px', padding: '10px 12px', borderRadius: 16, border: '1px solid ' + T.hair }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 4px 8px 12px', padding: '10px 12px', borderRadius: R.box, border: '1px solid ' + T.hair }}>
               <Icon name={viewAsUser ? 'user' : 'crown'} size={19} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 800 }}>{viewAsUser ? 'حالت کاربر عادی' : 'حالت مالک'}</div>
@@ -86,7 +84,7 @@ export function MenuV4({ C, T, TH, isMobile, demoOn, toggleDemo, showBusiness, b
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 4px 10px 12px', padding: '10px 12px', borderRadius: 16, border: '1px solid ' + T.hair }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 4px 10px 12px', padding: '10px 12px', borderRadius: R.box, border: '1px solid ' + T.hair }}>
             <Icon name={themeMode === 'dark' ? 'moon' : 'sun'} size={19} />
             <div style={{ flex: 1, fontSize: 13, fontWeight: 800 }}>{themeMode === 'dark' ? 'حالت تیره' : 'حالت روشن'}</div>
             <Switch on={themeMode === 'dark'} C={C} T={T} onClick={toggleMode} label="حالت تیره" />

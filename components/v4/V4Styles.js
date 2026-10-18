@@ -8,9 +8,11 @@
 //   tl4-row l  → به لبه چپ قاب می‌چسبد
 //   tl4-row b  → به لبه پایین می‌چسبد (زبانه بالای محتوا)
 // رنگ از متغیرهای --fa (انتخاب‌شده) و --fh (زیر ماوس) و شعاع از --fr می‌آید.
+import { R } from '@/components/v4/theme'
+
 export function V4Styles({ C, T }) {
   const css = `
-  .tl4{--fr:14px;--fa:${C.accent};--fh:${T.hover};--fon:${T.onAccent}}
+  .tl4{--fr:${R.box}px;--fa:${C.accent};--fh:${T.hover};--fon:${T.onAccent}}
   .tl4 .leaflet-container{background:${T.mapBg} !important}
   .tl4 .leaflet-container:not(.tl-vector) .leaflet-tile-pane{filter:${T.tileFilter} !important;transition:filter .4s}
   .tl4 .leaflet-control-attribution{background:${T.glass} !important;color:${C.sub} !important;border:1px solid ${T.hair};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};font-size:9.5px !important}
@@ -45,7 +47,7 @@ export function V4Styles({ C, T }) {
   .tl4-btn.is-on{background:${C.accent} !important;color:${T.onAccent} !important;border-color:transparent !important}
 
   .tl4-rail-label{white-space:nowrap;overflow:hidden;transition:opacity .2s ease, max-width .28s ease}
-  .tl4-tipbox{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);white-space:nowrap;padding:5px 10px;border-radius:10px;font-size:11.5px;font-weight:800;color:${C.text};background:${T.glassStrong};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};border:1px solid ${T.hair};box-shadow:${T.shadow1};pointer-events:none;opacity:0;transition:opacity .15s ease;z-index:5}
+  .tl4-tipbox{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);white-space:nowrap;padding:5px 10px;border-radius:${R.box}px;font-size:11.5px;font-weight:800;color:${C.text};background:${T.glassStrong};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};border:1px solid ${T.hair};box-shadow:${T.shadow1};pointer-events:none;opacity:0;transition:opacity .15s ease;z-index:5}
   @media (hover:hover) and (pointer:fine){ .tl4-row:hover .tl4-tipbox{opacity:1} }
 
   .tl4 .tl2-pin-live{font-variant-numeric:tabular-nums}
@@ -62,6 +64,10 @@ export function V4Styles({ C, T }) {
   .tl4 .leaflet-marker-icon:has(.tl4-pin:hover),.tl4 .leaflet-marker-icon:has(.tl4-pin.is-open){z-index:100000 !important}
 
   @keyframes tl4Spin{to{transform:rotate(360deg)}}
+  @keyframes tl4Pulse{0%,100%{opacity:.5}50%{opacity:.9}}
+  @keyframes tl4Rise{from{transform:scaleY(.05);opacity:0}to{transform:scaleY(1);opacity:1}}
+  .tl4 ::selection{background:${C.text};color:${T.onAccent}}
+  .tl4-noscroll{scrollbar-width:none}.tl4-noscroll::-webkit-scrollbar{display:none}
   @keyframes tl4Fade{from{opacity:0}to{opacity:1}}
   @keyframes tl4Pop{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion: reduce){ .tl4 *{animation:none !important;transition:none !important} }

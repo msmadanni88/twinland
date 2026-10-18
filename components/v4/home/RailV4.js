@@ -11,6 +11,7 @@ import { Icon } from '@/components/v4/icons'
 import { ExploreLine, ExploreRing } from '@/components/v3/map/ExploreProgress'
 import { skinInfoV4 } from '@/components/v4/map/skinsV4'
 import { V4_FLAGS } from '@/components/v4/flags'
+import { R } from '@/components/v4/theme'
 
 const OPEN_KEY = 'tl_rail_open'
 
@@ -25,11 +26,11 @@ function tools(p) {
   const { C, labels, boundaryMode, follow, onToggleFollow, themeMode, skinId, city } = p
   const list = [
     { key: 'skin', icon: 'layers', label: 'پوسته نقشه', sub: skinInfoV4(skinId).label, onClick: () => p.setShowSkin(true) },
-    { key: 'labels', icon: labels ? 'type' : 'typeOff', label: 'نوشته‌های نقشه', sub: labels ? 'دیده می‌شوند' : 'پنهان', on: labels, onClick: p.toggleLabels, tut: 'map-labels' },
+    { key: 'labels', icon: labels ? 'type' : 'typeOff', label: 'نمایش اطلاعات نقشه', sub: labels ? 'روشن' : 'خاموش', on: labels, onClick: p.toggleLabels, tut: 'map-labels' },
     { key: 'boundary', icon: 'polygon', label: 'مرزها', sub: boundaryMode === 'off' ? 'خاموش' : boundaryMode === 'district' ? 'مناطق تهران' : 'استان‌ها', on: boundaryMode !== 'off', onClick: () => p.setShowBoundary(true), tut: 'boundary-btn' },
   ]
   if (onToggleFollow) list.push({ key: 'follow', icon: follow ? 'crosshair' : 'crosshairOff', label: 'دنبال کردن رویداد', sub: follow ? 'روشن' : 'خاموش', on: follow, onClick: onToggleFollow, tut: 'map-follow' })
-  list.push({ key: 'theme', icon: themeMode === 'dark' ? 'moon' : 'sun', label: themeMode === 'dark' ? 'حالت تیره' : 'حالت روشن', sub: 'ضربه برای عوض کردن', onClick: p.toggleMode })
+  list.push({ key: 'theme', icon: themeMode === 'dark' ? 'moon' : 'sun', label: themeMode === 'dark' ? 'حالت تیره' : 'حالت روشن', onClick: p.toggleMode })
   if (p.isMobile) list.push({ key: 'city', icon: 'pin', label: CITIES[city].name, sub: 'شهر', onClick: () => p.setShowCity(true) })
   return list
 }
@@ -42,15 +43,15 @@ export function RailV4(p) {
 
   if (isMobile) {
     const sq = {
-      width: 40, height: 40, borderRadius: 12, border: 'none', padding: 0, background: 'transparent', color: C.text, cursor: 'pointer',
+      width: 40, height: 40, borderRadius: R.box, border: 'none', padding: 0, background: 'transparent', color: C.text, cursor: 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }
     return (
       <div className="tl4-glass" style={{ position: 'absolute', left: Lay.gap, bottom: 'calc(env(safe-area-inset-bottom, 0px) + ' + (Lay.aboveDock + liftBy) + 'px)', zIndex: 60,
-        display: 'flex', flexDirection: 'column', gap: 2, padding: 4, borderRadius: 16, boxShadow: T.shadow1, background: T.glassStrong,
+        display: 'flex', flexDirection: 'column', gap: 2, padding: 4, borderRadius: R.box, boxShadow: T.shadow1, background: T.glassStrong,
         transition: 'bottom .3s cubic-bezier(.34,1.56,.64,1)', animation: 'tl2Slide .45s .1s both cubic-bezier(.2,.9,.3,1)' }}>
         {list.map(it => (
-          <button key={it.key} data-tut={it.tut} className={'tl4-btn' + (it.on ? ' is-on' : '')} aria-label={it.label} aria-pressed={it.on == null ? undefined : !!it.on} title={it.label} onClick={it.onClick} style={sq}>
+          <button key={it.key} data-tut={it.tut} className={'tl4-btn' + (it.on ? ' is-on' : '')} aria-label={it.sub ? it.label + ': ' + it.sub : it.label} aria-pressed={it.on == null ? undefined : !!it.on} title={it.sub ? it.label + ': ' + it.sub : it.label} onClick={it.onClick} style={sq}>
             <Icon name={it.icon} size={19} />
           </button>
         ))}
@@ -76,7 +77,7 @@ export function RailV4(p) {
         <span style={{ fontSize: 12.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.label}</span>
         {it.sub && <span style={{ fontSize: 10.5, fontWeight: 600, opacity: 0.72, overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.sub}</span>}
       </span>
-      {!open && <span className="tl4-tipbox" style={{ direction: 'rtl' }}>{it.label}{it.sub ? ' · ' + it.sub : ''}</span>}
+      {!open && <span className="tl4-tipbox" style={{ direction: 'rtl' }}>{it.label}{it.sub ? ': ' + it.sub : ''}</span>}
     </button>
   )
   const explore = showExplore ? {

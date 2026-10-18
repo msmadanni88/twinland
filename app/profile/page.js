@@ -12,6 +12,17 @@ import { useUiVersion } from '@/components/ui/UiVersionProvider'
 import { uiAtLeast } from '@/lib/ui/versions'
 import { V3_FLAGS } from '@/components/v3/flags'
 import { EventArt } from '@/components/events/EventArt'
+import dynamic from 'next/dynamic'
+import { V4Blank } from '@/lib/ui/v4Blank'
+
+// نسخه v4.0 صفحه پروفایل جدا بار می‌شود و کد نسخه قبل دست نخورده است
+const ProfileV4 = dynamic(() => import('@/components/v4/profile/ProfileV4'), { ssr: false, loading: V4Blank })
+
+export default function ProfilePage() {
+  const { active } = useUiVersion()
+  if (uiAtLeast(active, 'v4.0')) return <ProfileV4 />
+  return <LegacyProfilePage />
+}
 
 // مدال‌های محاسبه‌شده از آمار واقعی (fallback وقتی جدول awards هنوز پر نشده)
 const BADGE_DEFS = [
@@ -65,7 +76,7 @@ function faDateTime(iso) {
   } catch (e) { return faWhen(iso) }
 }
 
-export default function ProfilePage() {
+function LegacyProfilePage() {
   const { active: uiActive } = useUiVersion()
   const v3 = uiAtLeast(uiActive, 'v3.0') && !!V3_FLAGS.eventWidgets   // تاریخچه رویدادها با تصویر ویجت، فقط در v3.0
   const [questDone, setQuestDone] = useState([])

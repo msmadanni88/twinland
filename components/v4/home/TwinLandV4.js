@@ -10,13 +10,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { UIStyles } from '@/lib/theme/ui'
 import { getLevelInfo } from '@/lib/game/gameSystem'
 import { CITIES } from '@/lib/constants'
-import { DEFAULT_MODE, buildC, loadPrefs, saveMode, V4_PALETTE } from '@/lib/theme/palettes'
+import { useV4Theme } from '@/components/v4/useV4Theme'
 import { MapSettingsPopup } from '@/components/map/MapSettingsPopup'
 import { CelebrationOverlay } from '@/components/overlays/CelebrationOverlay'
 import { LedAdBar } from '@/components/overlays/LedAdBar'
-import { NotificationPanel } from '@/components/overlays/NotificationPanel'
 import { TutorialCoach } from '@/components/overlays/TutorialCoach'
-import { XPPanel } from '@/components/overlays/XPPanel'
 import { Toast } from '@/components/overlays/Toast'
 import { useViewport } from '@/components/home/hooks/useViewport'
 import { useToast } from '@/components/home/hooks/useToast'
@@ -42,7 +40,7 @@ import { setTracking } from '@/lib/track'
 import { identifyUser, initAnalytics, track } from '@/lib/analytics'
 import { takeOpenCafe, takeReferralMessage } from '@/lib/growth/entry'
 import { V4_FLAGS } from '@/components/v4/flags'
-import { V4_COLOR, v4Layout, v4Tokens } from '@/components/v4/theme'
+import { V4_COLOR, v4Layout } from '@/components/v4/theme'
 import { V4Styles } from '@/components/v4/V4Styles'
 import { makePinStyleV4 } from '@/components/v4/map/pinsV4'
 import { MapLoaderV4, MapStageV4 } from '@/components/v4/map/MapStageV4'
@@ -58,15 +56,15 @@ import { MenuV4 } from '@/components/v4/home/MenuV4'
 import { BoundaryPickerV4, CityPickerV4, SkinPickerV4 } from '@/components/v4/home/PickersV4'
 import { PanelShellV4 } from '@/components/v4/panels/PanelShellV4'
 import { useCheckinDays } from '@/components/v4/home/useCheckinDays'
+import { V4Provider } from '@/components/v4/kit/context'
+import { UserAvatar } from '@/components/v4/kit/UserAvatar'
+import { PersonSheet } from '@/components/v4/profile/PersonSheet'
+import { XpSheetV4 } from '@/components/v4/overlays/XpSheetV4'
+import { NotificationsV4 } from '@/components/v4/overlays/NotificationsV4'
 
-// حالت روشن و تیره؛ پالت همیشه سیاه و سفید v4 است و انتخاب پالت کاربر برای نسخه‌های دیگر دست نمی‌خورد
-function useV4Theme() {
-  const [themeMode, setThemeMode] = useState(DEFAULT_MODE)
-  useEffect(() => { setThemeMode(loadPrefs().mode) }, [])
-  const C = useMemo(() => buildC(V4_PALETTE, themeMode), [themeMode])
-  const toggleMode = useCallback(() => setThemeMode(m => { const n = m === 'dark' ? 'light' : 'dark'; saveMode(n); return n }), [])
-  return { C, themeMode, toggleMode }
-}
+
+// چهره نویسنده هر نظر در برگه کافه؛ همان چهره مشترک سایت
+const CommentAvatarV4 = ({ person }) => <UserAvatar person={person} size={36} />
 
 export function TwinLandV4({ session, onLogout }) {
   const [city, setCity] = useState('tehran')
@@ -77,8 +75,7 @@ export function TwinLandV4({ session, onLogout }) {
   const [loaderCap, setLoaderCap] = useState(false)
   useEffect(() => { const t = setTimeout(() => setLoaderCap(true), 12000); return () => clearTimeout(t) }, [])
   const { isDesktop, isMobile } = useViewport()
-  const { C, themeMode, toggleMode } = useV4Theme()
-  const T = useMemo(() => v4Tokens(C), [C])
+  const { C, T, themeMode, toggleMode } = useV4Theme()
   const Lay = v4Layout({ isMobile, isDesktop })
 
   // زیرنقشه: حالت و نوشته‌ها با ref خوانده می‌شوند تا ساختن دوباره لازم نباشد
@@ -128,6 +125,9 @@ export function TwinLandV4({ session, onLogout }) {
   const [showBoundary, setShowBoundary] = useState(false)
   const [showMapSettings, setShowMapSettings] = useState(false)
   const [railOpen, toggleRail] = useRailOpen()
+  // پروفایل هر نفر که از رتبه‌بندی، کلن، حلقه یا نظرها باز شود
+  const [personId, setPersonId] = useState(null)
+  const openPerson = useCallback((id) => { setPersonId(id); track('person_open', { from: 'home' }) }, [])
 
   const pinStyle = useMemo(() => makePinStyleV4(C, T), [C, T])
   const { showToast, toast } = useToast()
@@ -258,7 +258,7 @@ export function TwinLandV4({ session, onLogout }) {
   const leftInset = isMobile ? Lay.gap : Lay.gap * 2 + (railOpen ? Lay.railWOpen : Lay.railW)
   const sumLive = Object.values(live).reduce((a, b) => a + b, 0)
   const totalLive = demo.on ? sumLive : (realLiveTotal != null ? realLiveTotal : sumLive)
-  const anySheet = showRegionFilter || showRegionResults || showXP || showMenu || showCity || showSkin || showBoundary || showMapSettings || (!docked && panelOpen)
+  const anySheet = showRegionFilter || showRegionResults || showXP || showMenu || showCity || showSkin || showBoundary || showMapSettings || (!docked && panelOpen) || !!personId
   const followAvailable = V4_FLAGS.mapFollow && eventWidgets
   const followOn = followAvailable && follow
   const eventCafe = useMemo(() => (activeEventCafeId ? cafes.find(c => c.id === activeEventCafeId) || null : null), [cafes, activeEventCafeId])
@@ -284,6 +284,7 @@ export function TwinLandV4({ session, onLogout }) {
   }
 
   return (
+    <V4Provider C={C} T={T} openPerson={openPerson}>
     <div className="tl2 tl4" data-skin={skinId} data-mode={themeMode}
       style={{ position: 'fixed', inset: 0, height: '100dvh', width: '100vw', overflow: 'hidden', direction: 'rtl', background: T.mapBg, color: C.text,
         fontFamily: "'Estedad','Vazirmatn',system-ui,sans-serif", colorScheme: themeMode === 'dark' ? 'dark' : 'light' }}>
@@ -322,9 +323,9 @@ export function TwinLandV4({ session, onLogout }) {
 
       <PanelShellV4 demoTabs={demoTabs} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
 
-      {selCafe && <CafeSheet tint={V4_COLOR.pin} headTint={themeMode === 'dark' ? '#3A3A40' : '#C9C9CF'} noPlay={isBiz && !effAdmin} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} checkedToday={!demo.on ? checkedToday : null} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
-      {showXP && <XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}
-      {showNotif && <NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
+      {selCafe && <CafeSheet commentAvatar={CommentAvatarV4} onPerson={openPerson} tint={V4_COLOR.pin} headTint={themeMode === 'dark' ? '#3A3A40' : '#C9C9CF'} noPlay={isBiz && !effAdmin} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} checkedToday={!demo.on ? checkedToday : null} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
+      {showXP && <XpSheetV4 xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}
+      {showNotif && <NotificationsV4 notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
       <UIStyles />
       <TutorialCoach neon="#FFFFFF" C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} tutorialLoaded={tutorialLoaded} replay={tutorialReplay} onReplayEnd={() => setTutorialReplay(false)} isMobile={isMobile} />
       {celebration && <CelebrationOverlay C={C} data={celebration} onClose={() => setCelebration(null)} />}
@@ -337,6 +338,8 @@ export function TwinLandV4({ session, onLogout }) {
 
       <Toast BH={Lay.aboveDock + 36} C={C} toast={toast} />
       <MapLoaderV4 C={C} T={T} show={mapLoading && !loaderCap} progress={mapProgress} monoLogo={!!V4_FLAGS.monoLogo} />
+      {personId && <PersonSheet id={personId} onClose={() => setPersonId(null)} />}
     </div>
+    </V4Provider>
   )
 }
