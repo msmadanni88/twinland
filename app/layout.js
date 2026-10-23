@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { UiVersionProvider } from '@/components/ui/UiVersionProvider'
 import { fetchSiteUiVersion } from '@/lib/ui/siteVersion'
 import { PwaBoot } from '@/components/pwa/PwaBoot'
+import { SessionKeeper } from '@/components/auth/SessionKeeper'
 
 // نسخه ظاهر سایت هر 30 ثانیه از دیتابیس تازه می‌شود — lib/ui/siteVersion.js
 export const revalidate = 30
@@ -53,7 +54,7 @@ export default async function RootLayout({ children }) {
         />
         <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       </head>
-      <body><UiVersionProvider site={siteUi}>{children}</UiVersionProvider><PwaBoot /><Analytics /></body>
+      <body><UiVersionProvider site={siteUi}>{children}</UiVersionProvider><PwaBoot /><SessionKeeper /><Analytics /></body>
     </html>
   )
 }

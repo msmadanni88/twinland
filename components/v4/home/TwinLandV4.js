@@ -38,7 +38,8 @@ import { useMapFollow } from '@/components/v3/map/useMapFollow'
 import { DemoConsole, SimClan, SimDashboard, SimMissions, SimProfile, SimRank } from '@/components/v3/demo/DemoPanels'
 import { setTracking } from '@/lib/track'
 import { identifyUser, initAnalytics, track } from '@/lib/analytics'
-import { takeOpenCafe, takeReferralMessage } from '@/lib/growth/entry'
+import { takeOpenCafe } from '@/lib/growth/entry'
+import { ReferralCelebrationV4 } from '@/components/v4/growth/ReferralCelebrationV4'
 import { V4_FLAGS } from '@/components/v4/flags'
 import { V4_COLOR, v4Layout } from '@/components/v4/theme'
 import { V4Styles } from '@/components/v4/V4Styles'
@@ -211,13 +212,7 @@ export function TwinLandV4({ session, onLogout }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realCafes, mapLoading])
 
-  useEffect(() => {
-    const show = () => { const m = takeReferralMessage(); if (m && m.msg) showToast(m.msg, m.ok ? undefined : 'warn') }
-    show()
-    window.addEventListener('tl-referral', show)
-    return () => window.removeEventListener('tl-referral', show)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // نتیجه کد دعوت: پنجره خوش‌آمد و جایزه در ReferralCelebrationV4
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -329,6 +324,7 @@ export function TwinLandV4({ session, onLogout }) {
       <UIStyles />
       <TutorialCoach neon="#FFFFFF" C={C} session={session} accountType={accountType} tutorialSeen={tutorialSeen} setTutorialSeen={setTutorialSeen} tutorialLoaded={tutorialLoaded} replay={tutorialReplay} onReplayEnd={() => setTutorialReplay(false)} isMobile={isMobile} />
       {celebration && <CelebrationOverlay C={C} data={celebration} onClose={() => setCelebration(null)} />}
+      {!demo.on && <ReferralCelebrationV4 notifications={notifications} onMark={markNotifRead} onXp={setXp} onPerson={openPerson} showToast={showToast} />}
 
       <MenuV4 C={C} T={T} TH={Lay.barTop + Lay.barH} isMobile={isMobile} demoOn={demo.on} toggleDemo={toggleDemo} showBusiness={isBiz || isOwner || effAdmin} backfillDistricts={backfillDistricts} backfilling={backfilling} effAdmin={effAdmin} isOwner={isOwner} onLogout={onLogout} resetMe={resetMe} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setShowMapSettings={setShowMapSettings} setShowMenu={setShowMenu} setShowXP={setShowXP} setTab={setTab} setTutorialReplay={setTutorialReplay} showMenu={showMenu} showToast={showToast} themeMode={themeMode} toggleMode={onToggleMode} toggleViewMode={toggleViewMode} viewAsUser={viewAsUser} />
       <CityPickerV4 C={C} T={T} show={showCity} setShow={setShowCity} city={city} setCity={setCity} showToast={showToast} />

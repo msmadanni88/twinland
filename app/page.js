@@ -4,6 +4,7 @@ import { useUiVersion } from '@/components/ui/UiVersionProvider'
 import { resolveSurface } from '@/lib/ui/surfaces'
 import { SB_KEY, SB_URL } from '@/lib/config'
 import { claimPendingReferral, rememberEntryParams } from '@/lib/growth/entry'
+import { bindSession, isFresh, readSession, refreshSession } from '@/lib/auth/session'
 
 export default function Page(){
   const [session,   setSession]   = useState(null)
@@ -12,11 +13,21 @@ export default function Page(){
   useEffect(()=>{
     // پیوند دعوت ?ref= و پیوند مستقیم کافه ?cafe= پیش از ورود نگه داشته می‌شوند تا بعد از ورود به کار بیایند
     rememberEntryParams()
-    try{
-      const raw = localStorage.getItem('tl_session')
-      if(raw){ const s = JSON.parse(raw); if(s && s.access_token && (!s.expires_at || s.expires_at > Date.now())) setSession(s); else localStorage.removeItem('tl_session') }
-    }catch(e){}
-    setAuthReady(true)
+    // نشست تمام‌شده دیگر پاک نمی‌شود: اول با توکن تمدید، تازه می‌شود و فقط اگر سرور ردش کرد، کاربر دوباره وارد می‌شود
+    let alive=true
+    const s0 = readSession()
+    if(!s0){ setAuthReady(true); return }
+    const use = (s)=>{ if(!alive) return; if(s&&s.access_token){ bindSession(s); setSession(s) } else { try{localStorage.removeItem('tl_session')}catch(e){} } setAuthReady(true) }
+    if(isFresh(s0, 60*1000) || !s0.refresh_token){ use(isFresh(s0) ? s0 : null); return ()=>{ alive=false } }
+    // بی‌اینترنت نشست همان‌طور می‌ماند و با برگشت اینترنت تمدید می‌شود؛ فقط رد صریح سرور null برمی‌گرداند
+    refreshSession().then(s=>use(s), ()=>use(s0))
+    return ()=>{ alive=false }
+  },[])
+  // وقتی سرور توکن تمدید را دیگر نپذیرد، صفحه ورود نشان داده می‌شود
+  useEffect(()=>{
+    const dead=()=>{ try{localStorage.removeItem('tl_session')}catch(e){} bindSession(null); setSession(null) }
+    window.addEventListener('tl-session-dead',dead)
+    return ()=>window.removeEventListener('tl-session-dead',dead)
   },[])
   useEffect(()=>{ recheck() },[session, recheck])
   // کد دعوت فقط یک بار و فقط بعد از ورود ثبت می‌شود؛ قاعده‌ها سمت سرور است
@@ -41,6 +52,6 @@ export default function Page(){
   const AuthGate = resolveSurface('auth', active)
   const TwinLand = resolveSurface('home', active)
   if(!authReady) return <div style={{position:'fixed',inset:0,background:'#0b0714'}}/>
-  if(!session) return <AuthGate onAuthed={setSession}/>
-  return <TwinLand session={session} onLogout={()=>{try{localStorage.removeItem('tl_session')}catch(e){}setSession(null)}}/>
+  if(!session) return <AuthGate onAuthed={(s)=>{ bindSession(s); setSession(s) }}/>
+  return <TwinLand session={session} onLogout={()=>{try{localStorage.removeItem('tl_session')}catch(e){}bindSession(null);setSession(null)}}/>
 }

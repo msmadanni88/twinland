@@ -26,7 +26,8 @@ import { EditProfileSheet } from '@/components/v4/profile/EditProfileSheet'
 import { PrivacySettings } from '@/components/v4/profile/PrivacySettings'
 import { PublicProfileView, asOthersSee, joinedLabel, usePublicProfile } from '@/components/v4/profile/PublicProfileView'
 import { useMyActivity } from '@/components/v4/profile/useMyActivity'
-import { ReferralInline } from '@/components/v4/growth/Referral'
+import { ReferralInline, useReferral } from '@/components/v4/growth/Referral'
+import { BadgeTile, ReferralTierRow } from '@/components/v4/growth/ReferralBadge'
 import { SheetV4 } from '@/components/v4/ui/Sheet'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
@@ -261,19 +262,19 @@ function BadgesTab({ act }) {
   const earned = act.awards.filter(a => a.kind === 'badge')
   const items = act.awards.filter(a => a.kind !== 'badge')
   const goals = BADGES.map(b => ({ ...b, done: b.ok(act.stats) }))
+  const ref = useReferral(true)
   return (<>
     <Card>
       <SectionHead title="نشان‌ها" hint={earned.length ? fa(earned.length) + ' نشان گرفته‌ای' : 'با چک‌این و رویدادها نشان می‌گیری'} />
       {earned.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8, marginBottom: 12 }}>
-          {earned.map(b => (
-            <div key={b.id} style={{ borderRadius: R.box, background: T.chip, border: '1px solid ' + T.hair, padding: '10px 6px', textAlign: 'center' }}>
-              <div style={{ fontSize: 24 }}>{b.icon || '•'}</div>
-              <div style={{ fontSize: 10.5, fontWeight: 800, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</div>
-            </div>
-          ))}
+          {earned.map(b => <BadgeTile key={b.id} badge={b} />)}
         </div>
       )}
+      <div style={{ fontSize: 12, fontWeight: 900, margin: '4px 0 8px' }}>نشان‌های دعوت</div>
+      <div style={{ padding: '12px 6px', borderRadius: R.box, background: T.chip, border: '1px solid ' + T.hair, marginBottom: 12 }}>
+        <ReferralTierRow count={ref && ref.ok ? Number(ref.invited) || 0 : 0} size={48} />
+      </div>
       <div style={{ fontSize: 12, fontWeight: 900, margin: '4px 0 8px' }}>هدف‌های بعدی</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
         {goals.map(g => (

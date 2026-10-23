@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SB_KEY, SB_URL } from '@/lib/config'
 import { REASON_LABELS, getSession, subscribeToTables } from '@/lib/game/gameSystem'
 import { loadMe } from '@/lib/profile/people'
+import { getToken } from '@/lib/auth/session'
 import { districtLabel } from '@/lib/events/format'
 import { faDigits } from '@/components/v4/kit/kit'
 
@@ -17,7 +18,8 @@ export function useMyActivity() {
     const s = getSession()
     const uid = s && s.user && s.user.id
     if (!uid) { setData(d => ({ ...d, loading: false })); return }
-    const h = { apikey: SB_KEY, Authorization: 'Bearer ' + s.access_token }
+    const tk = (await getToken()) || s.access_token
+    const h = { apikey: SB_KEY, Authorization: 'Bearer ' + tk }
     const get = (q) => fetch(SB_URL + '/rest/v1/' + q, { headers: h }).then(r => (r.ok ? r.json() : [])).then(r => (Array.isArray(r) ? r : [])).catch(() => [])
     const [checkins, xp, quests, clan, awards, favs] = await Promise.all([
       get('checkins?user_id=eq.' + uid + '&select=id,cafe_id,xp_awarded,created_at,district,cafes(name,district)&order=created_at.desc&limit=500'),

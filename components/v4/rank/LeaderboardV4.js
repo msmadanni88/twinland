@@ -50,7 +50,7 @@ export function LeaderboardV4({ full = false }) {
   useEffect(() => {
     if (!ready) return
     let alive = true
-    rpc('leaderboard_regions', {}, token).then(r => {
+    rpc('leaderboard_regions', {}, token ? undefined : null).then(r => {
       if (!alive || !Array.isArray(r)) return
       setRegions(r)
       setRegion(prev => prev || (r[0] && r[0].region) || null)
@@ -66,7 +66,7 @@ export function LeaderboardV4({ full = false }) {
     const args = { p_scope: scope, p_region: scope === 'region' ? region : null }
     Promise.all([
       fetchLeaderboardCards(scope, args.p_region, 50),
-      loggedIn ? rpc('leaderboard_me', args, token) : Promise.resolve(null),
+      loggedIn ? rpc('leaderboard_me', args) : Promise.resolve(null),
     ]).then(([list, mine]) => {
       if (!alive) return
       if (!Array.isArray(list)) { setFail(true); setRows(r => r || []); return }
@@ -214,7 +214,7 @@ function LeagueCardV4({ token, ready }) {
   useEffect(() => {
     if (!ready) return () => {}
     let alive = true
-    const get = () => rpc('league_status', {}, token).then(r => { if (alive && r && r.prizes) setSt(r) })
+    const get = () => rpc('league_status', {}, token ? undefined : null).then(r => { if (alive && r && r.prizes) setSt(r) })
     get()
     const t = setInterval(() => { if (!document.hidden) get() }, 300000)
     return () => { alive = false; clearInterval(t) }

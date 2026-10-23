@@ -14,9 +14,12 @@ import { useV4Theme } from '@/components/v4/useV4Theme'
 import { V4Provider } from '@/components/v4/kit/context'
 import { IconBtn } from '@/components/v4/kit/kit'
 import { R } from '@/components/v4/theme'
+import { useSessionReady } from '@/lib/auth/session'
 
 export function V4Page({ title, back = '/', backLabel = 'برگشت به نقشه', actions, maxWidth = 560, children, openPerson }) {
   const { C, T, themeMode, toggleMode } = useV4Theme()
+  // اگر توکن ورود تمام شده باشد، اول تمدید می‌شود و بعد محتوا داده‌اش را می‌خواند
+  const ready = useSessionReady()
   useEffect(() => {
     try {
       let m = document.querySelector('meta[name="theme-color"]')
@@ -48,7 +51,7 @@ export function V4Page({ title, back = '/', backLabel = 'برگشت به نقش�
           </div>
         </header>
         <main style={{ maxWidth, margin: '0 auto', padding: '6px 12px calc(env(safe-area-inset-bottom, 0px) + 40px)', boxSizing: 'border-box' }}>
-          {children}
+          {ready ? children : <div aria-busy="true" style={{ height: 160, borderRadius: R.box, background: T.chip, animation: 'tl4Pulse 1.4s ease-in-out infinite' }} />}
         </main>
       </div>
     </V4Provider>

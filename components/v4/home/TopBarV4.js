@@ -2,6 +2,7 @@
 // نوار بالای صفحه — نسخه v4.0
 // منو، لوگو، شهر، جستجو، امتیاز با نوار چندتکه‌ای و اعلان‌ها؛ همه روی یک شیشه مات با آیکون خطی.
 // نشان لول تنها چیز رنگی این نوار است.
+import { useEffect, useRef, useState } from 'react'
 import { CITIES } from '@/lib/constants'
 import { L } from '@/lib/theme/labels'
 import { Icon } from '@/components/v4/icons'
@@ -9,10 +10,41 @@ import { LevelBadge, XpBar } from '@/components/v4/kit/Meter'
 import { R } from '@/components/v4/theme'
 import { V4_FLAGS } from '@/components/v4/flags'
 
+// نقطه اعلان خوانده‌نشده: قرمز، تنها جای قرمز نوار بالا
+const NOTIF_DOT = '#FF3B30'
+// اعلان‌هایی که اگر خوانده نشده باشند، با باز شدن صفحه زنگ را یک بار تکان می‌دهند
+const IMPORTANT = new Set(['referral_welcome', 'referral_reward', 'referral_join', 'referral_badge', 'level_up', 'league_win', 'collectible', 'quest_complete', 'redeemed', 'comment_reply'])
+
+// زنگ فقط وقتی تکان می‌خورد که اعلان تازه برسد، یا وقتی صفحه باز شد و اعلان مهم خوانده‌نشده هست؛ هر بار یک تکان کوتاه
+function useBellRing(notifications) {
+  const [ring, setRing] = useState(0)
+  const known = useRef(null)
+  const timer = useRef(null)
+  const fire = (ms) => { clearTimeout(timer.current); timer.current = setTimeout(() => setRing(k => k + 1), ms) }
+  useEffect(() => {
+    const t = setTimeout(() => { if (!known.current) known.current = new Set() }, 4000)
+    return () => { clearTimeout(t); clearTimeout(timer.current) }
+  }, [])
+  useEffect(() => {
+    const list = notifications || []
+    if (!known.current) {
+      if (!list.length) return
+      known.current = new Set(list.map(n => n.id))
+      if (list.some(n => !n.read && IMPORTANT.has(n.type))) fire(1200)
+      return
+    }
+    const fresh = list.filter(n => !known.current.has(n.id))
+    fresh.forEach(n => known.current.add(n.id))
+    if (fresh.some(n => !n.read)) fire(150)
+  }, [notifications])
+  return ring
+}
+
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 
 export function TopBarV4({ C, T, Lay, city, isMobile, levelInfo, notifications, onLogoTap, search, setSearch, setShowCity, setShowMenu, setShowNotif, setShowXP, showMenu, showNotif, xp }) {
   const unread = notifications.some(n => !n.read)
+  const ring = useBellRing(notifications)
   const sq = (on) => ({
     width: 40, height: 40, borderRadius: R.box, flexShrink: 0, padding: 0, cursor: 'pointer',
     border: '1px solid ' + (on ? 'transparent' : T.hair), background: on ? C.accent : T.chip, color: on ? T.onAccent : C.text,
@@ -80,8 +112,8 @@ export function TopBarV4({ C, T, Lay, city, isMobile, levelInfo, notifications, 
       </button>
 
       <button data-tut="notif-btn" className={'tl4-btn' + (showNotif ? ' is-on' : '')} aria-label={L.notifications + (unread ? '، تازه داری' : '')} onClick={() => setShowNotif(v => !v)} style={sq(showNotif)}>
-        <Icon name="bell" size={20} />
-        {unread && <span style={{ position: 'absolute', top: 8, left: 9, width: 8, height: 8, borderRadius: '50%', background: showNotif ? T.onAccent : C.text, boxShadow: '0 0 0 2px ' + (showNotif ? C.accent : C.card) }} />}
+        <span key={ring} className={ring ? 'tl4-bell-ring' : undefined} style={{ display: 'inline-flex' }}><Icon name="bell" size={20} /></span>
+        {unread && <span aria-hidden="true" style={{ position: 'absolute', top: 7, left: 8, width: 9, height: 9, borderRadius: '50%', background: NOTIF_DOT, boxShadow: '0 0 0 2px ' + (showNotif ? C.accent : C.card) }} />}
       </button>
     </div>
   )

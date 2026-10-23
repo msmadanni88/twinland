@@ -4,7 +4,8 @@
 //  پیوند دعوت همان‌جا دیده می‌شود و با یک ضربه فرستاده یا کپی می‌شود؛ لازم نیست پنجره دیگری باز شود.
 //  کد از تابع my_referral می‌آید و چند دقیقه در حافظه می‌ماند. مقدار جایزه هم از همان تابع می‌آید،
 //  پس اگر جایزه در سرور عوض شود، همه نوشته‌ها خودکار درست می‌شوند.
-//  قاعده‌های ضدتقلب در سرور است: claim_referral و tl_referral_on_checkin.
+//  قاعده‌های ضدتقلب در سرور است: claim_referral. از 23 اکتبر 2026 جایزه همان لحظه ثبت‌نام به هر دو نفر می‌رسد
+//  و دعوت‌کننده با 1، 3، 5، 10 و 25 دعوت موفق نشان پله‌ای می‌گیرد — lib/growth/referralTiers.js
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react'
 import { getSession } from '@/lib/game/gameSystem'
@@ -16,33 +17,53 @@ import { R } from '@/components/v4/theme'
 import { useV4 } from '@/components/v4/kit/context'
 import { Btn, Stat } from '@/components/v4/kit/kit'
 import { SheetV4 } from '@/components/v4/ui/Sheet'
+import { ReferralTierRow } from '@/components/v4/growth/ReferralBadge'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 let cache = null, cacheAt = 0, inflight = null
+const BUST = 'tl-referral-bust'
+
+// کارت دعوت را همه‌جا تازه می‌کند؛ مثلاً وقتی دوستی با پیوند آمد
+export function bustReferral() {
+  cache = null; cacheAt = 0
+  try { window.dispatchEvent(new Event(BUST)) } catch (e) {}
+}
+
+function loadReferral() {
+  if (!inflight) {
+    inflight = rpc('my_referral', {}).then(r => {
+      inflight = null
+      cache = r && r.ok ? r : { ok: false, error: (r && r.error) || 'network' }
+      cacheAt = Date.now()
+      return cache
+    })
+  }
+  return inflight
+}
 
 export function useReferral(enabled = true) {
   const [d, setD] = useState(cache)
+  const [nonce, setNonce] = useState(0)
+  useEffect(() => {
+    const f = () => setNonce(n => n + 1)
+    window.addEventListener(BUST, f)
+    return () => window.removeEventListener(BUST, f)
+  }, [])
   useEffect(() => {
     if (!enabled) return
     let alive = true
     const s = getSession()
     if (!s || !s.access_token) { setD({ ok: false, error: 'auth' }); return }
     if (cache && cache.ok && Date.now() - cacheAt < 5 * 60e3) { setD(cache); return }
-    if (!inflight) {
-      inflight = rpc('my_referral', {}, s.access_token).then(r => {
-        inflight = null
-        cache = r && r.ok ? r : { ok: false, error: (r && r.error) || 'network' }
-        cacheAt = Date.now()
-        return cache
-      })
-    }
-    inflight.then(v => { if (alive) setD(v) })
+    if (cache && !cache.ok) cache = null
+    loadReferral().then(v => { if (alive) setD(v) })
     return () => { alive = false }
-  }, [enabled])
-  return d
+  }, [enabled, nonce])
+  const retry = () => { cache = null; cacheAt = 0; setD(null); setNonce(n => n + 1) }
+  return d ? { ...d, retry } : d
 }
 
-export const inviteText = (reward) => 'بیا با هم کافه‌ها را روی نقشه TwinLand بگردیم. با این پیوند بیا و اولین چک‌اینت را بزن تا هر دو ' + fa(reward || 150) + ' امتیاز بگیریم:'
+export const inviteText = (reward) => 'بیا با هم کافه‌ها را روی نقشه TwinLand بگردیم. با این پیوند ثبت‌نام کن تا همان لحظه هر دو ' + fa(reward || 150) + ' امتیاز بگیریم:'
 
 export function inviteHeadline(reward) {
   return 'دوستت را دعوت کن و هر دو ' + fa(reward || 150) + ' امتیاز بگیرید'
@@ -83,20 +104,30 @@ export function ReferralLink({ d, showToast, style, C: c, T: t }) {
 export function ReferralInline({ showToast, compact = false, style, C: c, T: t }) {
   const { C, T } = useV4({ C: c, T: t })
   const d = useReferral(true)
-  if (d && !d.ok) return null
+  // حساب کسب‌وکار کد دعوت ندارد؛ برای خطای دیگر کارت خالی نمی‌ماند و دکمه دوباره دارد
+  if (d && !d.ok && (d.error === 'business' || d.error === 'auth')) return null
+  if (d && !d.ok) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...style }}>
+        <span style={{ width: 34, height: 34, borderRadius: R.box, background: T.chip, border: '1px solid ' + T.hair, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="gift" size={18} /></span>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.sub, lineHeight: 1.8 }}>پیوند دعوت گرفته نشد.</div>
+        <Btn kind="ghost" size="sm" icon="refresh" onClick={d.retry} C={C} T={T}>دوباره</Btn>
+      </div>
+    )
+  }
   return (
     <div style={style}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <span style={{ width: 34, height: 34, borderRadius: R.box, background: T.chip, border: '1px solid ' + T.hair, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="gift" size={18} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 900, color: C.text, lineHeight: 1.6 }}>{inviteHeadline(d && d.reward)}</div>
-          {!compact && <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.7 }}>جایزه بعد از اولین چک‌این واقعی دوستت به هر دو نفر می‌رسد.</div>}
+          {!compact && <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.7 }}>دوستت که با پیوند تو ثبت‌نام کند، همان لحظه جایزه به هر دو نفر می‌رسد.</div>}
         </div>
       </div>
       {d ? <ReferralLink d={d} showToast={showToast} C={C} T={T} /> : <div style={{ height: 42, borderRadius: R.box, background: T.chip, animation: 'tl4Pulse 1.4s ease-in-out infinite' }} />}
       {d && d.invited > 0 && (
         <div style={{ fontSize: 11, color: C.sub, marginTop: 8 }}>
-          {fa(d.invited)} نفر با پیوندت آمده‌اند{d.rewarded ? ' · ' + fa(d.rewarded) + ' جایزه گرفته' : ''}{d.pending ? ' · ' + fa(d.pending) + ' منتظر چک‌این' : ''}
+          {fa(d.invited)} نفر با پیوندت آمده‌اند{d.rewarded ? ' · ' + fa(d.rewarded) + ' جایزه گرفته‌ای' : ''}
         </div>
       )}
     </div>
@@ -112,7 +143,7 @@ export function ReferralSheetV4({ open = true, onClose, showToast }) {
   return (
     <SheetV4 open={open} onClose={onClose} title="دعوت دوست" icon="gift" maxWidth={480}>
       <div style={{ fontSize: 13, lineHeight: 2, color: C.sub, marginBottom: 14 }}>
-        {inviteHeadline(d && d.reward)}. دوستت با پیوند تو ثبت‌نام می‌کند و وقتی اولین چک‌این واقعی‌اش را در یک کافه زد، جایزه به هر دو نفر می‌رسد.
+        {inviteHeadline(d && d.reward)}. دوستت با پیوند تو ثبت‌نام می‌کند و همان لحظه جایزه به هر دو نفر می‌رسد. هر چه دوستان بیشتری بیایند، نشان دعوتت ارزشمندتر می‌شود.
       </div>
       {err && <div style={{ fontSize: 13, color: C.text, textAlign: 'center', padding: 12, borderRadius: R.box, background: T.chip }}>{err}</div>}
       {!err && !d && <div style={{ height: 120, borderRadius: R.box, background: T.chip, animation: 'tl4Pulse 1.4s ease-in-out infinite' }} />}
@@ -122,12 +153,15 @@ export function ReferralSheetV4({ open = true, onClose, showToast }) {
           <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: 6, direction: 'ltr', marginTop: 4, fontFamily: 'ui-monospace, Menlo, monospace' }}>{d.code}</div>
         </div>
         <ReferralLink d={d} showToast={showToast} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginTop: 14 }}>
-          <Stat value={Number(d.invited) || 0} label="دعوت‌شده" />
-          <Stat value={Number(d.rewarded) || 0} label="جایزه گرفته" />
-          <Stat value={Number(d.pending) || 0} label="منتظر چک‌این" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginTop: 14 }}>
+          <Stat value={Number(d.invited) || 0} label="دوست آمده" />
+          <Stat value={(Number(d.rewarded) || 0) * (Number(d.reward) || 150)} label="امتیاز دعوت" />
         </div>
-        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.9, marginTop: 12 }}>کد فقط برای حساب‌های تازه کار می‌کند و جایزه بعد از چک‌این واقعی داخل کافه داده می‌شود. هر ۳۰ روز حداکثر ۲۰ جایزه دعوت.</div>
+        <div style={{ marginTop: 14, padding: '12px 8px', borderRadius: R.box, background: T.chip, border: '1px solid ' + T.hair }}>
+          <div style={{ fontSize: 12, fontWeight: 900, marginBottom: 10, textAlign: 'center' }}>نشان‌های دعوت</div>
+          <ReferralTierRow count={Number(d.invited) || 0} size={50} />
+        </div>
+        <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.9, marginTop: 12 }}>کد فقط برای حساب‌های تازه کار می‌کند و جایزه همان لحظه ثبت‌نام به هر دو نفر داده می‌شود. هر ۳۰ روز حداکثر ۲۰ جایزه دعوت.</div>
       </>}
     </SheetV4>
   )

@@ -70,6 +70,11 @@ export function V4Styles({ C, T }) {
   .tl4-noscroll{scrollbar-width:none}.tl4-noscroll::-webkit-scrollbar{display:none}
   @keyframes tl4Fade{from{opacity:0}to{opacity:1}}
   @keyframes tl4Pop{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+  /* زنگ اعلان: یک تکان خیلی کوتاه، فقط برای اعلان تازه یا اعلان‌های مهم خوانده‌نشده */
+  @keyframes tl4BellRing{0%{transform:rotate(0)}15%{transform:rotate(14deg)}30%{transform:rotate(-12deg)}45%{transform:rotate(8deg)}60%{transform:rotate(-5deg)}75%{transform:rotate(2deg)}100%{transform:rotate(0)}}
+  .tl4-bell-ring{display:inline-flex;transform-origin:50% 12%;animation:tl4BellRing .7s cubic-bezier(.36,.07,.19,.97) 1}
+  /* پنجره جایزه دعوت */
+  @keyframes tl4RefPop{0%{opacity:0;transform:scale(.6)}60%{opacity:1;transform:scale(1.08)}100%{transform:scale(1)}}
   @media (prefers-reduced-motion: reduce){ .tl4 *{animation:none !important;transition:none !important} }
   `
   return <style dangerouslySetInnerHTML={{ __html: css }} />

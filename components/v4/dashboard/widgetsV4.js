@@ -18,6 +18,7 @@ import { Btn, Card, Chip, SectionHead, faDigits } from '@/components/v4/kit/kit'
 import { Meter, XpBar } from '@/components/v4/kit/Meter'
 import { PersonLink, UserAvatar } from '@/components/v4/kit/UserAvatar'
 import { ReferralInline } from '@/components/v4/growth/Referral'
+import { useMe } from '@/lib/profile/people'
 
 const wrap = { margin: '0 12px 12px' }
 const more = (C) => ({ fontSize: 11.5, fontWeight: 800, color: C.text, textDecoration: 'none', background: 'none', border: 'none', fontFamily: 'inherit', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', gap: 2 })
@@ -28,7 +29,8 @@ function MoreLink({ C, href, onClick }) {
 
 // ── سلام و پیشرفت ───────────────────────────────────────────
 export function HeroV4({ ctx }) {
-  const { C, T, levelInfo, xp, streak, userName, checkinDays, setShowXP } = ctx
+  const { C, T, levelInfo, xp, streak, userName, checkinDays, setShowXP, goTab } = ctx
+  const me = useMe()
   const lv = levelInfo.current
   const RR = 36, CIRC = 2 * Math.PI * RR
   const pct = Math.min(100, levelInfo.progress || 0)
@@ -48,7 +50,12 @@ export function HeroV4({ ctx }) {
           </div>
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11.5, color: C.sub, fontWeight: 700 }}>سلام{userName ? '، ' + userName : ''}</div>
+          {/* چهره خودم کنار سلام؛ همان UserAvatar همه‌جا، ضربه پروفایل را باز می‌کند */}
+          <button type="button" className="tl4-press" onClick={() => goTab && goTab('profile')} aria-label="پروفایل من"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, margin: '0 0 2px', cursor: 'pointer', fontFamily: 'inherit', maxWidth: '100%' }}>
+            <UserAvatar person={(me && me.card) || { name: userName }} size={30} C={C} T={T} />
+            <span style={{ fontSize: 12.5, color: C.text, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>سلام{userName ? '، ' + userName : ''}</span>
+          </button>
           <div style={{ fontSize: 25, fontWeight: 900, color: C.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1.25 }}>{faNum(xp)} <span style={{ fontSize: 12.5, color: C.sub }}>XP</span></div>
           <div style={{ fontSize: 11, color: C.sub, margin: '2px 0 7px' }}>{lv.name}{levelInfo.next ? ' · ' + faNum(remain) + ' تا ' + levelInfo.next.name : ' · بالاترین لول'}</div>
           <XpBar levelInfo={levelInfo} size="md" />

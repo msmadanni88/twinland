@@ -54,7 +54,8 @@ function badgesFor(ev, max) {
   return list.filter(b => b.art !== null).slice(0, max)
 }
 
-export function EventDock({ C, T, Lay, cafes, getPos, isMobile, onActiveCafeChange, rightInset, setSelCafe }) {
+// rotateMs: مدت ماندن روی هر رویداد؛ نقشه هم همین‌قدر روی کافه آن رویداد می‌ماند. پیش‌فرض نسخه‌های قبل 6 ثانیه
+export function EventDock({ C, T, Lay, cafes, getPos, isMobile, onActiveCafeChange, rightInset, setSelCafe, rotateMs = ROTATE_MS }) {
   const { events: all } = useEventFeed({ slot: 'bar', limit: 12, getPos })
   const events = useMemo(() => {
     const open = all.filter(e => !e.done)
@@ -87,12 +88,12 @@ export function EventDock({ C, T, Lay, cafes, getPos, isMobile, onActiveCafeChan
   useEffect(() => {
     if (events.length < 2) return
     clearInterval(timerRef.current)
-    const delay = marquee.on ? Math.max(ROTATE_MS, (marquee.dur * 2 + 3) * 1000) : ROTATE_MS
+    const delay = marquee.on ? Math.max(rotateMs, (marquee.dur * 2 + 3) * 1000) : rotateMs
     timerRef.current = setInterval(() => {
       if (!holdRef.current && !document.hidden) liveRef.current.goTo(liveRef.current.safeIdx + 1)
     }, delay)
     return () => clearInterval(timerRef.current)
-  }, [events.length, marquee.on, marquee.dur])
+  }, [events.length, marquee.on, marquee.dur, rotateMs])
 
   // کافه فعال روی نقشه هایلایت شود
   useEffect(() => {

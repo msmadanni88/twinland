@@ -13,7 +13,11 @@ import { R } from '@/components/v4/theme'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 
+// نقشه در حرکت خودکار روی هر کافه 3 ثانیه بیشتر از نسخه‌های قبل می‌ماند: 9 ثانیه به‌جای 6
+const EVENT_ROTATE_MS = 9000
+
 // قرص استریک: تنها چیز رنگی بالای نقشه کنار نشان لول
+
 export function StreakPill({ streak, onClick, height = 32, open }) {
   return (
     <button className="tl4-press" onClick={onClick} aria-expanded={!!open} aria-label={'استریک ' + fa(streak) + ' روز، دیدن روزها'}
@@ -80,7 +84,7 @@ export function HudV4({ C, T, Lay, bannerBottom = null, eventWidgets = false, ge
     </div>
 
     {eventWidgets && bannerBottom ? (
-      <EventDock C={C} T={T} Lay={Lay} cafes={cafes} getPos={getPos} isMobile={isMobile} onActiveCafeChange={setActiveEventCafeId} rightInset={rightInset} setSelCafe={setSelCafe} />
+      <EventDock C={C} T={T} Lay={Lay} cafes={cafes} getPos={getPos} isMobile={isMobile} onActiveCafeChange={setActiveEventCafeId} rightInset={rightInset} setSelCafe={setSelCafe} rotateMs={EVENT_ROTATE_MS} />
     ) : (
       <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + ' + (bannerTop - 10) + 'px)', left: left - 10, width: isMobile ? 'calc(100vw - ' + Lay.gap + 'px)' : 'min(62vw, 420px)', height: 0, zIndex: 40, animation: 'tl2Fade .5s .2s both' }}>
         <EventBanner C={C} cafes={cafes} setSelCafe={setSelCafe} onActiveCafeChange={setActiveEventCafeId} />

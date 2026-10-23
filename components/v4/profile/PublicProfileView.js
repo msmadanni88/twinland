@@ -14,6 +14,7 @@ import { useV4 } from '@/components/v4/kit/context'
 import { Card, Empty, Skeleton, Stat, Tag } from '@/components/v4/kit/kit'
 import { UserAvatar } from '@/components/v4/kit/UserAvatar'
 import { LevelBadge, XpBar } from '@/components/v4/kit/Meter'
+import { BadgeTile } from '@/components/v4/growth/ReferralBadge'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
 
@@ -115,12 +116,7 @@ export function PublicProfileView({ data, loading, onRetry }) {
           {data.badges.length === 0
             ? <div style={{ fontSize: 12.5, color: C.sub }}>هنوز نشانی نگرفته.</div>
             : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
-                {data.badges.map((b, i) => (
-                  <div key={i} title={b.title} style={{ borderRadius: R.box, background: T.chip, border: '1px solid ' + T.hair, padding: '10px 6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 24, lineHeight: 1.2 }}>{b.icon || '•'}</div>
-                    <div style={{ fontSize: 10.5, fontWeight: 800, marginTop: 4, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</div>
-                  </div>
-                ))}
+                {data.badges.map((b, i) => <BadgeTile key={i} badge={b} />)}
               </div>}
         </Card>
       )}

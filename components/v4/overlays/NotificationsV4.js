@@ -9,7 +9,7 @@ import { SheetV4 } from '@/components/v4/ui/Sheet'
 
 const TYPE_ICON = {
   collectible: 'image', quest_complete: 'target', level_up: 'arrowUp', league_win: 'trophy', redeemed: 'gift',
-  referral_join: 'users', referral_reward: 'gift', comment_reply: 'chat', comment_hidden: 'shield', explore: 'compass',
+  referral_join: 'users', referral_reward: 'gift', referral_welcome: 'gift', referral_badge: 'medal', comment_reply: 'chat', comment_hidden: 'shield', explore: 'compass',
 }
 // ایموجی اول عنوان در نسخه‌های قبل بود؛ اینجا آیکون خطی جایش را می‌گیرد
 const clean = (s) => String(s || '').replace(/^[\p{Extended_Pictographic}️‍\s]+/u, '')
