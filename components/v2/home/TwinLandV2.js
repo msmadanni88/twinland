@@ -312,7 +312,7 @@ export function TwinLandV2({ session, onLogout, hexFog = false }) {
 
       <PanelShell v3={eventWidgets || (hexFog && !!V3_FLAGS.eventWidgets)} demoTabs={demoTabs} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
 
-      {selCafe && <CafeSheet noPlay={isBiz && !effAdmin} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} checkedToday={hexFog && !demo.on ? checkedToday : null} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
+      {selCafe && <CafeSheet noPlay={isBiz && !isOwner} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} checkedToday={hexFog && !demo.on ? checkedToday : null} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
       {showXP && <XPPanel C={C} xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}
       {showNotif && <NotificationPanel C={C} notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
       <UIStyles />
