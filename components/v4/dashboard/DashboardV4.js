@@ -10,10 +10,12 @@ import { useEventFeed } from '@/components/events/useEventFeed'
 import { CircleWidget, CityV4, EventsV4, ExploreV4, HeroV4, PulseV4, QuestsV4, RankV4, ShortcutsV4, TodayV4 } from '@/components/v4/dashboard/widgetsV4'
 import { useCheckinDays } from '@/components/v4/home/useCheckinDays'
 import { dayKey } from '@/components/v4/ui/DayArc'
+import { ClanWidgetV4 } from '@/components/v4/clan/ClanWidget'
 
 export const DASHBOARD_WIDGETS_V4 = {
   hero: HeroV4,
   circle: CircleWidget,
+  clan: ClanWidgetV4,
   today: TodayV4,
   events: EventsV4,
   quests: QuestsV4,
@@ -24,7 +26,7 @@ export const DASHBOARD_WIDGETS_V4 = {
   shortcuts: ShortcutsV4,
 }
 export const DASHBOARD_LAYOUT_V4 = {
-  user: ['hero', 'today', 'circle', 'events', 'quests', 'city', 'pulse', 'rank', 'explore', 'shortcuts'],
+  user: ['hero', 'today', 'clan', 'circle', 'events', 'quests', 'city', 'pulse', 'rank', 'explore', 'shortcuts'],
 }
 
 export function DashboardV4({ role = 'user', C, T, cafes, filtered, live, totalLive, checkedIn, xp, levelInfo, streak, userName, showToast, setSearch, setShowXP, setSelCafe, setPanelTab, onInvite }) {

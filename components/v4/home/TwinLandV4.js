@@ -61,6 +61,7 @@ import { V4Provider } from '@/components/v4/kit/context'
 import { UserAvatar } from '@/components/v4/kit/UserAvatar'
 import { PersonSheet } from '@/components/v4/profile/PersonSheet'
 import { XpSheetV4 } from '@/components/v4/overlays/XpSheetV4'
+import { CafeClanStrip } from '@/components/v4/clan/CafeClanStrip'
 import { NotificationsV4 } from '@/components/v4/overlays/NotificationsV4'
 
 
@@ -142,6 +143,15 @@ export function TwinLandV4({ session, onLogout }) {
       if (sp.get('demo') === '1') sessionStorage.setItem('tl_demo', '1')
       if (sp.get('demo') === '0') sessionStorage.removeItem('tl_demo')
       setDemoOn(sessionStorage.getItem('tl_demo') === '1')
+    } catch (e) {}
+  }, [])
+  // کد دعوت کلنی که پیش از ورود باز شده بود؛ بعد از ورود یک بار به صفحه پیوستن برمی‌گردیم
+  useEffect(() => {
+    try {
+      const code = String(localStorage.getItem('tl_clan_join') || '')
+      if (!code) return
+      localStorage.removeItem('tl_clan_join')
+      if (/^[A-Z2-9]{6}$/.test(code)) window.location.href = '/clan?join=' + code
     } catch (e) {}
   }, [])
   const toggleDemo = () => setDemoOn(v => { try { if (v) sessionStorage.removeItem('tl_demo'); else sessionStorage.setItem('tl_demo', '1') } catch (e) {} return !v })
@@ -318,7 +328,7 @@ export function TwinLandV4({ session, onLogout }) {
 
       <PanelShellV4 demoTabs={demoTabs} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
 
-      {selCafe && <CafeSheet commentAvatar={CommentAvatarV4} onPerson={openPerson} tint={V4_COLOR.pin} headTint={themeMode === 'dark' ? '#3A3A40' : '#C9C9CF'} noPlay={isBiz && !isOwner} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} checkedToday={!demo.on ? checkedToday : null} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
+      {selCafe && <CafeSheet commentAvatar={CommentAvatarV4} onPerson={openPerson} aboutExtra={demo.on ? null : <CafeClanStrip cafeId={selCafe.id} showToast={showToast} />} tint={V4_COLOR.pin} headTint={themeMode === 'dark' ? '#3A3A40' : '#C9C9CF'} noPlay={isBiz && !isOwner} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} checkedToday={!demo.on ? checkedToday : null} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
       {showXP && <XpSheetV4 xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}
       {showNotif && <NotificationsV4 notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
       <UIStyles />

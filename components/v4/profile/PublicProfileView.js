@@ -65,7 +65,7 @@ export function PublicProfileView({ data, loading, onRetry }) {
   const meta = [
     city && { icon: 'pin', text: city },
     data.joined && { icon: 'calendar', text: joinedLabel(data.joined) },
-    data.clan && { icon: 'users', text: 'کلن ' + data.clan.name },
+    data.clan && { icon: 'users', text: 'کلن ' + data.clan.name, href: data.clan.id ? (data.self ? '/clan' : '/clan?c=' + data.clan.id) : null },
     data.email && { icon: 'mail', text: data.email, ltr: true },
   ].filter(Boolean)
   const stats = data.stats
@@ -83,11 +83,15 @@ export function PublicProfileView({ data, loading, onRetry }) {
         {data.bio && <div style={{ fontSize: 13, lineHeight: 1.9, color: C.text, marginTop: 10, overflowWrap: 'anywhere' }}>{data.bio}</div>}
         {meta.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 12 }}>
-            {meta.map((m, i) => (
-              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', borderRadius: R.pill, background: T.chip, border: '1px solid ' + T.hair, fontSize: 11.5, fontWeight: 700, color: C.text, maxWidth: '100%' }}>
-                <Icon name={m.icon} size={14} color={C.sub} /><span style={{ direction: m.ltr ? 'ltr' : 'rtl', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.text}</span>
-              </span>
-            ))}
+            {meta.map((m, i) => {
+              const Tg = m.href ? 'a' : 'span'
+              return (
+                <Tg key={i} href={m.href || undefined} className={m.href ? 'tl4-press' : undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', borderRadius: R.pill, background: T.chip, border: '1px solid ' + (m.href ? T.hairStrong : T.hair), fontSize: 11.5, fontWeight: 700, color: C.text, maxWidth: '100%', textDecoration: 'none' }}>
+                  <Icon name={m.icon} size={14} color={C.sub} /><span style={{ direction: m.ltr ? 'ltr' : 'rtl', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.text}</span>
+                  {m.href && <Icon name="chevronLeft" size={12} color={C.sub} />}
+                </Tg>
+              )
+            })}
           </div>
         )}
         {info && (

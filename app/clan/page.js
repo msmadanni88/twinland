@@ -9,11 +9,24 @@ import {
   fetchMyClans, fetchClanStandings, fetchClanMembers, fetchClanMissions, subscribeToTables,
   clanCreate, clanJoin, clanLeave, clanSetActive,
 } from '@/lib/game/gameSystem'
+import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { uiAtLeast } from '@/lib/ui/versions'
+import dynamic from 'next/dynamic'
+import { V4Blank } from '@/lib/ui/v4Blank'
 
 const EMBLEMS = ['⚔️', '🌙', '☕', '⛰️', '🔥', '🐺', '🦊', '🦁', '👑', '💎']
 const COLORS  = ['#8b5cf6', '#3b82f6', '#ec4899', '#10b981', '#f97316', '#ef4444', '#eab308']
 
+// نسخه v4.0 صفحه کلن جدا بار می‌شود و کد نسخه‌های قبل دست نخورده است
+const ClanPageV4 = dynamic(() => import('@/components/v4/clan/ClanPageV4'), { ssr: false, loading: V4Blank })
+
 export default function ClanPage() {
+  const { active } = useUiVersion()
+  if (uiAtLeast(active, 'v4.0')) return <ClanPageV4 />
+  return <LegacyClanPage />
+}
+
+function LegacyClanPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [tab, setTab] = useState('mine')       // mine | discover | create
   const [myClans, setMyClans] = useState([])

@@ -15,7 +15,7 @@ import { track } from '@/lib/analytics'
 import { Icon } from '@/components/v4/icons'
 import { R } from '@/components/v4/theme'
 import { useV4 } from '@/components/v4/kit/context'
-import { Card, Chip, Empty, Segmented, Skeleton, Tag } from '@/components/v4/kit/kit'
+import { Card, Chip, Empty, ListRow, Segmented, Skeleton, Tag } from '@/components/v4/kit/kit'
 import { PersonLink, UserAvatar } from '@/components/v4/kit/UserAvatar'
 
 const fa = (n) => Number(n || 0).toLocaleString('fa')
@@ -116,6 +116,7 @@ export function LeaderboardV4({ full = false }) {
       {scope === 'week' && <div style={{ padding: pad }}><LeagueCardV4 token={token} ready={ready} /></div>}
 
       <div style={{ padding: pad }}><MyCardV4 loggedIn={loggedIn} me={me} scope={scope} /></div>
+      <div style={{ padding: pad }}><ListRow icon="users" title="رتبه‌بندی کلن‌ها" sub="امتیاز هفته کلن‌ها و پرچم منطقه‌های این ماه" href="/clan?tab=ranks" /></div>
 
       {list === null && <div style={{ padding: pad }}><Skeleton h={60} n={5} /></div>}
       {fail && <div style={{ textAlign: 'center', padding: 12, color: C.sub, fontSize: 12.5 }}>جدول لود نشد. <button onClick={load} style={{ border: 'none', background: 'none', color: C.text, fontWeight: 900, fontFamily: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}>دوباره</button></div>}

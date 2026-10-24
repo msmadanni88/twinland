@@ -149,6 +149,11 @@ function MyProfileBody({ params, showToast }) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6, fontSize: 11.5, color: C.sub }}>
               {city && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="pin" size={13} />{city}</span>}
               {me.profile && me.profile.joined && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="calendar" size={13} />{joinedLabel(me.profile.joined)}</span>}
+              {me.profile && me.profile.clan && me.profile.clan.name && (
+                <a href="/clan" className="tl4-press" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: C.text, fontWeight: 800, textDecoration: 'none' }}>
+                  <Icon name="users" size={13} />کلن {me.profile.clan.name}<Icon name="chevronLeft" size={12} color={C.sub} />
+                </a>
+              )}
             </div>
           </div>
         </div>

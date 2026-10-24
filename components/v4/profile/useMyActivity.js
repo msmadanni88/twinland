@@ -9,7 +9,7 @@ import { getToken } from '@/lib/auth/session'
 import { districtLabel } from '@/lib/events/format'
 import { faDigits } from '@/components/v4/kit/kit'
 
-const LABELS = { ...REASON_LABELS, quest: 'جایزه رویداد', referral_invitee: 'جایزه دعوت', referral_inviter: 'جایزه دعوت دوست', league: 'جایزه لیگ هفتگی', league_win: 'جایزه لیگ هفتگی' }
+const LABELS = { ...REASON_LABELS, quest: 'جایزه رویداد', referral_invitee: 'جایزه دعوت', referral_inviter: 'جایزه دعوت دوست', league: 'جایزه لیگ هفتگی', league_win: 'جایزه لیگ هفتگی', league_week: 'جایزه لیگ هفتگی', clan_tier: 'صندوق هفتگی کلن', clan_meetup: 'دورهمی کلن', referral: 'جایزه دعوت' }
 export const reasonLabel = (r) => LABELS[r] || (String(r || '').startsWith('secret') ? 'جایزه پنهان' : 'امتیاز')
 
 export function useMyActivity() {
@@ -56,7 +56,7 @@ export function useMyActivity() {
     data.xp.filter(x => !String(x.reason || '').startsWith('checkin')).forEach(x => items.push({ k: 'x' + x.id, cat: 'xp', icon: 'star', at: x.created_at, title: reasonLabel(x.reason), sub: '', amount: x.amount }))
     data.quests.forEach(q => items.push({ k: 'q' + q.quest_id, cat: 'quest', icon: 'target', at: q.completed_at || q.updated_at,
       title: 'رویداد کامل شد: ' + ((q.quests && q.quests.title) || ''), sub: [(q.quests && q.quests.cafes && q.quests.cafes.name), (q.quests && q.quests.reward_label)].filter(Boolean).join(' · '), amount: 0 }))
-    const CLAN = { joined: 'عضو کلن شدی', left: 'کلن را ترک کردی', created: 'کلن را ساختی', record: 'رکورد کلن', leader: 'رهبر کلن شدی' }
+    const CLAN = { joined: 'عضو کلن شدی', left: 'کلن را ترک کردی', created: 'کلن را ساختی', record: 'رکورد کلن', leader: 'رهبر کلن شدی', kicked: 'از کلن بیرون شدی' }
     data.clan.forEach(c => items.push({ k: 'l' + c.id, cat: 'clan', icon: 'users', at: c.created_at,
       title: (CLAN[c.event_type] || 'کلن') + (c.clan_name ? ': ' + c.clan_name : ''), sub: c.detail && !CLAN[c.event_type] ? c.detail : '', amount: 0 }))
     data.awards.forEach(a => items.push({ k: 'a' + a.id, cat: 'award', icon: a.kind === 'badge' ? 'medal' : 'image', at: a.earned_at,

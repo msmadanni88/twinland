@@ -24,7 +24,7 @@ const PAGES = [['about', 'درباره'], ['gallery', 'گالری'], ['menu', '�
 // checkedToday فقط در v3.0: دکمه چک‌این فقط برای امروز قفل می‌شود، نه برای همیشه، تا بازدید دوباره و ماموریت وفاداری ممکن باشد
 // tint و headTint اختیاری‌اند: نسخه v4.0 برای نشان کافه همان سبز ثابت نشانگرها و برای سر برگه رنگ خنثی می‌دهد.
 // بدون آن‌ها رنگ هر کافه از نامش می‌آید، مثل قبل.
-export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headTint = null, commentAvatar = null, onPerson = null, C, T, cafe, live, favs, setFavs, checkedIn, checkedToday = null, isAdmin, onClose, onCheckin, showToast }) {
+export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headTint = null, commentAvatar = null, onPerson = null, aboutExtra = null, C, T, cafe, live, favs, setFavs, checkedIn, checkedToday = null, isAdmin, onClose, onCheckin, showToast }) {
   const [wide, setWide] = useState(false)
   const [page, setPage] = useState('about')
   useEffect(() => { setPage('about') }, [cafe.id])
@@ -164,6 +164,9 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
                   </span>
                 </div>
               </div>
+
+              {/* جای اضافه نسخه‌های تازه؛ v4.0 نوار کلن را این‌جا می‌گذارد و نسخه‌های قبل چیزی نمی‌فرستند */}
+              {aboutExtra}
 
               {!d.evLoading && d.cafeEvents.length > 0 && (
                 <div style={{ marginBottom: 14 }}>

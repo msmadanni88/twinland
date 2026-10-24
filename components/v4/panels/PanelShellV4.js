@@ -62,7 +62,7 @@ export function PanelShellV4({ demoTabs = null, C, T, Lay, cafes, checkedIn, coi
         {!demoTabs && panelTab === 'dashboard' && <DashboardV4 C={C} T={T} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} userName={userName} setShowXP={setShowXP} setSelCafe={setSelCafe} setPanelTab={setPanelTab} onInvite={() => setInvite(true)} />}
         {!demoTabs && panelTab === 'missions' && <MissionsV4 cafes={cafes} highlightQuestId={highlightQuestId} setSelCafe={setSelCafe} showToast={showToast} />}
         {!demoTabs && panelTab === 'rank' && <LeaderboardV4 />}
-        {!demoTabs && panelTab === 'clan' && <ClanTabV4 />}
+        {!demoTabs && panelTab === 'clan' && <ClanTabV4 showToast={showToast} />}
         {!demoTabs && panelTab === 'profile' && <ProfileTabV4 xp={xp} levelInfo={levelInfo} streak={streak} checkedIn={checkedIn} userName={userName} showToast={showToast} />}
       </div>
     </aside>
