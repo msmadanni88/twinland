@@ -7,7 +7,8 @@ import { L } from '@/lib/theme/labels'
 import { useDragScroll } from '@/lib/theme/ui'
 import { Icon } from '@/components/v4/icons'
 
-export function ZoneChipsV4({ C, T, Lay, compact = false, goZone, isMobile, leftInset, open = true, rightInset, search, setSearch, zone }) {
+// kinds فقط از v5.0: سرشاخه‌های نوع مکان با شمار هرکدام، اول ردیف. بدون آن ردیف همان v4.0 است.
+export function ZoneChipsV4({ C, T, Lay, compact = false, goZone, isMobile, kind = 'all', kinds = null, leftInset, open = true, rightInset, search, setSearch, setKind, zone }) {
   const ref = useDragScroll()
   const [focus, setFocus] = useState(false)
   const h = compact ? 32 : Lay.chipsH - 4
@@ -40,6 +41,17 @@ export function ZoneChipsV4({ C, T, Lay, compact = false, goZone, isMobile, left
           )}
         </div>
       )}
+      {kinds && kinds.length > 1 && <>
+        <button className="tl4-press" onClick={() => setKind('all')} aria-pressed={kind === 'all'} style={chip(kind === 'all')}>همه نوع‌ها</button>
+        {kinds.map(k => (
+          <button key={'k-' + k.key} className="tl4-press" onClick={() => setKind(kind === k.key ? 'all' : k.key)} aria-pressed={kind === k.key}
+            style={{ ...chip(kind === k.key), display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Icon name={k.icon} size={14} stroke={2} />{k.label}
+            <span style={{ fontSize: 10.5, opacity: 0.7, fontWeight: 800 }}>{Number(k.count).toLocaleString('fa')}</span>
+          </button>
+        ))}
+        <span aria-hidden="true" style={{ flexShrink: 0, width: 1, height: h - 12, background: T.hairStrong, margin: '0 3px' }} />
+      </>}
       {ZONES.map(z => (
         <button key={z.key} className="tl4-press" onClick={() => goZone(z)} aria-pressed={zone === z.key} style={{ ...chip(zone === z.key), display: 'flex', alignItems: 'center', gap: 5 }}>
           {z.key === 'top' && <Icon name="star" size={13} stroke={2} />}{String(z.label).replace(/^[^\u0600-\u06FFA-Za-z0-9]+\s*/, '')}

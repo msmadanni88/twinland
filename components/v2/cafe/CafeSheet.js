@@ -24,7 +24,8 @@ const PAGES = [['about', 'درباره'], ['gallery', 'گالری'], ['menu', '�
 // checkedToday فقط در v3.0: دکمه چک‌این فقط برای امروز قفل می‌شود، نه برای همیشه، تا بازدید دوباره و ماموریت وفاداری ممکن باشد
 // tint و headTint اختیاری‌اند: نسخه v4.0 برای نشان کافه همان سبز ثابت نشانگرها و برای سر برگه رنگ خنثی می‌دهد.
 // بدون آن‌ها رنگ هر کافه از نامش می‌آید، مثل قبل.
-export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headTint = null, commentAvatar = null, onPerson = null, aboutExtra = null, C, T, cafe, live, favs, setFavs, checkedIn, checkedToday = null, isAdmin, onClose, onCheckin, showToast }) {
+// kindBadge و glyph فقط از v5.0: نشان نوع مکان در ردیف نشان‌ها و آیکون نوع به‌جای فنجان. بدون آن‌ها همان قبلی.
+export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headTint = null, commentAvatar = null, onPerson = null, aboutExtra = null, kindBadge = null, glyph = null, xpPair = null, C, T, cafe, live, favs, setFavs, checkedIn, checkedToday = null, isAdmin, onClose, onCheckin, showToast }) {
   const [wide, setWide] = useState(false)
   const [page, setPage] = useState('about')
   useEffect(() => { setPage('about') }, [cafe.id])
@@ -42,7 +43,9 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
   const beenBefore = !!checkedToday && !isChecked && checkedIn.has(cafe.id)
   const isFav = favs.has(cafe.id)
   // v3.0 همان عددهای سرور را نشان می‌دهد: 50 برای هر چک‌این و 30 اضافه برای اولین بار در این مکان
-  const xpAmount = checkedToday ? (checkedIn.has(cafe.id) ? 50 : 80) : (cafe.is_top ? XP_CONFIG.checkin_top : XP_CONFIG.checkin)
+  // v5.0 برای هر نوع مکان عدد همان نوع را می‌دهد: xpPair = [پایه، پاداش اولین بار]
+  const xpAmount = xpPair ? (checkedIn.has(cafe.id) ? xpPair[0] : xpPair[0] + xpPair[1])
+    : checkedToday ? (checkedIn.has(cafe.id) ? 50 : 80) : (cafe.is_top ? XP_CONFIG.checkin_top : XP_CONFIG.checkin)
   const liveNow = live[cafe.id] || 0
   const heroH = wide ? 168 : 150
   const where = cafe.description || cafe.address || cafe.district
@@ -105,7 +108,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
             <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: (T.r || 22), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32,
               background: 'radial-gradient(circle at 30% 25%,' + mix(isChecked ? C.green : color, '#FFFFFF', 0.25) + ',' + (isChecked ? C.green : color) + ')',
               border: '3px solid ' + C.card, boxShadow: T.glow(isChecked ? C.green : color, 0.6), color: onColor(isChecked ? C.green : color) }}>
-              {isChecked ? '✓' : '☕'}
+              {isChecked ? '✓' : (glyph || '☕')}
             </div>
             <div style={{ flex: 1, minWidth: 0, paddingBottom: 4 }}>
               <div style={{ fontSize: 21, fontWeight: 900, color: C.text, lineHeight: 1.35 }}>{cafe.name}</div>
@@ -113,6 +116,7 @@ export function CafeSheet({ noPlay = false, canClaim = false, tint = null, headT
             </div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '12px 18px 0' }}>
+            {kindBadge}
             {cafe.is_top && <span style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 900, background: C.gold, color: onColor(C.gold) }}>★ کافه برتر</span>}
             {isChecked && <span style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', fontSize: 11.5, fontWeight: 900, background: alpha(C.green, 0.16), color: C.green }}>✓ امروز اینجا بودی</span>}
             {beenBefore && <span style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', fontSize: 11.5, fontWeight: 900, background: alpha(C.accent, 0.14), color: C.accent }}>↺ قبلاً آمده‌ای</span>}

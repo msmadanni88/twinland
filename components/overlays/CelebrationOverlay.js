@@ -34,7 +34,8 @@ export function CelebrationOverlay({C, data, onClose}) {
   const grad = data.levelUp
     ? 'linear-gradient(150deg,'+(data.levelColor||C.accent)+'ee, #1c1030f2 70%)'
     : 'linear-gradient(150deg,'+C.accent+'22, rgba(20,18,26,.94) 60%)'
-  const title = data.levelUp ? '🎉 لِوِل آپ!' : data.isNewCafe ? '🎉 کافه‌ی جدید کشف کردی!' : '✅ چک‌این شد!'
+  // categoryLabel فقط از v5.0 و فقط برای نوع‌های غیر کافه می‌آید
+  const title = data.levelUp ? '🎉 لِوِل آپ!' : data.isNewCafe ? (data.categoryLabel ? '🎉 یک ' + data.categoryLabel + ' تازه کشف کردی!' : '🎉 کافه‌ی جدید کشف کردی!') : '✅ چک‌این شد!'
 
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:5000,background:'radial-gradient(ellipse at 50% 30%, rgba(60,40,120,.45), rgba(0,0,0,.72))',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',animation:'fadeIn .25s ease',overflow:'hidden'}}>
@@ -100,6 +101,35 @@ export function CelebrationOverlay({C, data, onClose}) {
             {data.bonusCapped&&(
               <div style={{fontSize:10.5,color:'rgba(255,255,255,.62)',lineHeight:1.8}}>
                 {data.bonusCapped==='gap'?'پاداش مکان تازه از ۱۰ دقیقه بعد از چک‌این قبلی حساب می‌شود؛ امتیاز چک‌این ثبت شد':'سقف پاداش مکان تازه برای امروز پر شده؛ امتیاز چک‌این ثبت شد'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* نسخه v5.0: مسیرهای مشترک، کوپن همکاری و سقف امتیاز روزانه؛ در نسخه‌های قبل این داده‌ها نمی‌آیند */}
+        {((data.trails&&data.trails.length>0)||(data.coupons&&data.coupons.length>0)||data.xpCapped)&&(
+          <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:7}}>
+            {(data.trails||[]).map((t,i)=>(
+              <div key={'t'+i} style={{display:'flex',alignItems:'center',gap:10,background:t.completed?'linear-gradient(135deg,rgba(52,199,89,.32),rgba(52,199,89,.12))':'rgba(255,255,255,.1)',border:'1px solid '+(t.completed?'rgba(52,199,89,.6)':'rgba(255,255,255,.2)'),borderRadius:16,padding:'10px 13px',textAlign:'right'}}>
+                <span style={{fontSize:22}}>{t.completed?'🏁':'🧭'}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:900,color:'#fff'}}>{t.completed?(t.kind==='event'?'در «'+t.title+'» بودی':'مسیر «'+t.title+'» تمام شد'):'مسیر «'+t.title+'»'}</div>
+                  <div style={{fontSize:10.5,color:'rgba(255,255,255,.8)',marginTop:2}}>{t.completed?'جایزه‌ها در بخش مسیرهای من است':'قدم '+Number(t.done||0).toLocaleString('fa')+' از '+Number(t.need||0).toLocaleString('fa')+'؛ بقیه را تا پایان مهلت برو'}</div>
+                </div>
+              </div>
+            ))}
+            {(data.coupons||[]).map((k,i)=>(
+              <div key={'k'+i} style={{display:'flex',alignItems:'center',gap:10,background:'rgba(255,255,255,.1)',border:'1px dashed rgba(204,255,0,.55)',borderRadius:16,padding:'10px 13px',textAlign:'right'}}>
+                <span style={{fontSize:20}}>🎟️</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:900,color:'#fff'}}>{k.reward}</div>
+                  <div style={{fontSize:10.5,color:'rgba(255,255,255,.8)',marginTop:2}}>{(k.place?'از «'+k.place+'» · ':'')+(k.status==='pending_proof'?'با کد حضور صندوق باز می‌شود':'کد در بخش مسیرهای من است')}</div>
+                </div>
+              </div>
+            ))}
+            {data.xpCapped&&(
+              <div style={{fontSize:10.5,color:'rgba(255,255,255,.62)',lineHeight:1.8}}>
+                {data.xpCapped==='category'?'سقف امتیاز روزانه '+(data.categoryLabel||'این نوع مکان')+' پر شده؛ چک‌این ثبت شد':'سقف امتیاز روزانه چک‌این پر شده؛ چک‌این ثبت شد'}
               </div>
             )}
           </div>

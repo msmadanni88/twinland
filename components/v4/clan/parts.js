@@ -168,7 +168,7 @@ export function MeetupCard({ m, onCancel, showToast, compact = false, C: c, T: t
 
 // ── خبرهای کلن ──────────────────────────────────────────────
 const EVENT_ICON = { created: 'flame', joined: 'users', left: 'arrowLeft', kicked: 'x', role: 'shield', leader: 'crown', leader_auto: 'crown',
-  settings: 'sliders', meetup: 'calendar', meetup_cancel: 'x', meetup_done: 'check', tier: 'gift', level: 'arrowUp' }
+  settings: 'sliders', meetup: 'calendar', meetup_cancel: 'x', meetup_done: 'check', tier: 'gift', level: 'arrowUp', trail_done: 'route' }
 export function eventText(e) {
   const a = e.actor || 'یک نفر', b = e.target || 'یک نفر', d = e.data || {}
   switch (e.kind) {
@@ -185,6 +185,7 @@ export function eventText(e) {
     case 'meetup_done': return 'دورهمی «' + (d.cafe || 'کافه') + '» با ' + fa(d.count) + ' نفر برگزار شد'
     case 'tier': return 'صندوق ' + (TIER_NAMES[(d.tier || 1) - 1]) + ' این هفته باز شد'
     case 'level': return 'کلن سطح ' + fa(d.level) + ' شد'
+    case 'trail_done': return a + ' مسیر «' + (d.title || 'مسیر') + '» را تمام کرد و ' + fa(d.points) + ' امتیاز برای کلن آورد'
     default: return 'تغییر تازه در کلن'
   }
 }

@@ -44,7 +44,7 @@
   // ظاهر پیش از نقاشی صفحه انتخاب می‌شود تا رنگ نپرد
   (function(){try{
     var ui=localStorage.getItem('tl_ui_active')||document.documentElement.getAttribute('data-ui')||'';
-    if(ui==='v4.0'){var m=localStorage.getItem('tl_thememode')==='light'?'light':'dark';document.documentElement.className='v4 '+m;
+    if(ui==='v4.0'||ui==='v5.0'){var m=localStorage.getItem('tl_thememode')==='light'?'light':'dark';document.documentElement.className='v4 '+m;
       document.querySelector('meta[name=theme-color]').setAttribute('content',m==='light'?'#F3F3F4':'#050506')}
   }catch(e){}})()
 </script>

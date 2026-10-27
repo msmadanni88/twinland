@@ -8,7 +8,8 @@ import { track } from '@/lib/analytics'
 
 // checkedToday فقط در v3.0 داده می‌شود: آنجا محدودیت «یک چک‌این در هر مکان در هر روز» است، همان قانون سرور.
 // بدون آن، رفتار نسخه‌های قدیمی دست نمی‌خورد.
-export function useCheckin({ checkedIn, checkedToday = null, setCheckedToday, onDone, effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp }) {
+// rpcName فقط در v5.0 به بعد checkin_v5 است: نوع مکان، سقف روزانه هر نوع، مسیرها و کوپن‌ها. نسخه‌های قبل همان do_checkin.
+export function useCheckin({ checkedIn, checkedToday = null, setCheckedToday, onDone, effAdmin, freshToken, isOwner, rpcName = 'do_checkin', session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp }) {
   const [celebration, setCelebration] = useState(null)          // دیتای انیمیشن جشن بعد از چک‌این
 
   async function doCheckin(cafe){
@@ -35,7 +36,7 @@ export function useCheckin({ checkedIn, checkedToday = null, setCheckedToday, on
     const token=await freshToken()
     let res=null
     try{
-      res=await fetch(SB_URL+'/rest/v1/rpc/do_checkin',{
+      res=await fetch(SB_URL+'/rest/v1/rpc/'+(rpcName==='checkin_v5'?'checkin_v5':'do_checkin'),{
         method:'POST',
         headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify(body)
@@ -49,6 +50,9 @@ export function useCheckin({ checkedIn, checkedToday = null, setCheckedToday, on
       else if(err==='too_far') showToast('برای چک‌این باید در کافه باشی — الان حدود '+Number(res.distance_m||0).toLocaleString('fa')+' متر فاصله داری'+((pos.accuracy||0)>100?'؛ GPS را روشن کن':''),'warn')
       else if(err==='location_required'||err==='invalid_location') showToast('موقعیتت درست خوانده نشد — دوباره امتحان کن','warn')
       else if(err==='not_authenticated'||(res&&res.code==='PGRST301')) showToast('نشستت منقضی شد، یه‌بار خروج و ورود کن','warn')
+      else if(err==='category_closed') showToast('این نوع مکان هنوز در بازی باز نشده است','warn')
+      else if(err==='own_workplace') showToast('در محل کار خودت چک‌این حساب نمی‌شود','warn')
+      else if(err==='business_account') showToast('حساب کسب‌وکار چک‌این ندارد؛ برای بازی با حساب کاربری وارد شو','warn')
       else showToast('چک‌این نشد: '+((res&&(res.message||res.error))||'خطای ناشناخته'),'warn')
       return
     }
@@ -81,6 +85,11 @@ export function useCheckin({ checkedIn, checkedToday = null, setCheckedToday, on
       newCell: !!res.new_cell,
       milestones: Array.isArray(res.milestones)?res.milestones:[],
       bonusCapped: res.bonus_capped||null,
+      // فقط از checkin_v5: سقف امتیاز روزانه، پیشرفت مسیرها و کوپن‌هایی که همین چک‌این ساخت
+      xpCapped: res.xp_capped||null,
+      categoryLabel: res.category&&res.category!=='cafe'?(res.category_label||null):null,
+      trails: Array.isArray(res.trails)?res.trails:[],
+      coupons: Array.isArray(res.coupons)?res.coupons:[],
     })
   }
   return { celebration, doCheckin, setCelebration }

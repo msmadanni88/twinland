@@ -63,12 +63,23 @@ import { PersonSheet } from '@/components/v4/profile/PersonSheet'
 import { XpSheetV4 } from '@/components/v4/overlays/XpSheetV4'
 import { CafeClanStrip } from '@/components/v4/clan/CafeClanStrip'
 import { NotificationsV4 } from '@/components/v4/overlays/NotificationsV4'
+import { Icon } from '@/components/v4/icons'
+// نسخه v5.0 روی همین صفحه ساخته شده؛ هرچه زیر نشانه v5 است در v4.0 خاموش می‌ماند
+import { useUiVersion } from '@/components/ui/UiVersionProvider'
+import { uiAtLeast } from '@/lib/ui/versions'
+import { catIcon, catInfo, rootCounts, rootOf } from '@/lib/places/categories'
+import { myBusinesses, progressOf, useAlliancesNear, useMyAlliances } from '@/lib/alliances/alliances'
+import { TrailsMini, TrailsSection } from '@/components/v5/alliances/TrailsSection'
+import { PlaceAlliances } from '@/components/v5/alliances/PlaceAlliances'
+import { useTrailRoute } from '@/components/v5/alliances/useTrailRoute'
 
 
 // چهره نویسنده هر نظر در برگه کافه؛ همان چهره مشترک سایت
 const CommentAvatarV4 = ({ person }) => <UserAvatar person={person} size={36} />
 
 export function TwinLandV4({ session, onLogout }) {
+  const { active: uiActive } = useUiVersion()
+  const v5 = uiAtLeast(uiActive, 'v5.0')
   const [city, setCity] = useState('tehran')
   const [skinId, setSkinIdState] = useState(DEFAULT_SKIN_V4)
   const [labels, setLabels] = useState(!!V4_FLAGS.labelsDefault)
@@ -131,11 +142,11 @@ export function TwinLandV4({ session, onLogout }) {
   const [personId, setPersonId] = useState(null)
   const openPerson = useCallback((id) => { setPersonId(id); track('person_open', { from: 'home' }) }, [])
 
-  const pinStyle = useMemo(() => makePinStyleV4(C, T), [C, T])
+  const pinStyle = useMemo(() => makePinStyleV4(C, T, { kinds: v5 }), [C, T, v5])
   const { showToast, toast } = useToast()
   const { mapDisplay, setMapDisplay } = useMapDisplay()
   const { freshToken } = useFreshToken({ session })
-  const { cafes: realCafes, live: realLive, liveTotal: realLiveTotal } = useCafes({ showToast })
+  const { cafes: realCafes, live: realLive, liveTotal: realLiveTotal } = useCafes({ showToast, allCategories: v5 })
   const [demoOn, setDemoOn] = useState(false)
   useEffect(() => {
     try {
@@ -166,10 +177,36 @@ export function TwinLandV4({ session, onLogout }) {
   const checkedIn = demo.on ? demo.me.checkedIn : realCheckedIn
   const checkinDays = useCheckinDays(realCheckedIn.size, !demo.on)
   function onQuestTap(cafe, questId) { setHighlightQuestId(questId); setPanelTab('missions'); setPanelOpen(true) }
-  const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, activeEventTone: activeEvent.tone, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode: 'normal', onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
+  // ── v5.0: نوع مکان، همکاری‌ها و مسیرها ──
+  const allianceOn = v5 && !demo.on
+  const [kind, setKind] = useState('all')
+  const kindChips = useMemo(() => (v5 ? rootCounts(cafes) : null), [v5, cafes])
+  useEffect(() => { if (kind !== 'all' && kindChips && !kindChips.some(k => k.key === kind)) setKind('all') }, [kind, kindChips])
+  const posFnRef = useRef(null)
+  const near = useAlliancesNear({ enabled: allianceOn, getPos: () => (posFnRef.current ? posFnRef.current() : null) })
+  const mine = useMyAlliances(allianceOn)
+  const allianceMap = useMemo(() => {
+    const m = {}
+    near.items.forEach(a => (a.places || []).forEach(p => { if (!m[p.cafe_id]) m[p.cafe_id] = a.kind }))
+    return { m, sig: Object.keys(m).sort().join(',') }
+  }, [near.items])
+  const mapCafes = useMemo(() => (allianceOn && allianceMap.sig ? cafes.map(c => (allianceMap.m[c.id] ? { ...c, alliance: allianceMap.m[c.id] } : c)) : cafes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allianceOn, cafes, allianceMap.sig])
+  const [routeTrail, setRouteTrail] = useState(null)
+  // کارمند و مدیر شعبه حساب کاربری عادی دارند؛ پیوند پنل کسب‌وکار در منو برایشان هم باز است
+  const [staffBiz, setStaffBiz] = useState(false)
+  useEffect(() => {
+    if (!v5 || !session || !session.user) return
+    let alive = true
+    myBusinesses().then(r => { if (alive) setStaffBiz(Array.isArray(r) && r.length > 0) })
+    return () => { alive = false }
+  }, [v5, session && session.user && session.user.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { applyRegionFilter, clearRegionFilter, filterApplied, filtered, mapInst, mapLoading, mapRef, panMap, regionFilter, regionResults, selectedRegions, setRegionFilter, setShowRegionFilter, setShowRegionResults, showRegionFilter, showRegionResults } = useCafeMap({ C, activeEventCafeId, activeEventTone: activeEvent.tone, basemap, boundaryMode, cafes: mapCafes, checkedIn, city, kindOf: v5 ? rootOf : null, kind, live, mapDisplay, mapMode: 'normal', onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone })
   const { backfillDistricts, backfilling, claimSecretXP, resetMe, toggleViewMode } = useOwnerTools({ freshToken, session, setViewAsUser, setXp, showToast, viewAsUser })
   const exploreRefreshRef = useRef(null)
-  const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn: realCheckedIn, checkedToday, setCheckedToday, onDone: () => exploreRefreshRef.current && exploreRefreshRef.current(), effAdmin, freshToken, isOwner, session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp: realXp })
+  const afterCheckinRef = useRef(null)
+  const { celebration, doCheckin, setCelebration } = useCheckin({ checkedIn: realCheckedIn, checkedToday, setCheckedToday, onDone: () => { if (exploreRefreshRef.current) exploreRefreshRef.current(); if (afterCheckinRef.current) afterCheckinRef.current() }, effAdmin, freshToken, isOwner, rpcName: v5 ? 'checkin_v5' : 'do_checkin', session, setCheckedIn, setCoins, setSelCafe, setStreak, setXp, showToast, xp: realXp })
   function demoCheckin(cafe) {
     const r = demo.checkinMe(cafe)
     if (r.ok) { showToast('چک‌این نمایشی ثبت شد · +' + r.gain.toLocaleString('fa') + ' XP'); setSelCafe(null) }
@@ -193,6 +230,22 @@ export function TwinLandV4({ session, onLogout }) {
   const bannerBottom = V4_FLAGS.bottomEventBar ? (isMobile ? (compact ? 'mobile' : null) : 'desktop') : null
   const eventWidgets = !!(bannerBottom && V4_FLAGS.eventWidgets)
   const getPos = useCallback(() => { try { const c = mapInst.current && mapInst.current.getCenter(); return c ? { lat: c.lat, lng: c.lng } : null } catch (e) { return null } }, [mapInst])
+  posFnRef.current = getPos
+  afterCheckinRef.current = allianceOn ? () => { near.reload(); mine.reload() } : null
+  useTrailRoute({ mapInst, ready: !mapLoading, trail: routeTrail, color: C.text, ring: T.mapBg, ink: T.mapBg })
+  // یک مکان از کارت مسیر یا همکاری: برگه‌اش باز و نقشه رویش
+  const openPlace = useCallback((id) => {
+    const c = cafes.find(x => x.id === id)
+    if (!c) { showToast('این مکان الان روی نقشه نیست', 'warn'); return }
+    if (kind !== 'all' && rootOf(c.category) !== kind) setKind('all')
+    setSelCafe(c)
+    try { if (mapInst.current && c.lat && c.lng) mapInst.current.flyTo([c.lat, c.lng], Math.max(mapInst.current.getZoom(), 16), { duration: 0.9 }) } catch (e) {}
+  }, [cafes, kind, mapInst, showToast])
+  const onRoute = useCallback((a) => {
+    setRouteTrail(a); setSelCafe(null)
+    if (isMobile) setPanelOpen(false)
+    track('trail_route', { id: a && a.id })
+  }, [isMobile])
   const dockFeed = useEventFeed({ slot: 'bar', limit: 12, getPos, enabled: eventWidgets })
   const railLift = eventWidgets && isMobile && dockFeed.events.length > 0 ? DOCK_RAIL_LIFT : 0
   const questCount = useMemo(() => cafes.filter(c => c.active_quest).length, [cafes])
@@ -204,7 +257,7 @@ export function TwinLandV4({ session, onLogout }) {
   useEffect(() => {
     initAnalytics()
     if (session && session.user && session.user.id) identifyUser(session.user.id)
-    track('app_open', { ui: 'v4', mobile: isMobile })
+    track('app_open', { ui: v5 ? 'v5' : 'v4', mobile: isMobile })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session && session.user && session.user.id])
 
@@ -301,7 +354,26 @@ export function TwinLandV4({ session, onLogout }) {
 
       <TopBarV4 C={C} T={T} Lay={Lay} city={city} isMobile={isMobile} levelInfo={levelInfo} notifications={notifications} onLogoTap={onLogoTap} search={search} setSearch={setSearch} setShowCity={setShowCity} setShowMenu={setShowMenu} setShowNotif={setShowNotif} setShowXP={setShowXP} showMenu={showMenu} showNotif={showNotif} xp={xp} />
 
-      <ZoneChipsV4 C={C} T={T} Lay={Lay} compact={compact} open={filtersOpen} goZone={goZone} isMobile={isMobile} leftInset={leftInset} rightInset={rightInset} search={search} setSearch={setSearch} zone={zone} />
+      <ZoneChipsV4 C={C} T={T} Lay={Lay} compact={compact} open={filtersOpen} goZone={goZone} isMobile={isMobile} leftInset={leftInset} rightInset={rightInset} search={search} setSearch={setSearch} zone={zone}
+        kinds={kindChips} kind={kind} setKind={(k) => { setKind(k); track('kind_filter', { kind: k }) }} />
+
+      {routeTrail && (() => {
+        const live = near.items.find(x => x.id === routeTrail.id) || mine.items.find(x => x.id === routeTrail.id) || routeTrail
+        const p = progressOf(live)
+        return (
+          <div role="status" style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + ' + (Lay.chipsTop + Lay.chipsH + 8) + 'px)', left: '50%', transform: 'translateX(-50%)', zIndex: 295,
+            maxWidth: 'min(92vw, 420px)', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px 7px 12px', borderRadius: T.radius.pill,
+            background: T.glassStrong, backdropFilter: T.blur, WebkitBackdropFilter: T.blur, border: '1px solid ' + T.hair, boxShadow: T.shadow2, color: C.text }}>
+            <Icon name="route" size={16} />
+            <span style={{ minWidth: 0, fontSize: 12.5, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{live.title}</span>
+            <span style={{ fontSize: 11, color: C.sub, flexShrink: 0 }}>{p.complete ? 'تمام شد' : 'قدم ' + Number(p.done).toLocaleString('fa') + ' از ' + Number(p.need).toLocaleString('fa')}</span>
+            <button className="tl4-btn" aria-label="بستن مسیر" onClick={() => setRouteTrail(null)}
+              style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid ' + T.hair, background: T.chip, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer', flexShrink: 0 }}>
+              <Icon name="x" size={13} stroke={2.2} />
+            </button>
+          </div>
+        )
+      })()}
 
       <HudV4 C={C} T={T} Lay={Lay} bannerBottom={bannerBottom} eventWidgets={eventWidgets} getPos={getPos} compact={compact} filtersOpen={filtersOpen} cafes={cafes} checkedIn={checkedIn} checkinDays={checkinDays} clearRegionFilter={clearRegionFilter} filterApplied={filterApplied} filtered={filtered} isMobile={isMobile} leftInset={leftInset} regionResults={regionResults} rightInset={rightInset} selectedRegions={selectedRegions} setActiveEventCafeId={setActiveEventCafeId} setSelCafe={setSelCafe} setShowRegionFilter={setShowRegionFilter} setShowRegionResults={setShowRegionResults} showRegionFilter={showRegionFilter} showRegionResults={showRegionResults} streak={streak} totalLive={totalLive} />
 
@@ -326,9 +398,15 @@ export function TwinLandV4({ session, onLogout }) {
 
       <DockV4 C={C} T={T} Lay={Lay} isMobile={isMobile} panelOpen={panelOpen} panelTab={panelTab} rightInset={rightInset} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setTab={setTab} />
 
-      <PanelShellV4 demoTabs={demoTabs} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
+      <PanelShellV4 demoTabs={demoTabs} extraTop={allianceOn ? {
+          missions: <TrailsSection near={near.items} nearLoaded={near.loaded} mine={mine.items} mineLoaded={mine.loaded} onPlace={openPlace} onRoute={onRoute} />,
+          dashboard: <TrailsMini near={near.items} mine={mine.items} onOpen={() => setPanelTab('missions')} />,
+        } : null} C={C} T={T} Lay={Lay} cafes={cafes} checkedIn={checkedIn} coins={coins} docked={docked} filtered={filtered} highlightQuestId={highlightQuestId} levelInfo={levelInfo} live={live} panelOpen={panelOpen} panelTab={panelTab} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setSearch={setSearch} setSelCafe={setSelCafe} setShowXP={setShowXP} showToast={showToast} streak={streak} totalLive={totalLive} userName={userName} xp={xp} />
 
-      {selCafe && <CafeSheet commentAvatar={CommentAvatarV4} onPerson={openPerson} aboutExtra={demo.on ? null : <CafeClanStrip cafeId={selCafe.id} showToast={showToast} />} tint={V4_COLOR.pin} headTint={themeMode === 'dark' ? '#3A3A40' : '#C9C9CF'} noPlay={isBiz && !isOwner} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} checkedToday={!demo.on ? checkedToday : null} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
+      {selCafe && <CafeSheet commentAvatar={CommentAvatarV4} onPerson={openPerson} aboutExtra={demo.on ? null : <>{allianceOn && <PlaceAlliances cafeId={selCafe.id} onPlace={openPlace} onRoute={onRoute} showToast={showToast} />}<CafeClanStrip cafeId={selCafe.id} showToast={showToast} /></>}
+        kindBadge={v5 && selCafe.category && selCafe.category !== 'cafe' ? <span style={{ height: 26, padding: '0 10px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 900, background: T.chip, color: C.text, border: '1px solid ' + T.hair }}><Icon name={catIcon(selCafe.category)} size={14} />{catInfo(selCafe.category).label}</span> : null}
+        glyph={v5 ? <Icon name={catIcon(selCafe.category)} size={30} stroke={2} /> : null}
+        xpPair={v5 && selCafe.category && selCafe.category !== 'cafe' ? catInfo(selCafe.category).xp : null} tint={V4_COLOR.pin} headTint={themeMode === 'dark' ? '#3A3A40' : '#C9C9CF'} noPlay={isBiz && !isOwner} canClaim={isBiz} C={C} T={T} cafe={selCafe} live={live} favs={favs} setFavs={setFavs} checkedIn={checkedIn} checkedToday={!demo.on ? checkedToday : null} isAdmin={effAdmin} onClose={() => setSelCafe(null)} onCheckin={() => (demo.on ? demoCheckin(selCafe) : doCheckin(selCafe))} showToast={showToast} />}
       {showXP && <XpSheetV4 xp={xp} levelInfo={levelInfo} streak={streak} onClose={() => setShowXP(false)} />}
       {showNotif && <NotificationsV4 notifications={notifications} onMark={markNotifRead} onMarkAll={markAllNotifRead} onClose={() => setShowNotif(false)} />}
       <UIStyles />
@@ -336,7 +414,7 @@ export function TwinLandV4({ session, onLogout }) {
       {celebration && <CelebrationOverlay C={C} data={celebration} onClose={() => setCelebration(null)} />}
       {!demo.on && <ReferralCelebrationV4 notifications={notifications} onMark={markNotifRead} onXp={setXp} onPerson={openPerson} showToast={showToast} />}
 
-      <MenuV4 C={C} T={T} TH={Lay.barTop + Lay.barH} isMobile={isMobile} demoOn={demo.on} toggleDemo={toggleDemo} showBusiness={isBiz || isOwner || effAdmin} backfillDistricts={backfillDistricts} backfilling={backfilling} effAdmin={effAdmin} isOwner={isOwner} onLogout={onLogout} resetMe={resetMe} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setShowMapSettings={setShowMapSettings} setShowMenu={setShowMenu} setShowXP={setShowXP} setTab={setTab} setTutorialReplay={setTutorialReplay} showMenu={showMenu} showToast={showToast} themeMode={themeMode} toggleMode={onToggleMode} toggleViewMode={toggleViewMode} viewAsUser={viewAsUser} />
+      <MenuV4 C={C} T={T} TH={Lay.barTop + Lay.barH} isMobile={isMobile} demoOn={demo.on} toggleDemo={toggleDemo} showBusiness={isBiz || isOwner || effAdmin || staffBiz} backfillDistricts={backfillDistricts} backfilling={backfilling} effAdmin={effAdmin} isOwner={isOwner} onLogout={onLogout} resetMe={resetMe} setPanelOpen={setPanelOpen} setPanelTab={setPanelTab} setShowMapSettings={setShowMapSettings} setShowMenu={setShowMenu} setShowXP={setShowXP} setTab={setTab} setTutorialReplay={setTutorialReplay} showMenu={showMenu} showToast={showToast} themeMode={themeMode} toggleMode={onToggleMode} toggleViewMode={toggleViewMode} viewAsUser={viewAsUser} />
       <CityPickerV4 C={C} T={T} show={showCity} setShow={setShowCity} city={city} setCity={setCity} showToast={showToast} />
       <SkinPickerV4 C={C} T={T} show={showSkin} setShow={setShowSkin} skinId={skinId} setSkinId={setSkinId} showToast={showToast} />
       <BoundaryPickerV4 C={C} T={T} show={showBoundary} setShow={setShowBoundary} boundaryMode={boundaryMode} setBoundaryMode={setBoundaryMode} showToast={showToast} />

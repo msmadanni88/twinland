@@ -19,7 +19,8 @@ function beaconVars(hex){
   return '--bc:#'+f+';--bc12:'+a(.12)+';--bc30:'+a(.3)+';--bc45:'+a(.45)+';--bc70:'+a(.7)+';'
 }
 
-export function useCafeMap({ C, activeEventCafeId, activeEventTone = null, basemap, boundaryMode, cafes, checkedIn, city, live, mapDisplay, mapMode, onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone }) {
+// kind اختیاری و فقط از v5.0: سرشاخه نوع مکان (drink، bread، food و ...) یا 'all'. بدون آن رفتار قبلی دست نمی‌خورد.
+export function useCafeMap({ C, activeEventCafeId, activeEventTone = null, basemap, boundaryMode, cafes, checkedIn, city, kindOf = null, kind = 'all', live, mapDisplay, mapMode, onQuestTap, pinStyle, search, setSelCafe, showToast, skinId, themeMode, zone }) {
   const mapRef   = useRef(null)
   const mapInst  = useRef(null)
   const mapCenterRef = useRef(null)
@@ -327,6 +328,7 @@ export function useCafeMap({ C, activeEventCafeId, activeEventTone = null, basem
   const filtered=cafes.filter(c=>{
     const zOk=zone==='all'||c.zone===zone||(zone==='top'&&c.is_top)
     const sOk=!search||c.name.includes(search)
+    const kOk=!kindOf||!kind||kind==='all'||kindOf(c.category)===kind
     // فیلتر منطقه‌ای اعمال‌شده
     let rOk=true
     if(filterApplied && selectedRegions.length){
@@ -340,10 +342,12 @@ export function useCafeMap({ C, activeEventCafeId, activeEventTone = null, basem
           return lyr && cafeInLayer(lat,lng,lyr)
         })
       }
-      const catOk=!regionFilter.categories.length || regionFilter.categories.includes(c.category||'cafe')
+      // پنجره فیلتر منطقه فقط کافه و رستوران را می‌شناسد؛ نوع‌های تازه v5.0 با این فیلتر پنهان نمی‌شوند
+      const cat=c.category||'cafe'
+      const catOk=!regionFilter.categories.length || regionFilter.categories.includes(cat) || (cat!=='cafe'&&cat!=='restaurant')
       rOk=inRegion&&catOk
     }
-    return zOk&&sOk&&rOk
+    return zOk&&sOk&&kOk&&rOk
   })
 
   useEffect(()=>{

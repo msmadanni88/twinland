@@ -22,7 +22,8 @@ const TABS = [
   { key: 'profile', label: L.profile, icon: 'user' },
 ]
 
-export function PanelShellV4({ demoTabs = null, C, T, Lay, cafes, checkedIn, coins, docked, filtered, highlightQuestId, levelInfo, live, panelOpen, panelTab, setPanelOpen, setPanelTab, setSearch, setSelCafe, setShowXP, showToast, streak, totalLive, userName, xp }) {
+// extraTop فقط از v5.0: چیزی بالای یک زبانه، مثل بخش مسیرها بالای ماموریت‌ها. کلیدش نام زبانه است.
+export function PanelShellV4({ demoTabs = null, extraTop = null, C, T, Lay, cafes, checkedIn, coins, docked, filtered, highlightQuestId, levelInfo, live, panelOpen, panelTab, setPanelOpen, setPanelTab, setSearch, setSelCafe, setShowXP, showToast, streak, totalLive, userName, xp }) {
   const tabsRef = useDragScroll()
   const [invite, setInvite] = useState(false)
   if (!panelOpen) return null
@@ -59,6 +60,7 @@ export function PanelShellV4({ demoTabs = null, C, T, Lay, cafes, checkedIn, coi
       </div>
       <div className="tl-vscroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: docked ? 0 : 'env(safe-area-inset-bottom, 0px)' }}>
         {demoTabs && (demoTabs[panelTab] || null)}
+        {!demoTabs && extraTop && (extraTop[panelTab] || null)}
         {!demoTabs && panelTab === 'dashboard' && <DashboardV4 C={C} T={T} cafes={cafes} filtered={filtered} live={live} totalLive={totalLive} showToast={showToast} setSearch={setSearch} checkedIn={checkedIn} xp={xp} levelInfo={levelInfo} streak={streak} userName={userName} setShowXP={setShowXP} setSelCafe={setSelCafe} setPanelTab={setPanelTab} onInvite={() => setInvite(true)} />}
         {!demoTabs && panelTab === 'missions' && <MissionsV4 cafes={cafes} highlightQuestId={highlightQuestId} setSelCafe={setSelCafe} showToast={showToast} />}
         {!demoTabs && panelTab === 'rank' && <LeaderboardV4 />}

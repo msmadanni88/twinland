@@ -16,7 +16,8 @@ function districtOrder(d) {
 }
 
 export default async function CafesPage() {
-  const cafes = await allActiveCafes('id,name,branch,district,tier')
+  // این صفحه فهرست کافه‌هاست؛ نوع‌های تازه v5.0 صفحه خودشان را دارند ولی این‌جا نمی‌آیند
+  const cafes = (await allActiveCafes('id,name,branch,district,tier,category')).filter(c => !c.category || c.category === 'cafe' || c.category === 'restaurant')
   const groups = new Map()
   for (const c of cafes) {
     const k = c.district || 'بدون منطقه'

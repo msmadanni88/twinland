@@ -7,6 +7,7 @@ import { getSession, subscribeToTables } from '@/lib/game/gameSystem'
 import { UiVersionCard } from '@/components/ui/UiVersionCard'
 import { CommentModeration } from '@/components/admin/CommentModeration'
 import { LeagueAdmin } from '@/components/admin/LeagueAdmin'
+import { SmeAdmin } from '@/components/admin/SmeAdmin'
 
 export default function AdminPage() {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
@@ -87,6 +88,7 @@ export default function AdminPage() {
 
       <div style={{ padding: '18px', maxWidth: 640, margin: '0 auto' }}>
         <UiVersionCard C={C} />
+        <SmeAdmin C={C} />
         {isAdmin && <CommentModeration C={C} />}
         {isAdmin && <LeagueAdmin C={C} />}
         <div style={{ fontSize: 13, color: C.sub, marginBottom: 14 }}>

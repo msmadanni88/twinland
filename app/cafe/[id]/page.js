@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import { photoUrl } from '@/lib/cafeContent'
 import { SITE, UUID_RE, cafeTitle, districtLabel, faDigits, instagramUrl, sbGet, sbRpc, telHref, websiteUrl } from '@/lib/public/sbServer'
 import { PUBLIC_CSS } from '@/lib/public/publicCss'
+import { catInfo } from '@/lib/places/categories'
 
 export const revalidate = 3600
 
@@ -84,7 +85,7 @@ export default async function CafePage({ params }) {
 
   const ld = {
     '@context': 'https://schema.org',
-    '@type': c.category === 'restaurant' ? 'Restaurant' : 'CafeOrCoffeeShop',
+    '@type': catInfo(c.category).schema,
     name: title,
     url: SITE + '/cafe/' + c.id,
     image: c.logo_url || undefined,
@@ -137,7 +138,7 @@ export default async function CafePage({ params }) {
           </div>
           {(c.motto || c.description) && <p className="motto">{c.motto || c.description}</p>}
           <a href={openInApp} className="btn wide">باز کردن روی نقشه TwinLand و چک‌این</a>
-          <p className="hint">با چک‌این در همین کافه امتیاز، آیتم کلکسیونی و جایزه واقعی می‌گیری.</p>
+          <p className="hint">با چک‌این در همین {catInfo(c.category).noun} امتیاز، آیتم کلکسیونی و جایزه واقعی می‌گیری.</p>
         </section>
 
         <section className="card">
@@ -201,7 +202,7 @@ export default async function CafePage({ params }) {
 
         <section className="card">
           <h2>نظر مردم</h2>
-          {(!Array.isArray(comments) || comments.length === 0) && <p className="muted">هنوز کسی درباره این کافه نظر نداده. اولین نفر باش.</p>}
+          {(!Array.isArray(comments) || comments.length === 0) && <p className="muted">هنوز کسی درباره این {catInfo(c.category).noun} نظر نداده. اولین نفر باش.</p>}
           {Array.isArray(comments) && comments.map(r => (
             <article key={r.id} className="cm">
               <div className="cm-head"><span className="av">{r.avatar && r.avatar.length <= 4 ? r.avatar : '☕'}</span><b>{r.name}</b>{r.visited && <span className="chip ok">اینجا بوده</span>}<span className="muted small">{ago(r.created_at)}</span></div>
@@ -214,7 +215,7 @@ export default async function CafePage({ params }) {
 
         {Array.isArray(nearby) && nearby.length > 0 && (
           <section className="card">
-            <h2>کافه‌های دیگر {districtLabel(c.district)}</h2>
+            <h2>{c.category && c.category !== 'cafe' ? 'جاهای دیگر' : 'کافه‌های دیگر'} {districtLabel(c.district)}</h2>
             <div className="near">
               {nearby.map(n => <a key={n.id} href={'/cafe/' + n.id} className="pill">{cafeTitle(n)}</a>)}
             </div>

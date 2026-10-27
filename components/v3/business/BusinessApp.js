@@ -17,6 +17,10 @@ import { AreaMap } from '@/components/v3/business/AreaMap'
 import { useBizSim } from '@/components/v3/demo/useBizSim'
 import { Traffic } from '@/components/v3/business/Traffic'
 import { Reviews, useBizReviewCount } from '@/components/v3/business/Reviews'
+// نسخه v5.0: شعبه‌های برند، کارکنان، صندوق و همکاری به شکل قرارداد. در v3.0 و v4.0 همه این‌ها خاموش است.
+import { AlliancesTab } from '@/components/v5/business/AlliancesTab'
+import { JoinStaffCard, StaffTab } from '@/components/v5/business/StaffTab'
+import { listBusiness, myBusinesses, staffJoin } from '@/lib/alliances/alliances'
 
 const OWNER_EMAIL = 'msmadani88@gmail.com'
 const NAV = [
@@ -24,10 +28,15 @@ const NAV = [
   ['campaigns', '🎯', 'کمپین‌ها'], ['reviews', '💬', 'نظرها'], ['clans', '🛡', 'کلن‌ها'], ['collab', '🤝', 'همکاری'], ['storefront', '🏪', 'ویترین و منو'], ['account', '⚙️', 'حساب'],
 ]
 
-export function BusinessApp({ slots }) {
+const NAV_V5_EXTRA = ['staff', '🧾', 'کارکنان و صندوق']
+const TAB_ALIAS = { alliances: 'collab' }
+
+export function BusinessApp({ slots, v5 = false }) {
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })
   const [wide, setWide] = useState(false)
   const [tab, setTab] = useState('overview')
+  const [allyPending, setAllyPending] = useState(0)
+  const [joinNote, setJoinNote] = useState(null)
   const [businesses, setBusinesses] = useState([])
   const [sel, setSel] = useState(null)
   const [dash, setDash] = useState(null)
@@ -51,9 +60,28 @@ export function BusinessApp({ slots }) {
       if (sp.get('demo') === '1') sessionStorage.setItem('tl_demo', '1')
       if (sp.get('demo') === '0') sessionStorage.removeItem('tl_demo')
       setDemoOn(sessionStorage.getItem('tl_demo') === '1')
+      if (v5) {
+        const t = sp.get('tab'); const k = TAB_ALIAS[t] || t
+        if (k && (NAV.some(n => n[0] === k) || k === 'staff')) setTab(k)
+      }
     } catch (e) {}
     return () => window.removeEventListener('resize', fit)
-  }, [])
+  }, [v5])
+
+  // پیوند دعوت کارکنان: /business?join=CODE — با حساب خود کارمند باز می‌شود
+  useEffect(() => {
+    if (!v5) return
+    let code = null
+    try { code = new URLSearchParams(window.location.search).get('join') } catch (e) {}
+    if (!code || !/^[A-Za-z0-9]{8}$/.test(code)) return
+    const s = getSession(); if (!s || !s.access_token) return
+    staffJoin(code.toUpperCase()).then(r => {
+      setJoinNote(r && r.ok ? { ok: true, text: 'به «' + r.org + '» پیوستی؛ نقش: ' + (r.role === 'manager' ? 'مدیر' : 'کارمند') } : { ok: false, text: 'کد دعوت پیدا نشد یا تاریخش گذشته' })
+      try { const u = new URL(window.location.href); u.searchParams.delete('join'); window.history.replaceState(null, '', u.pathname + u.search) } catch (e) {}
+      if (r && r.ok) { setTab('staff'); loadList() }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v5])
 
   const H = (s) => ({ apikey: SB_KEY, Authorization: 'Bearer ' + ((s && s.access_token) || SB_KEY), 'Content-Type': 'application/json' })
   const rpc = (name, body) => {
@@ -67,15 +95,28 @@ export function BusinessApp({ slots }) {
     if (!s || !s.user) { if (typeof window !== 'undefined') window.location.href = '/'; return }
     setIsOwner(String(s.user.email || '').toLowerCase() === OWNER_EMAIL)
     const rows = await fetch(SB_URL + '/rest/v1/businesses?owner_id=eq.' + s.user.id + '&select=id,cafe_id,status,plan,created_at,cafes(name,district,icon_id,motto,is_full,featured_menu_item_id)&order=created_at.desc', { headers: H(s) }).then(r => r.json()).catch(() => [])
-    const arr = Array.isArray(rows) ? rows : []
+    let arr = Array.isArray(rows) ? rows.map(b => ({ ...b, role: b.status === 'verified' ? 'owner' : null })) : []
+    // v5.0: شعبه‌هایی که مدیر یا کارمندشان هستم هم می‌آیند، با نقش من
+    if (v5) {
+      const mine = await myBusinesses()
+      if (Array.isArray(mine)) {
+        mine.forEach(m => {
+          const hit = arr.find(b => b.id === m.id)
+          if (hit) hit.role = m.role || hit.role
+          else arr.push({ id: m.id, cafe_id: m.cafe_id, status: m.status, plan: 'free', role: m.role, org: m.org, cafes: { name: m.name, district: m.district } })
+        })
+      }
+    }
     setBusinesses(arr)
     setSel(prev => (prev && arr.some(b => b.id === prev)) ? prev : ((arr.find(b => b.status === 'verified') || arr[0] || {}).id || null))
     setLoading(false)
-  }, [])
+  }, [v5])
 
   const loadData = useCallback(async (b, quiet) => {
     if (!b || b.status !== 'verified') { setDash(null); setArea(null); setCollab(null); setDashState(b ? 'denied' : 'idle'); return }
-    if (!quiet) setDashState('loading')
+    // کارمند آمار و همکاری را نمی‌بیند؛ فقط صندوق
+    if (v5 && b.role === 'staff') { setDash(null); setArea(null); setCollab(null); setDashState('staff'); return }
+    if (v5) listBusiness(b.id).then(l => { if (selRef.current === b.id) setAllyPending(l && l.ok ? (l.items || []).filter(a => (a.status === 'proposed' || a.status === 'countered') && !a.my_accepted).length : 0) })
     const [res, ar, co, tr] = await Promise.all([rpc('business_dashboard', { p_business_id: b.id }), rpc('business_area_overview', { p_business_id: b.id }), rpc('business_collab_overview', { p_business_id: b.id }), rpc('business_traffic', { p_business_id: b.id, p_days: 30 })])
     if (selRef.current !== b.id) return
     const ok = !!(res && res.ok)
@@ -89,7 +130,7 @@ export function BusinessApp({ slots }) {
     setCollab(co && co.ok ? co : null)
     setTraffic(tr && tr.ok ? tr : null)
     setDashState(ok ? 'ready' : 'denied')
-  }, [])
+  }, [v5])
 
   const current = useMemo(() => businesses.find(b => b.id === sel) || null, [businesses, sel])
   selRef.current = sel
@@ -112,7 +153,11 @@ export function BusinessApp({ slots }) {
   const C = buildC(pal.palette, pal.mode)
   const K = bizTokens(C)
   const view = demoOn && demo ? { biz: demo.biz, d: demo.d, area: demo.area, collab: demo.collab, state: 'ready' } : { biz: current, d: dash, area, collab, state: dashState }
-  const pendingIn = ((view.collab && view.collab.items) || []).filter(i => i.incoming && i.status === 'pending').length
+  const pendingIn = ((view.collab && view.collab.items) || []).filter(i => i.incoming && i.status === 'pending').length + (v5 && !demoOn ? allyPending : 0)
+  const myRole = (current && current.role) || null
+  const staffOnly = v5 && !demoOn && myRole === 'staff'
+  const nav = !v5 ? NAV : staffOnly ? [NAV_V5_EXTRA, NAV[NAV.length - 1]] : NAV.slice(0, -1).concat([NAV_V5_EXTRA, NAV[NAV.length - 1]])
+  useEffect(() => { if (staffOnly && tab !== 'staff' && tab !== 'account') setTab('staff') }, [staffOnly, tab])
   const unanswered = useBizReviewCount(!demoOn && current && current.status === 'verified' ? current.id : null)
 
   async function propose(p) {
@@ -172,6 +217,7 @@ export function BusinessApp({ slots }) {
     if (loading && !demoOn) return <Card C={C} K={K}><Empty C={C} icon="⏳" title="در حال بارگذاری…" /></Card>
     if (!view.biz && tab !== 'account') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {v5 && <JoinStaffCard C={C} K={K} onJoined={() => { loadList(); setTab('staff') }} />}
         {slots && slots.EmptyState ? <slots.EmptyState C={C} onReload={loadList} /> : <Card C={C} K={K}><Empty C={C} icon="🏪" title="هنوز کسب‌وکاری ثبت نکرده‌ای" /></Card>}
         <div style={{ textAlign: 'center' }}><Btn C={C} kind="ghost" onClick={toggleDemo}>🎬 دیدن پنل با داده ساختگی</Btn></div>
       </div>
@@ -194,11 +240,12 @@ export function BusinessApp({ slots }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {businesses.slice(0, 40).map(b => (
               <button key={b.id} className="tl-press" onClick={() => { setSel(b.id); setTab('overview') }} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 12, border: '1px solid ' + (b.id === sel ? C.accent : C.border), background: C.chip, color: C.text, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
-                <span>{(b.cafes && b.cafes.name) || 'کسب‌وکار'}</span><span style={{ color: b.status === 'verified' ? K.good : K.warn, fontSize: 11.5 }}>{b.status === 'verified' ? '✓ تأییدشده' : '⏳ در انتظار'}</span>
+                <span>{(b.cafes && b.cafes.name) || 'کسب‌وکار'}</span><span style={{ color: b.status === 'verified' ? K.good : K.warn, fontSize: 11.5 }}>{b.status === 'verified' ? '✓ ' + (v5 && b.role && b.role !== 'owner' ? (b.role === 'manager' ? 'مدیر' : 'کارمند') : 'تأییدشده') : '⏳ در انتظار'}</span>
               </button>
             ))}
           </div>
         </Card>}
+        {v5 && !demoOn && <JoinStaffCard C={C} K={K} onJoined={() => loadList()} />}
         {isOwner && !demoOn && <Card C={C} K={K} title="ابزار مالک اپ" hint="فقط برای حساب مالک دیده می‌شود">
           <Btn C={C} kind="soft" disabled={busy} onClick={claimAll}>{busy ? 'در حال اضافه کردن…' : '👑 افزودن همه مکان‌ها برای تست'}</Btn>
         </Card>}
@@ -209,6 +256,10 @@ export function BusinessApp({ slots }) {
         {slots && slots.Content && <div style={{ marginTop: 12 }}><slots.Content C={C} biz={view.biz} isPending onReload={loadList} /></div>}
       </Card>
     )
+    // v5.0: صندوق و همکاری داده آمار نمی‌خواهند
+    if (v5 && !demoOn && (tab === 'staff' || staffOnly)) return <StaffTab C={C} K={K} biz={view.biz} role={myRole || 'owner'} />
+    if (v5 && !demoOn && tab === 'collab') return <AlliancesTab C={C} K={K} biz={view.biz}
+      legacy={view.collab ? <Collab C={C} K={K} collab={view.collab} onPropose={propose} onRespond={respond} busy={busy} /> : null} />
     if (view.state === 'loading' || (view.state === 'idle' && !view.d)) return <Card C={C} K={K}><Empty C={C} icon="📊" title="در حال گرفتن آمار…" /></Card>
     if (!view.d) return <Card C={C} K={K}><Empty C={C} icon="🔒" title="دسترسی به آمار این کسب‌وکار ممکن نشد" text="صفحه را تازه کن. اگر ادامه داشت، دوباره وارد شو." /></Card>
     if (tab === 'overview') return <Overview C={C} K={K} d={view.d} area={view.area} go={setTab} />
@@ -227,7 +278,7 @@ export function BusinessApp({ slots }) {
     return null
   }
 
-  const title = (NAV.find(n => n[0] === tab) || NAV[0])[2]
+  const title = (nav.find(n => n[0] === tab) || nav[0])[2]
   return (
     <div style={{ minHeight: '100dvh', background: C.bg, color: C.text, fontFamily: "'Estedad','Vazirmatn',system-ui,sans-serif", direction: 'rtl' }}>
       <UIStyles />
@@ -239,7 +290,7 @@ export function BusinessApp({ slots }) {
               <div><div style={{ fontSize: 15, fontWeight: 900 }}>TwinLand Business</div><div style={{ fontSize: 11, color: C.sub }}>پنل کسب‌وکار</div></div>
             </div>
             {switcher}
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>{NAV.map(n => navBtn(n[0], n[1], n[2]))}</nav>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>{nav.map(n => navBtn(n[0], n[1], n[2]))}</nav>
             <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {demoBar}
               <a href="/?play=1" style={{ fontSize: 12.5, color: C.accent, fontWeight: 800, textDecoration: 'none', textAlign: 'center', padding: '8px', borderRadius: 12, background: C.chip }}>🗺 نقشه عمومی</a>
@@ -252,6 +303,7 @@ export function BusinessApp({ slots }) {
                 {identity}
               </header>
               {demoOn && demo && demo.last && <div style={{ fontSize: 12, color: C.sub, fontWeight: 700 }}>{demo.last.icon} {demo.last.text} · رویداد ساختگی شماره {fa(demo.n)}</div>}
+              {joinNote && <div style={{ fontSize: 12.5, fontWeight: 800, color: joinNote.ok ? K.good : K.bad }}>{joinNote.text}</div>}
               {body()}
             </div>
           </main>
@@ -265,10 +317,11 @@ export function BusinessApp({ slots }) {
             </div>
             {switcher}
             {demoBar}
-            <div className="tl-hscroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>{NAV.map(n => navBtn(n[0], n[1], n[2]))}</div>
+            <div className="tl-hscroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>{nav.map(n => navBtn(n[0], n[1], n[2]))}</div>
           </div>
           <main style={{ padding: '12px 12px 40px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {demoOn && demo && demo.last && <div style={{ fontSize: 12, color: C.sub, fontWeight: 700 }}>{demo.last.icon} {demo.last.text}</div>}
+            {joinNote && <div style={{ fontSize: 12.5, fontWeight: 800, color: joinNote.ok ? K.good : K.bad }}>{joinNote.text}</div>}
             {body()}
           </main>
         </div>

@@ -36,7 +36,7 @@ const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
 const V3_SLOTS = { Campaigns: (p) => <TabCampaigns {...p} />, Content: (p) => <CafeContentEditor {...p} />, EmptyState: (p) => <EmptyState {...p} /> }
 export default function BusinessRoute() {
   const { active } = useUiVersion()
-  if (uiAtLeast(active, 'v3.0')) return <BusinessApp slots={V3_SLOTS} />
+  if (uiAtLeast(active, 'v3.0')) return <BusinessApp slots={V3_SLOTS} v5={uiAtLeast(active, 'v5.0')} />
   return <LegacyBusinessPage />
 }
 

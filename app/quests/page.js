@@ -35,6 +35,10 @@ function diffParts(target) {
 }
 
 export default function QuestsPage() {
+  // اعلان‌های مسیر و کوپن همکاری نسخه v5.0 به /quests?tab=trails اشاره می‌کنند؛ صفحه خودشان /trails است
+  useEffect(() => {
+    try { if (new URLSearchParams(window.location.search).get('tab') === 'trails') window.location.replace('/trails') } catch (e) {}
+  }, [])
   const { active: uiActive } = useUiVersion()
   const v3 = uiAtLeast(uiActive, 'v3.0') && !!V3_FLAGS.eventWidgets   // تصویر ویجت به‌جای ایموجی، فقط در v3.0
   const [pal, setPal] = useState({ palette: DEFAULT_PALETTE, mode: DEFAULT_MODE })

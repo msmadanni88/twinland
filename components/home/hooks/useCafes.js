@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import { SB_KEY, SB_URL } from '@/lib/config'
 
-export function useCafes({ showToast }) {
+// allCategories فقط در v5.0 به بعد: همه نوع‌های روشن. نسخه‌های قبل فقط کافه و رستوران می‌گیرند تا نوع‌های تازه
+// در ظاهری که آن‌ها را نمی‌شناسد کافه دیده نشوند.
+export function useCafes({ showToast, allCategories = false }) {
   const [cafes,      setCafes]      = useState([])
   const [live,       setLive]       = useState({})
   // شمار شهرگیر آدم‌های متمایز در ۲ ساعت اخیر؛ جمع کردن عددهای هر کافه یک نفر را چندبار می‌شمرد
@@ -39,7 +41,8 @@ export function useCafes({ showToast }) {
     const load=(attempt=0)=>{
       // سرور در هر پاسخ حداکثر 1000 ردیف می‌دهد؛ مکان‌ها صفحه‌صفحه گرفته می‌شوند تا هیچ‌کدام جا نماند
       const PAGE=1000
-      const page=(from,acc)=>fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true&order=id.asc&limit='+PAGE+'&offset='+from,{ headers:h }
+      const catQ=allCategories?'':'&category=in.(cafe,restaurant)'
+      const page=(from,acc)=>fetch(SB_URL+'/rest/v1/cafes?select=*&is_active=eq.true'+catQ+'&order=id.asc&limit='+PAGE+'&offset='+from,{ headers:h }
       ).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json() }).then(rows=>{
         if(!Array.isArray(rows)) throw new Error('bad response')
         const all=acc.concat(rows)
@@ -55,7 +58,7 @@ export function useCafes({ showToast }) {
     }
     load()
     return ()=>{ alive=false; clearTimeout(retry) }
-  },[])
+  },[allCategories])
 
   // «الان اینجا»: تعداد واقعی آدم‌هایی که در ۲ ساعت اخیر در هر کافه چک‌این کردن
   // (ویوی cafe_live_counts — فقط عدد، بدون هویت). هر ۶۰ ثانیه تازه می‌شه.
